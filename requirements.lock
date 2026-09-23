@@ -112,6 +112,7 @@ cryptography==50.0.1
     #   authlib
     #   google-auth
     #   joserfc
+    #   novatom-tcad-agent (pyproject.toml)
     #   pyjwt
 cyclopts==4.25.3
     # via fastmcp-slim
