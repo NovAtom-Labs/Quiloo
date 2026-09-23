@@ -260,23 +260,23 @@ Every recovery attempt is recorded and limited. If the approved repair budget is
 
 ## 12. LLM recommendation
 
-Use **GPT-5.6 Terra** as the first single production model candidate.
+Use **Claude Sonnet 5 on Amazon Bedrock** as the single pilot model.
 
-- Normal planning and tool use: medium reasoning
-- Difficult failure diagnosis and final review: high reasoning
-- Current standard API price: $2 per million input tokens and $12 per million output tokens
-- OpenHands connection: `openai/gpt-5.6-terra` through its LiteLLM model interface
+- Pilot reasoning setting: medium adaptive thinking
+- Current standard API price: $2 per million input tokens and $10 per million output tokens
+- OpenHands connection: `bedrock/global.anthropic.claude-sonnet-5` through LiteLLM
+- Authentication: Amazon Bedrock bearer token for development, replaced by short-term credentials for production
 
-Why Terra:
+Why Sonnet 5:
 
-- Strong reasoning and agentic tool use
-- Structured output and long-context support
-- Lower cost than GPT-5.6 Sol, GPT-5.5, Claude Opus 4.8, or GPT-6 Astra
+- Strong reasoning, coding, and long-running agentic tool use
+- One-million-token context and prompt caching on Bedrock
+- Half the standard token price of GPT-5.6 Sol
 - Model-independent architecture lets us replace it later
 
-Before freezing the pilot, Terra must pass an internal set of 30 to 50 representative TCAD tasks. The test will measure valid tool calls, specification quality, source selection, refusal of unsupported work, end-to-end completion, cost, and latency.
+Before freezing the pilot, Sonnet 5 must pass an internal set of 30 to 50 representative TCAD tasks. The test will measure valid tool calls, specification quality, source selection, refusal of unsupported work, end-to-end completion, cost, and latency.
 
-If Terra does not pass, use **GPT-5.5** as the conservative fallback because it has published OpenHands benchmark evidence, despite its higher price.
+GPT-5.6 Sol is the first comparison candidate for the later multi-model system. It becomes the pilot fallback only if the internal TCAD suite shows a material completion-rate advantage that justifies its higher cost.
 
 Cost controls include progressive skill loading, small retrieved passages, prompt caching, compact log summaries, strict tool budgets, and limited recovery attempts.
 

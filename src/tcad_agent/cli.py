@@ -25,11 +25,14 @@ from tcad_agent.validation.engine import ValidationEngine
 
 app = typer.Typer(help="Validate, compile, run, and report simulator-neutral TCAD studies.")
 knowledge_app = typer.Typer(help="Search the authorized versioned TCAD knowledge index.")
+evaluation_app = typer.Typer(help="Inspect versioned TCAD agent evaluation prompts.")
 app.add_typer(knowledge_app, name="knowledge")
+app.add_typer(evaluation_app, name="evaluation")
 
 DEFAULT_COMPILED_OUTPUT = Path("compiled")
 DEFAULT_RUN_OUTPUT = Path("runs")
 DEFAULT_KNOWLEDGE_INDEX = Path("knowledge-sources/index/knowledge.sqlite3")
+DEFAULT_AGENT_EVALUATIONS = Path("evaluations/agent/cases.yaml")
 
 
 def _load_spec(path: Path) -> ExperimentSpec:
@@ -137,6 +140,24 @@ def report_command(bundle: Path) -> None:
         typer.echo(f"report not found: {report}", err=True)
         raise typer.Exit(2)
     typer.echo(report.read_text())
+
+
+@evaluation_app.command("show")
+def show_evaluation_command(
+    case_id: str,
+    suite_path: Annotated[
+        Path, typer.Option("--suite")
+    ] = DEFAULT_AGENT_EVALUATIONS,
+) -> None:
+    """Print a user-copyable natural-language evaluation prompt."""
+    from tcad_agent.evaluations.agent_cases import AgentEvaluationSuite
+
+    try:
+        prompt = AgentEvaluationSuite.from_file(suite_path).read_prompt(case_id)
+    except (OSError, KeyError, ValidationError, yaml.YAMLError) as exc:
+        typer.echo(f"evaluation load failed: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(prompt)
 
 
 @knowledge_app.command("search")

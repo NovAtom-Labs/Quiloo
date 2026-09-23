@@ -23,7 +23,7 @@ The knowledge gap of general-purpose LLMs is addressed through four separate mec
 3. OpenHands skill files for procedural TCAD behavior.
 4. Deterministic compilers, validators, and simulator execution for truth.
 
-The recommended initial model is `gpt-5.6-terra` with medium reasoning for normal runs and high reasoning for recovery or review. It offers the best expected balance of agentic reasoning and cost at the time of this design. Model choice remains configuration, never architecture.
+The recommended initial model is Claude Sonnet 5 on Amazon Bedrock with medium adaptive reasoning for the full pilot workflow. It offers the best expected balance of agentic reasoning and cost for the single-model pilot, subject to the platform acceptance set. Model choice remains configuration, never architecture.
 
 ## 2. Product definition
 
@@ -739,28 +739,26 @@ Builds a deterministic technical report from normalized data, validator output, 
 
 ### 13.1 Primary recommendation
 
-Use **GPT-5.6 Terra** as the single production agent model for the initial system.
+Use **Claude Sonnet 5 on Amazon Bedrock** as the single production agent model for the pilot.
 
 Configuration:
 
-- Model ID: `openai/gpt-5.6-terra` through the OpenHands and LiteLLM provider path.
-- Reasoning effort: `medium` for request interpretation, planning, tool use, and reporting.
-- Reasoning effort: `high` for failure diagnosis and final review.
+- Model ID: `bedrock/global.anthropic.claude-sonnet-5` through the OpenHands and LiteLLM provider path.
+- Reasoning effort: `medium` adaptive thinking for the complete pilot workflow.
 - Output verbosity: low or medium.
-- Temperature: provider default for reasoning models unless evaluation shows a benefit.
-- Structured outputs: required for all domain objects.
+- Typed tool calls plus deterministic schema validation for every domain object.
 - Prompt caching: enabled for stable skill and schema context.
 - Maximum agent steps: bounded by workflow state and per-run budget.
 
 Why:
 
-- OpenAI positions Terra as the balance of intelligence and cost in the GPT-5.6 family.
-- It supports function calling, structured tool use, long context, and adjustable reasoning.
-- Current standard API pricing is $2 per million input tokens and $12 per million output tokens.
-- It is materially less expensive than GPT-5.6 Sol, GPT-5.5, Claude Opus 4.8, or GPT-6 Astra while remaining suitable for complex agent work.
+- Sonnet 5 is designed for coding, agents, and professional work at scale.
+- It supports tool use, adaptive reasoning, prompt caching, and a one-million-token context on Bedrock.
+- Current standard API pricing is $2 per million input tokens and $10 per million output tokens.
+- It costs half as much per token as GPT-5.6 Sol while remaining suitable for complex agent work.
 - A single model simplifies evaluation during the pilot. Deterministic validators provide the second line of defense instead of another LLM.
 
-This is a recommendation based on provider capabilities and cost as of 2026-09-22. OpenHands publishes direct benchmark evidence for GPT-5.5 but not yet for GPT-5.6 Terra. Therefore Terra must pass the platform acceptance set before it becomes the frozen pilot model.
+This recommendation is provisional until Sonnet 5 passes the platform acceptance set on the actual Bedrock and OpenHands integration.
 
 ### 13.2 Model acceptance gate
 
@@ -774,17 +772,17 @@ Run the same 30 to 50 representative tasks with a pinned model snapshot when ava
 - No regression in numeric claim grounding.
 - Median cost and latency within the pilot budget.
 
-If Terra fails this gate, use **GPT-5.5** as the conservative fallback because OpenHands currently reports it as the recommended GPT-family model with published OpenHands Index results. Its current standard price is higher at $5 per million input tokens and $30 per million output tokens.
+If Sonnet 5 fails this gate, evaluate **GPT-5.6 Sol on Amazon Bedrock** as the higher-cost fallback.
 
 ### 13.3 Models not recommended as the initial single model
 
 | Model | Reason not selected for the initial default |
 |---|---|
 | GPT-6 Astra | Highest capability, but $10 input and $50 output per million tokens is unnecessary before the workflow and validators mature. |
-| GPT-5.6 Sol | Stronger than Terra, but roughly twice Terra's token price. Consider only if the acceptance set shows a meaningful completion-rate gain. |
+| GPT-5.6 Sol | Higher capability ceiling, but twice Sonnet 5's standard token price. Consider only if the acceptance set shows a meaningful completion-rate gain. |
 | GPT-5.6 Luna | Excellent cost, but should first be evaluated for routine classification and extraction. It is too risky as the only reasoning model for scientific planning. |
-| GPT-5.5 | Strong OpenHands evidence and good tool use, but more expensive than Terra. Keep as the measured fallback. |
-| Claude Opus 4.8 | Strongest current OpenHands family result, but more expensive and not necessary until an internal TCAD evaluation proves a clear benefit. |
+| GPT-5.5 | Superseded for this pilot by the newer Bedrock candidates. |
+| Claude Opus 4.8 | More expensive and unnecessary until an internal TCAD evaluation proves a clear benefit. |
 | Gemini 3.8 Flash | Attractive price and agent focus, but use only after direct evaluation of structured tool reliability and TCAD reasoning in this harness. |
 | Local open-weight model | Useful later for private retrieval or cheap extraction. Current tool-use variance adds avoidable pilot risk. |
 

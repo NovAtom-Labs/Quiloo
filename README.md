@@ -44,6 +44,12 @@ Validate both ordinary data fixtures:
 .venv/bin/tcad-agent validate examples/pin-diode.yaml
 ```
 
+Inspect a natural-language agent evaluation prompt:
+
+```bash
+.venv/bin/tcad-agent evaluation show metal-silicon-junction-equilibrium
+```
+
 Run a study only after reviewing it:
 
 ```bash
@@ -69,10 +75,24 @@ The installed DEVSIM runtime is `2.9.1` at `/Users/satyagni/Documents/NovAtom La
 
 ## Configuration
 
-- `LLM_MODEL`: OpenHands model identifier. Default: `openai/gpt-5.6-terra`.
+- `LLM_MODEL`: OpenHands/LiteLLM model identifier. Pilot default: `bedrock/global.anthropic.claude-sonnet-5`.
 - `TCAD_REASONING_EFFORT`: OpenHands reasoning effort. Default: `medium`.
+- `AWS_BEARER_TOKEN_BEDROCK`: Amazon Bedrock API key. Keep it only in the ignored local `.env` file or a secret manager.
+- `AWS_REGION_NAME`: Bedrock invocation region. The local pilot uses `ap-south-1` with the global Sonnet 5 inference profile.
 - `TCAD_DEVSIM_PYTHON`: optional DEVSIM Python executable override. The default is the sibling `devsim/.venv/bin/python` path.
-- model-provider credentials such as `OPENAI_API_KEY`: required only when starting an actual OpenHands conversation.
+
+Create the local configuration from the safe template, add the credential, and
+export it before starting an agent process:
+
+```bash
+cp .env.example .env
+set -a
+source .env
+set +a
+```
+
+Never commit `.env`. Rotate any credential that has been disclosed outside the
+local secret store.
 
 The agent profile exposes only the `tcad_domain` tool. It does not expose a terminal. Simulation execution requires an approved plan identifier in agent workflows or `--approve` in the CLI.
 

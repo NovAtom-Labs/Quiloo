@@ -99,3 +99,14 @@ def test_cli_refuses_malformed_knowledge_manifest(tmp_path) -> None:
 
     assert result.exit_code == 2
     assert "knowledge build failed" in result.output
+
+
+def test_cli_shows_user_copyable_agent_evaluation_prompt() -> None:
+    result = runner.invoke(
+        app,
+        ["evaluation", "show", "metal-silicon-junction-equilibrium"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Equilibrium Al / p-Si / n-Si / Al" in result.output
+    assert "both contacts maintained at 0 V" in result.output

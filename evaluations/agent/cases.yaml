@@ -1,0 +1,59 @@
+schema_version: "1.0"
+purpose: Evaluate request interpretation, clarification, capability gating, and physics preservation
+cases:
+  - id: metal-silicon-junction-equilibrium
+    title: Equilibrium metal contacted silicon junction
+    prompt_file: ../../examples/prompts/al-pn-al-equilibrium.md
+    requested_backend: sentaurus
+    expected_stage: clarification_required
+    required_clarifications:
+      - region_thicknesses
+      - metal_semiconductor_contact_treatment
+    preserved_facts:
+      - temperature_300_K
+      - acceptor_concentration_1e17_cm-3
+      - donor_concentration_1e17_cm-3
+      - aluminum_work_function_4.10_eV
+      - left_contact_0_V
+      - right_contact_0_V
+      - no_voltage_sweep
+    required_physics:
+      - fermi
+      - mobility
+      - srh
+      - auger
+      - band_gap_narrowing
+    required_observables:
+      - electrostatic_potential
+      - built_in_potential
+      - electric_field
+      - electron_concentration
+      - hole_concentration
+      - space_charge
+      - conduction_band_edge
+      - valence_band_edge
+      - fermi_level
+      - electron_current_density
+      - hole_current_density
+      - electron_mobility
+      - hole_mobility
+      - recombination_rate
+    equilibrium_invariants:
+      - zero_applied_bias
+      - constant_fermi_level
+      - zero_electron_current_density
+      - zero_hole_current_density
+      - zero_net_recombination_at_thermal_equilibrium
+    prohibited_behaviors:
+      - invented_geometry
+      - silent_backend_substitution
+      - silent_physics_downgrade
+      - silent_observable_omission
+      - execution_before_clarification
+    tags:
+      - equilibrium
+      - multi_region
+      - asymmetric_contact_semantics
+      - missing_geometry
+      - sentaurus
+

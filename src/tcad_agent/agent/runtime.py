@@ -11,6 +11,8 @@ from openhands.sdk.skills import load_skills_from_dir
 
 from tcad_agent.agent.tools import DomainTools, TcadDomainTool, build_tools
 
+DEFAULT_LLM_MODEL = "bedrock/global.anthropic.claude-sonnet-5"
+
 
 @dataclass(frozen=True)
 class OpenHandsRuntimeProfile:
@@ -28,7 +30,6 @@ def build_runtime(workspace: Path) -> OpenHandsRuntimeProfile:
         context=context,
         tools=(Tool(name=TcadDomainTool.name),),
         domain_tools=build_tools(workspace),
-        model=os.getenv("LLM_MODEL", "openai/gpt-5.6-terra"),
+        model=os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL),
         reasoning_effort=os.getenv("TCAD_REASONING_EFFORT", "medium"),
     )
-
