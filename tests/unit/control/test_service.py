@@ -110,7 +110,7 @@ def test_clarification_answers_and_retrieved_knowledge_reach_model_context(
     )
     prompt = Path("examples/prompts/al-pn-al-equilibrium.md").read_text()
     submitted = control.submit(prompt, backend="devsim")
-    control.answer(
+    planned = control.answer(
         submitted.id,
         (
             ClarificationAnswer(field="geometry.p_region_thickness", value="1 um"),
@@ -119,6 +119,12 @@ def test_clarification_answers_and_retrieved_knowledge_reach_model_context(
         ),
     )
     assert gateway.context is not None
+    assert planned.prompt == prompt
+    assert planned.clarification_answers == {
+        "geometry.p_region_thickness": "1 um",
+        "geometry.n_region_thickness": "1 um",
+        "contacts.treatment": "ohmic",
+    }
     assert gateway.context.clarification_answers == {
         "geometry.p_region_thickness": "1 um",
         "geometry.n_region_thickness": "1 um",
@@ -126,6 +132,10 @@ def test_clarification_answers_and_retrieved_knowledge_reach_model_context(
     }
     assert gateway.context.knowledge[0].citation.source_id == "reviewed"
     assert gateway.context.knowledge[0].reviewed
+    manifest = gateway.context.capabilities["manifest"]
+    assert isinstance(manifest, dict)
+    assert manifest["backend"] == "devsim"
+    assert "potential" in manifest["observables"]
     assert any("Building Experiment Specifications" in item for item in gateway.context.procedures)
 
 

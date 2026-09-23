@@ -39,15 +39,24 @@ class MarkdownReport:
                 "",
                 "## Validation evidence",
                 "",
-                "| Check | Level | Status | Measured | Limit |",
-                "|---|---|---|---|---|",
+                "| Check | Level | Status | Evidence origin | Measured | Limit |",
+                "|---|---|---|---|---|---|",
             ]
         )
         for check in validation.checks:
             lines.append(
                 f"| {check.id} | {check.level} | {check.status} | "
-                f"{check.measured_value} | {check.limit} |"
+                f"{check.evidence_origin} | {check.measured_value} | {check.limit} |"
             )
+        lines.extend(
+            [
+                "",
+                "## Spatial evidence",
+                "",
+                "- `results/fields.csv` contains normalized SI field samples.",
+                "- `results/field-plots.svg` visualizes the same canonical field data.",
+            ]
+        )
         lines.extend(
             [
                 "",
@@ -60,4 +69,3 @@ class MarkdownReport:
             ]
         )
         return "\n".join(lines)
-

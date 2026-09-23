@@ -1,0 +1,58 @@
+schema_version: "1.0"
+name: silicon-pplus-p-n-nplus-equilibrium
+dimension: 1
+regions:
+  - id: p_plus
+    material: silicon
+    x0: 0 um
+    x1: 0.2 um
+    mesh_spacing: 0.01 um
+  - id: p_region
+    material: silicon
+    x0: 0.2 um
+    x1: 1 um
+    mesh_spacing: 0.02 um
+  - id: n_region
+    material: silicon
+    x0: 1 um
+    x1: 1.8 um
+    mesh_spacing: 0.02 um
+  - id: n_plus
+    material: silicon
+    x0: 1.8 um
+    x1: 2 um
+    mesh_spacing: 0.01 um
+profiles:
+  - kind: constant
+    region: p_plus
+    species: acceptor
+    value: 1e18 cm^-3
+  - kind: constant
+    region: p_region
+    species: acceptor
+    value: 1e16 cm^-3
+  - kind: constant
+    region: n_region
+    species: donor
+    value: 1e16 cm^-3
+  - kind: constant
+    region: n_plus
+    species: donor
+    value: 1e18 cm^-3
+contacts:
+  - id: anode
+    location: x_min
+    kind: ohmic
+  - id: cathode
+    location: x_max
+    kind: ohmic
+physics:
+  equations: [poisson, electron_continuity, hole_continuity]
+  models: [boltzmann, constant_mobility, srh]
+  temperature: 300 K
+study:
+  kind: equilibrium
+observables: [terminal_current, potential, electric_field, electron_density, hole_density]
+metadata:
+  purpose: four-region composition example using the generic DEVSIM path
+

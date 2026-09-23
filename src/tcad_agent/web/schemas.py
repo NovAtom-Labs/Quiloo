@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
 from tcad_agent.control.models import ClarificationAnswer
 
@@ -22,3 +22,9 @@ class AnswerRequest(WebRequest):
 
 class ApprovalRequest(WebRequest):
     plan_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ResearchResults(WebRequest):
+    experiment: dict[str, JsonValue]
+    result: dict[str, JsonValue]
+    validation: dict[str, JsonValue]

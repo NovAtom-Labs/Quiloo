@@ -279,8 +279,9 @@ class ControlService:
         validation = validation_engine.validate(
             result,
             expected_bias_points=expected_bias_points(spec),
+            spec=spec,
         )
-        failures = validation_engine.classify_failures(result)
+        failures = validation_engine.classify_failures(result, spec=spec)
         recovery: dict[str, JsonValue] | None = None
         if failures:
             decision = RecoveryPolicy().decide(
@@ -427,7 +428,11 @@ class ControlService:
                 f"{item.citation.source_id}:{item.citation.content_hash}"
                 for item in knowledge
             ),
-            capabilities={"backend": backend, "warnings": list(warnings)},
+            capabilities={
+                "backend": backend,
+                "manifest": CapabilityManifest.from_backend(backend).model_dump(mode="json"),
+                "warnings": list(warnings),
+            },
             clarification_answers=_string_mapping(record.data.get("answers")),
             knowledge=knowledge,
             procedures=procedures,
@@ -501,9 +506,11 @@ class ControlService:
         validation_value = record.data.get("validation")
         return RequestView(
             id=record.id,
+            prompt=record.request.prompt,
             state=record.state,
             revision=record.revision,
             backend=str(record.data.get("backend", "devsim")),
+            clarification_answers=_string_mapping(record.data.get("answers")),
             questions=questions,
             plan_digest=(
                 str(record.data["plan_digest"]) if "plan_digest" in record.data else None

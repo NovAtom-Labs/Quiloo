@@ -6,7 +6,7 @@ import json
 import os
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol, cast
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
@@ -32,7 +32,13 @@ from tcad_agent.model_gateway.openhands import (
     ModelConfigurationError,
     OpenHandsBedrockGateway,
 )
-from tcad_agent.web.schemas import AnswerRequest, ApprovalRequest, CreateResearchRequest
+from tcad_agent.web.runtime import runtime_fingerprint
+from tcad_agent.web.schemas import (
+    AnswerRequest,
+    ApprovalRequest,
+    CreateResearchRequest,
+    ResearchResults,
+)
 
 
 class UnavailableGateway:
@@ -75,8 +81,13 @@ def build_default_control() -> ControlService:
     )
 
 
-def create_app(control: ControlAPI | None = None) -> FastAPI:
+def create_app(
+    control: ControlAPI | None = None,
+    *,
+    runtime_id: str | None = None,
+) -> FastAPI:
     service = control or build_default_control()
+    active_runtime_id = runtime_id or runtime_fingerprint()
     package_root = Path(__file__).parent
     templates = Jinja2Templates(directory=package_root / "templates")
     app = FastAPI(title="NovAtom TCAD Agent", docs_url=None, redoc_url=None)
@@ -130,10 +141,19 @@ def create_app(control: ControlAPI | None = None) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict[str, str]:
-        return {"status": "ok"}
+        return {"status": "ok", "runtime_fingerprint": active_runtime_id}
 
     @app.get("/")
     def index(request: Request) -> Response:
+        return templates.TemplateResponse(request, "index.html", {})
+
+    @app.get("/requests/{request_id}/{stage}")
+    def workflow_page(
+        request: Request,
+        request_id: UUID,
+        stage: Literal["request", "clarify", "review", "results"],
+    ) -> Response:
+        del request_id, stage
         return templates.TemplateResponse(request, "index.html", {})
 
     @app.post("/api/requests", status_code=201)
@@ -155,6 +175,30 @@ def create_app(control: ControlAPI | None = None) -> FastAPI:
     @app.post("/api/requests/{request_id}/run")
     def run_request(request_id: UUID) -> RequestView:
         return service.execute(request_id)
+
+    @app.get("/api/requests/{request_id}/results")
+    def research_results(request_id: UUID) -> ResearchResults:
+        view = service.get(request_id)
+        if view.bundle_path is None:
+            raise HTTPException(status_code=409, detail="results are not available")
+        root = Path(view.bundle_path).resolve()
+
+        def load_object(relative: str) -> dict[str, object]:
+            path = (root / relative).resolve()
+            if not path.is_relative_to(root) or not path.is_file():
+                raise HTTPException(status_code=404, detail="result artifact is unavailable")
+            value = json.loads(path.read_text())
+            if not isinstance(value, dict):
+                raise HTTPException(status_code=500, detail="result artifact is malformed")
+            return cast(dict[str, object], value)
+
+        return ResearchResults.model_validate(
+            {
+                "experiment": load_object("experiment.json"),
+                "result": load_object("results/canonical.json"),
+                "validation": load_object("validation/report.json"),
+            }
+        )
 
     @app.get("/api/requests/{request_id}/events")
     def request_events(request_id: UUID) -> StreamingResponse:

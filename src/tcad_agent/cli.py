@@ -124,7 +124,11 @@ def run_command(
             (spec.study.stop.to("V") - spec.study.start.to("V"))
             / spec.study.step.to("V")
         ) + 1
-    validation = ValidationEngine().validate(result, expected_bias_points=expected_points)
+    validation = ValidationEngine().validate(
+        result,
+        expected_bias_points=expected_points,
+        spec=spec,
+    )
     terminal_event = (
         RunEventKind.COMPLETED
         if native.status == "completed" and validation.overall == "passed"

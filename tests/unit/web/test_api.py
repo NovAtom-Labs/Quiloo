@@ -1,5 +1,6 @@
 from html.parser import HTMLParser
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
@@ -49,7 +50,9 @@ def client(tmp_path: Path) -> TestClient:
 def test_root_and_health_are_local_researcher_entrypoints(tmp_path: Path) -> None:
     web = client(tmp_path)
     assert DEFAULT_HOST == "127.0.0.1"
-    assert web.get("/health").json() == {"status": "ok"}
+    health = web.get("/health").json()
+    assert health["status"] == "ok"
+    assert len(health["runtime_fingerprint"]) == 16
     page = web.get("/")
     assert page.status_code == 200
     assert "NovAtom TCAD Agent" in page.text
@@ -83,10 +86,29 @@ def test_researcher_page_exposes_workflow_review_and_results_regions(
     parser = ButtonTextParser()
     parser.feed(page.text)
     assert parser.elements["workflow-progress"] == "ol"
+    assert parser.elements["request-page"] == "section"
+    assert parser.elements["clarify-page"] == "section"
+    assert parser.elements["review-page"] == "section"
+    assert parser.elements["results-page"] == "section"
     assert parser.elements["plan-summary"] == "div"
     assert parser.elements["review-details"] == "div"
+    assert parser.elements["results-overview"] == "div"
+    assert parser.elements["field-selector"] == "select"
+    assert parser.elements["field-scale"] == "select"
+    assert parser.elements["field-chart"] == "svg"
+    assert parser.elements["bias-results"] == "tbody"
+    assert parser.elements["field-data"] == "tbody"
     assert parser.elements["validation-list"] == "div"
-    assert parser.elements["artifacts"] == "div"
+    assert parser.elements["artifacts"] == "details"
+
+
+def test_persistent_workflow_urls_serve_the_application_shell(tmp_path: Path) -> None:
+    web = client(tmp_path)
+    request_id = uuid4()
+    for stage in ("clarify", "review", "results"):
+        response = web.get(f"/requests/{request_id}/{stage}")
+        assert response.status_code == 200
+        assert 'id="workflow-progress"' in response.text
 
 
 def test_invalid_request_identifier_is_rejected(tmp_path: Path) -> None:

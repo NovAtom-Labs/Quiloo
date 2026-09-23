@@ -11,7 +11,7 @@ def test_runtime_defaults_to_pilot_bedrock_model(monkeypatch) -> None:
 
     profile = build_runtime(ROOT)
 
-    assert profile.model == "bedrock/global.anthropic.claude-sonnet-5"
+    assert profile.model == "bedrock/global.anthropic.claude-sonnet-4-6"
     assert profile.reasoning_effort == "medium"
 
 

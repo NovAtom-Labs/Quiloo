@@ -5,6 +5,12 @@ from typing import Literal
 from tcad_agent.domain.models import StrictModel
 
 ValidationStatus = Literal["passed", "warning", "failed", "not_applicable"]
+EvidenceOrigin = Literal[
+    "configured",
+    "simulator_observed",
+    "derived",
+    "statically_verified",
+]
 
 
 class ValidationCheck(StrictModel):
@@ -14,6 +20,7 @@ class ValidationCheck(StrictModel):
     measured_value: float | int | str | None = None
     limit: float | int | str | None = None
     message: str
+    evidence_origin: EvidenceOrigin = "derived"
     evidence_paths: tuple[str, ...] = ()
 
 

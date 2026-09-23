@@ -1,3 +1,13 @@
+"use strict";
+
+const STAGES = ["request", "clarify", "review", "results"];
+const PAGE_COPY = {
+  request: ["AUTONOMOUS DEVICE RESEARCH", "From research intent to <em>validated</em> device evidence.", "Describe the study. The agent resolves material assumptions, compiles an exact plan, and runs only after your approval."],
+  clarify: ["CONSEQUENTIAL INPUTS", "Resolve assumptions before the agent <em>commits</em>.", "Only information that changes the physical experiment is requested."],
+  review: ["IMMUTABLE EXECUTION PLAN", "Know exactly what the simulator will <em>execute</em>.", "Inspect the normalized structure, physics, outputs, backend, and limitations before approval."],
+  results: ["SIMULATION EVIDENCE", "Interrogate the result, not just a <em>download</em>.", "Explore fields, operating points, validation checks, and the exact device definition in one workspace."],
+};
+
 const promptInput = document.querySelector("#prompt");
 const backendInput = document.querySelector("#backend");
 const backendDescription = document.querySelector("#backend-description");
@@ -5,13 +15,12 @@ const submitButton = document.querySelector("#submit");
 const answerButton = document.querySelector("#answer");
 const approveButton = document.querySelector("#approve");
 const runButton = document.querySelector("#run");
-const statusPanel = document.querySelector("#status-panel");
-const resultsPanel = document.querySelector("#results-panel");
 const stateLabel = document.querySelector("#state");
+const clarifyState = document.querySelector("#clarify-state");
 const warning = document.querySelector("#warning");
-const questionsSection = document.querySelector("#questions-section");
 const questions = document.querySelector("#questions");
-const planSection = document.querySelector("#plan-section");
+const resolvedAnswers = document.querySelector("#resolved-answers");
+const requestContext = document.querySelector("#request-context");
 const planSummary = document.querySelector("#plan-summary");
 const reviewDetails = document.querySelector("#review-details");
 const planDigest = document.querySelector("#plan-digest");
@@ -22,9 +31,14 @@ const validationDetails = document.querySelector("#validation-details");
 const validation = document.querySelector("#validation");
 const artifacts = document.querySelector("#artifacts");
 const artifactLinks = document.querySelector("#artifact-links");
+const resultsLoading = document.querySelector("#results-loading");
+const resultsWorkspace = document.querySelector("#results-workspace");
 const progressStages = [...document.querySelectorAll("#workflow-progress li")];
+const workflowPages = [...document.querySelectorAll("[data-workflow-page]")];
+const resultsCache = new Map();
 
 let current = null;
+let displayedStage = "request";
 
 async function request(path, options = {}) {
   const response = await fetch(path, {
@@ -36,15 +50,14 @@ async function request(path, options = {}) {
   return data;
 }
 
-function setHidden(element, hidden) {
-  element.classList.toggle("hidden", hidden);
+function setHidden(node, hidden) {
+  node.classList.toggle("hidden", hidden);
 }
 
 function showNotice(message, kind = "warning") {
   warning.textContent = message || "";
   warning.dataset.kind = kind;
   setHidden(warning, !message);
-  if (message) statusPanel.classList.remove("hidden");
 }
 
 function formatLabel(value) {
@@ -52,32 +65,6 @@ function formatLabel(value) {
     .replaceAll("_", " ")
     .replaceAll("-", " ")
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function formatQuantity(value) {
-  if (value && typeof value === "object" && "magnitude" in value && "unit" in value) {
-    return `${value.magnitude} ${value.unit}`;
-  }
-  if (value && typeof value === "object" && "magnitude_si" in value && "si_unit" in value) {
-    const magnitude = Number(value.magnitude_si);
-    if (value.si_unit === "meter") {
-      if (Math.abs(magnitude) >= 1e-3) return `${formatNumber(magnitude * 1e3)} mm`;
-      if (Math.abs(magnitude) >= 1e-6) return `${formatNumber(magnitude * 1e6)} µm`;
-      if (Math.abs(magnitude) >= 1e-9) return `${formatNumber(magnitude * 1e9)} nm`;
-    }
-    if (value.si_unit === "1 / meter ** 3") {
-      return `${formatNumber(magnitude / 1e6)} cm⁻³`;
-    }
-    if (value.si_unit === "kelvin") return `${formatNumber(magnitude)} K`;
-    if (value.si_unit === "kilogram * meter ** 2 / ampere / second ** 3") {
-      return `${formatNumber(magnitude)} V`;
-    }
-    if (value.si_unit === "kilogram * meter ** 2 / second ** 2") {
-      return `${formatNumber(magnitude / 1.602176634e-19)} eV`;
-    }
-    return `${formatNumber(magnitude)} ${value.si_unit}`;
-  }
-  return formatLabel(value);
 }
 
 function formatNumber(value) {
@@ -89,7 +76,25 @@ function formatNumber(value) {
   return Number(value.toPrecision(6)).toString();
 }
 
+function formatQuantity(value) {
+  if (value && typeof value === "object" && "magnitude_si" in value && "si_unit" in value) {
+    const magnitude = Number(value.magnitude_si);
+    if (value.si_unit === "meter") {
+      if (Math.abs(magnitude) >= 1e-3) return `${formatNumber(magnitude * 1e3)} mm`;
+      if (Math.abs(magnitude) >= 1e-6) return `${formatNumber(magnitude * 1e6)} µm`;
+      if (Math.abs(magnitude) >= 1e-9) return `${formatNumber(magnitude * 1e9)} nm`;
+    }
+    if (value.si_unit === "1 / meter ** 3") return `${formatNumber(magnitude / 1e6)} cm⁻³`;
+    if (value.si_unit === "kelvin") return `${formatNumber(magnitude)} K`;
+    if (value.si_unit === "kilogram * meter ** 2 / ampere / second ** 3") return `${formatNumber(magnitude)} V`;
+    if (value.si_unit === "kilogram * meter ** 2 / second ** 2") return `${formatNumber(magnitude / 1.602176634e-19)} eV`;
+    return `${formatNumber(magnitude)} ${value.si_unit}`;
+  }
+  return formatLabel(value);
+}
+
 function activeStage(view) {
+  if (!view) return "request";
   const state = view.state;
   if (state === "needs_clarification") return "clarify";
   if (state === "failed") {
@@ -102,13 +107,44 @@ function activeStage(view) {
   return "request";
 }
 
-function renderProgress(view) {
-  const order = ["request", "clarify", "review", "results"];
-  const currentIndex = order.indexOf(activeStage(view));
+function parseLocation() {
+  const match = window.location.pathname.match(/^\/requests\/([0-9a-f-]{36})\/(request|clarify|review|results)$/i);
+  return match ? {id: match[1], stage: match[2]} : {id: null, stage: "request"};
+}
+
+function workflowPath(stage) {
+  return current ? `/requests/${current.id}/${stage}` : "/";
+}
+
+function updatePageCopy(stage) {
+  const [eyebrow, title, copy] = PAGE_COPY[stage];
+  document.querySelector("#page-eyebrow").textContent = eyebrow;
+  document.querySelector("#page-title").innerHTML = title;
+  document.querySelector("#page-copy").textContent = copy;
+  document.title = `${formatLabel(stage)} · NovAtom TCAD Agent`;
+}
+
+function showPage(stage, historyMode = null) {
+  const maximum = STAGES.indexOf(activeStage(current));
+  const requested = STAGES.indexOf(stage);
+  displayedStage = requested <= maximum || !current ? stage : activeStage(current);
+  for (const page of workflowPages) setHidden(page, page.dataset.workflowPage !== displayedStage);
+  updatePageCopy(displayedStage);
+  renderProgress();
+  if (historyMode) {
+    window.history[historyMode]({requestId: current?.id || null, stage: displayedStage}, "", workflowPath(displayedStage));
+  }
+  window.scrollTo({top: 0, behavior: "smooth"});
+}
+
+function renderProgress() {
+  const maximum = STAGES.indexOf(activeStage(current));
   for (const item of progressStages) {
-    const index = order.indexOf(item.dataset.stage);
-    item.classList.toggle("is-active", index === currentIndex);
-    item.classList.toggle("is-complete", index < currentIndex);
+    const index = STAGES.indexOf(item.dataset.stage);
+    item.classList.toggle("is-active", item.dataset.stage === displayedStage);
+    item.classList.toggle("is-complete", Boolean(current) && index < maximum);
+    const button = item.querySelector("button");
+    button.disabled = !current ? index > 0 : index > maximum;
   }
 }
 
@@ -168,57 +204,19 @@ function studyReview(study) {
   return reviewGroup("Study", entries);
 }
 
-function renderPlan(view) {
-  const spec = view.spec || view.plan?.spec;
-  planSummary.replaceChildren();
-  if (!spec) {
-    setHidden(planSection, true);
-    return;
-  }
-  const regions = spec.regions || [];
-  const profiles = spec.profiles || [];
-  const contacts = spec.contacts || [];
-  const equations = spec.physics?.equations || [];
-  const models = spec.physics?.models || [];
-  const observables = spec.observables || [];
-  const study = spec.study || {};
-  const materials = [...new Set(regions.map((region) => formatLabel(region.material)))];
-  planSummary.append(
-    summaryCard("Backend", String(view.backend).toUpperCase(), view.backend === "devsim" ? "Local deterministic runner" : "Licensed remote runner"),
-    summaryCard("Structure", `${regions.length} region${regions.length === 1 ? "" : "s"}`, `${materials.join(", ") || "Material not specified"} · ${spec.dimension || 1}D · ${contacts.length} contacts`),
-    summaryCard("Physics", formatQuantity(spec.physics?.temperature || "Not specified"), `${models.length} declared models`),
-    summaryCard("Study", formatLabel(study.kind || "Not specified"), study.kind === "equilibrium" ? "No external bias sweep" : "Bounded bias study"),
-  );
-  const limitation = spec.metadata?.limitation;
-  if (limitation) planSummary.append(summaryCard("Declared limitation", "Approximation in use", limitation));
-  reviewDetails.replaceChildren(
-    reviewGroup("Geometry", regions.map((region) => [
-      formatLabel(region.id),
-      `${formatLabel(region.material)} · ${regionThickness(region)} · mesh ${formatQuantity(region.mesh_spacing || "Not specified")}`,
-    ])),
-    reviewGroup("Doping", profiles.map((profile) => [
-      formatLabel(profile.region),
-      `${formatLabel(profile.species)} · ${formatQuantity(profile.value)}`,
-    ])),
-    reviewGroup("Contacts", contacts.map((contact) => [
-      formatLabel(contact.id),
-      `${formatLabel(contact.kind)} · ${formatLabel(contact.location)}${contact.work_function ? ` · ${formatQuantity(contact.work_function)}` : ""}`,
-    ])),
-    studyReview(study),
-    reviewGroup("Physics and outputs", [
-      ["Equations", equations.map(formatLabel).join(", ") || "None declared"],
-      ["Models", models.map(formatLabel).join(", ") || "None declared"],
-      ["Observables", observables.map(formatLabel).join(", ") || "None declared"],
-    ]),
-  );
-  planDigest.textContent = view.plan_digest || "Not generated";
-  plan.textContent = JSON.stringify(view.plan || {spec}, null, 2);
-  setHidden(planSection, false);
+function renderRequest(view) {
+  if (!view) return;
+  promptInput.value = view.prompt || "";
+  backendInput.value = view.backend || "devsim";
+  renderBackendDescription();
 }
 
 function renderQuestions(view) {
   questions.replaceChildren();
-  for (const item of view.questions || []) {
+  resolvedAnswers.replaceChildren();
+  requestContext.textContent = view?.prompt || "No active research request.";
+  const waiting = view?.state === "needs_clarification";
+  for (const item of view?.questions || []) {
     const wrapper = document.createElement("label");
     wrapper.className = "question-field";
     const label = document.createElement("span");
@@ -231,9 +229,20 @@ function renderQuestions(view) {
     wrapper.append(label, input);
     questions.appendChild(wrapper);
   }
-  const needsAnswers = view.state === "needs_clarification";
-  setHidden(questionsSection, !needsAnswers);
-  setHidden(answerButton, !needsAnswers);
+  for (const [field, value] of Object.entries(view?.clarification_answers || {})) {
+    resolvedAnswers.appendChild(reviewGroup("Resolved input", [[formatLabel(field), value]]));
+  }
+  if (!waiting && !resolvedAnswers.children.length) {
+    const message = document.createElement("p");
+    message.className = "empty-state";
+    message.textContent = "This request did not require additional clarification.";
+    resolvedAnswers.appendChild(message);
+  }
+  setHidden(questions, !waiting);
+  setHidden(answerButton, !waiting);
+  setHidden(resolvedAnswers, waiting);
+  clarifyState.textContent = waiting ? "Waiting" : "Resolved";
+  clarifyState.dataset.status = waiting ? "needs_clarification" : "completed";
   updateAnswerReadiness();
 }
 
@@ -248,93 +257,138 @@ function updateAnswerReadiness() {
   answerButton.disabled = inputs.length === 0 || inputs.some((input) => !input.value.trim());
 }
 
+function renderPlan(view) {
+  const spec = view?.spec || view?.plan?.spec;
+  planSummary.replaceChildren();
+  reviewDetails.replaceChildren();
+  if (!spec) return;
+  const regions = spec.regions || [];
+  const profiles = spec.profiles || [];
+  const contacts = spec.contacts || [];
+  const equations = spec.physics?.equations || [];
+  const models = spec.physics?.models || [];
+  const observables = spec.observables || [];
+  const study = spec.study || {};
+  const materials = [...new Set(regions.map((region) => formatLabel(region.material)))];
+  planSummary.append(
+    summaryCard("Backend", String(view.backend).toUpperCase(), view.backend === "devsim" ? "Local deterministic runner" : "Licensed remote runner"),
+    summaryCard("Structure", `${regions.length} region${regions.length === 1 ? "" : "s"}`, `${materials.join(", ") || "Material not specified"} · ${spec.dimension || 1}D · ${contacts.length} contacts`),
+    summaryCard("Physics", formatQuantity(spec.physics?.temperature || "Not specified"), `${models.length} declared models`),
+    summaryCard("Study", formatLabel(study.kind || "Not specified"), study.kind === "equilibrium" ? "No external bias sweep" : "Bounded bias study"),
+  );
+  if (spec.metadata?.limitation) planSummary.append(summaryCard("Declared limitation", "Approximation in use", spec.metadata.limitation));
+  reviewDetails.replaceChildren(
+    reviewGroup("Geometry", regions.map((region) => [formatLabel(region.id), `${formatLabel(region.material)} · ${regionThickness(region)} · mesh ${formatQuantity(region.mesh_spacing || "Not specified")}`])),
+    reviewGroup("Doping", profiles.map((profile) => [formatLabel(profile.region), `${formatLabel(profile.species)} · ${formatQuantity(profile.value)}`])),
+    reviewGroup("Contacts", contacts.map((contact) => [formatLabel(contact.id), `${formatLabel(contact.kind)} · ${formatLabel(contact.location)}${contact.work_function ? ` · ${formatQuantity(contact.work_function)}` : ""}`])),
+    studyReview(study),
+    reviewGroup("Physics and outputs", [
+      ["Equations", equations.map(formatLabel).join(", ") || "None declared"],
+      ["Models", models.map(formatLabel).join(", ") || "None declared"],
+      ["Observables", observables.map(formatLabel).join(", ") || "None declared"],
+    ]),
+  );
+  planDigest.textContent = view.plan_digest || "Not generated";
+  plan.textContent = JSON.stringify(view.plan || {spec}, null, 2);
+  stateLabel.textContent = formatLabel(view.state);
+  stateLabel.dataset.status = view.state;
+  setHidden(approveButton, view.state !== "user_confirmation_required");
+  setHidden(runButton, view.state !== "compiled");
+}
+
 function renderValidation(view) {
   validationList.replaceChildren();
-  const report = view.validation;
-  const states = ["running", "validating", "completed"];
-  const showResults = Boolean(report || view.bundle_path || states.includes(view.state));
-  setHidden(resultsPanel, !showResults);
-  if (!showResults) return;
-
-  validationStatus.textContent = report?.overall ? formatLabel(report.overall) : formatLabel(view.state);
-  validationStatus.dataset.status = report?.overall || view.state;
-  if (report?.checks?.length) {
-    for (const check of report.checks) {
-      const row = document.createElement("article");
-      row.className = "validation-row";
-      const indicator = document.createElement("span");
-      indicator.className = "check-indicator";
-      indicator.dataset.status = check.status;
-      const content = document.createElement("div");
-      const title = document.createElement("strong");
-      title.textContent = formatLabel(check.id);
-      const message = document.createElement("p");
-      message.textContent = check.message;
-      content.append(title, message);
-      const status = document.createElement("span");
-      status.className = "check-status";
-      status.textContent = formatLabel(check.status);
-      row.append(indicator, content, status);
-      validationList.appendChild(row);
-    }
-    validation.textContent = JSON.stringify(report, null, 2);
-    setHidden(validationDetails, false);
-  } else {
-    const pending = document.createElement("p");
-    pending.className = "empty-state";
-    pending.textContent = view.error_message || "The simulation record is being prepared.";
-    validationList.appendChild(pending);
-    setHidden(validationDetails, true);
+  const report = view?.validation;
+  validationStatus.textContent = report?.overall ? formatLabel(report.overall) : formatLabel(view?.state || "pending");
+  validationStatus.dataset.status = report?.overall || view?.state || "pending";
+  for (const check of report?.checks || []) {
+    const row = document.createElement("article");
+    row.className = "validation-row";
+    const indicator = document.createElement("span");
+    indicator.className = "check-indicator";
+    indicator.dataset.status = check.status;
+    const content = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = formatLabel(check.id);
+    const message = document.createElement("p");
+    message.textContent = check.message;
+    content.append(title, message);
+    const status = document.createElement("span");
+    status.className = "check-status";
+    status.textContent = formatLabel(check.status);
+    row.append(indicator, content, status);
+    validationList.appendChild(row);
   }
-
-  setHidden(artifacts, !view.bundle_path);
+  validation.textContent = report ? JSON.stringify(report, null, 2) : "";
+  setHidden(validationDetails, !report);
   artifactLinks.replaceChildren();
-  if (view.bundle_path) {
+  setHidden(artifacts, !view?.bundle_path);
+  if (view?.bundle_path) {
     const files = [
       ["Research report", "report.md"],
       ["Canonical results", "results/canonical.json"],
+      ["Normalized field data", "results/fields.csv"],
+      ["Static field plots", "results/field-plots.svg"],
       ["Validation record", "validation/report.json"],
       ["Evidence manifest", "manifest.json"],
       ["Event ledger", "events.jsonl"],
     ];
-    for (const [label, path] of files) {
+    for (const [name, path] of files) {
       const link = document.createElement("a");
-      link.textContent = label;
+      link.textContent = name;
       link.href = `/api/requests/${view.id}/artifacts/${path}`;
-      if (path === "report.md") link.id = "report";
       artifactLinks.appendChild(link);
     }
   }
 }
 
-function render(view) {
+async function renderResults(view) {
+  renderValidation(view);
+  if (!view?.bundle_path) {
+    resultsLoading.textContent = view?.error_message || "The simulator is still preparing result evidence.";
+    setHidden(resultsLoading, false);
+    setHidden(resultsWorkspace, true);
+    return;
+  }
+  resultsLoading.textContent = "Loading normalized simulator evidence…";
+  setHidden(resultsLoading, false);
+  try {
+    if (!resultsCache.has(view.id)) {
+      resultsCache.set(view.id, await request(`/api/requests/${view.id}/results`));
+    }
+    window.TcadResultsViewer.render(resultsCache.get(view.id));
+    setHidden(resultsWorkspace, false);
+    setHidden(resultsLoading, true);
+  } catch (error) {
+    resultsLoading.textContent = error.message;
+    setHidden(resultsWorkspace, true);
+  }
+}
+
+function render(view, stage = activeStage(view), historyMode = null) {
   current = view;
-  statusPanel.classList.remove("hidden");
-  stateLabel.textContent = formatLabel(view.state);
-  stateLabel.dataset.status = view.state;
-  renderProgress(view);
+  renderRequest(view);
   renderQuestions(view);
   renderPlan(view);
-  renderValidation(view);
-  setHidden(approveButton, view.state !== "user_confirmation_required");
-  setHidden(runButton, view.state !== "compiled");
-
-  const messages = [...(view.warnings || [])].map(formatLabel);
-  if (view.error_message) messages.push(view.error_message);
-  showNotice(messages.join(" · "), view.error_message ? "error" : "warning");
+  void renderResults(view);
+  const messages = [...(view?.warnings || [])].map(formatLabel);
+  if (view?.error_message) messages.push(view.error_message);
+  showNotice(messages.join(" · "), view?.error_message ? "error" : "warning");
+  showPage(stage, historyMode);
 }
 
 async function perform(button, pendingText, operation) {
-  const original = button.innerHTML;
+  const original = button.textContent;
   button.disabled = true;
   button.textContent = pendingText;
   showNotice("");
   try {
-    render(await operation());
+    const view = await operation();
+    render(view, activeStage(view), "pushState");
   } catch (error) {
     showNotice(error.message, "error");
   } finally {
-    button.innerHTML = original;
+    button.textContent = original;
     if (button === answerButton) updateAnswerReadiness();
     else button.disabled = false;
   }
@@ -348,10 +402,13 @@ function renderBackendDescription() {
 
 backendInput.addEventListener("change", renderBackendDescription);
 questions.addEventListener("input", updateAnswerReadiness);
+document.querySelector("#workflow-progress").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-stage-target]");
+  if (button && !button.disabled) showPage(button.dataset.stageTarget, "pushState");
+});
 
 submitButton.addEventListener("click", async () => {
   if (!promptInput.value.trim()) {
-    statusPanel.classList.remove("hidden");
     showNotice("Describe the requested device study before building a plan.", "error");
     return;
   }
@@ -380,7 +437,28 @@ approveButton.addEventListener("click", async () => {
 });
 
 runButton.addEventListener("click", async () => {
+  if (!current) return;
   await perform(runButton, "Running simulation…", () => request(`/api/requests/${current.id}/run`, {method: "POST"}));
 });
 
-renderBackendDescription();
+async function restoreLocation() {
+  const route = parseLocation();
+  if (!route.id) {
+    current = null;
+    showNotice("");
+    showPage("request");
+    renderProgress();
+    renderBackendDescription();
+    return;
+  }
+  try {
+    render(await request(`/api/requests/${route.id}`), route.stage);
+  } catch (error) {
+    current = null;
+    showPage("request", "replaceState");
+    showNotice(error.message, "error");
+  }
+}
+
+window.addEventListener("popstate", () => void restoreLocation());
+void restoreLocation();

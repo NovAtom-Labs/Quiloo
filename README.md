@@ -57,15 +57,17 @@ In the local web application, the researcher:
 3. Reviews normalized geometry, doping, contacts, study parameters, equations, models, observables, backend, and declared limitations.
 4. Approves the immutable plan digest.
 5. Runs the simulation.
-6. Reviews validation results and downloads the evidence bundle.
+6. Explores spatial fields, operating points, device structure, and validation evidence in the interactive results workspace.
+7. Downloads the evidence bundle when files are needed for audit or external analysis.
 
 Repeated Run actions return the existing terminal state. They do not create duplicate simulator jobs.
+Each stage has a persistent URL. Refreshing or revisiting a clarification, review, or results page restores the same request from the local request database.
 
 ## What works now
 
 | Area | Current capability |
 | --- | --- |
-| Research interface | Local, loopback-only web application with clarification, plan review, approval, execution, validation, and artifact downloads |
+| Research interface | Four sequential local pages for request, clarification, plan approval, and interactive results |
 | Portable specification | Strict one-dimensional `ExperimentSpec` with dimensional quantities and rejection of unknown fields |
 | Structures | Composable ordered silicon regions, without named-device execution branches |
 | Doping | Constant donor and acceptor profiles |
@@ -78,21 +80,72 @@ Repeated Run actions return the existing terminal state. They do not create dupl
 | Recovery | Bounded, allowlisted recovery policy with explicit failure classification |
 | Auditability | Persistent request states, immutable plan digests, event ledgers, artifact SHA-256 values, and atomic bundles |
 
+### Exact backend capability
+
+The manifests below are enforced before compilation. A model cannot expand these capabilities.
+
+| Capability | DEVSIM pilot | Sentaurus adapter |
+| --- | --- | --- |
+| Execution | Configured locally | Unconfigured until the licensed host is connected |
+| Dimension | 1D | 1D |
+| Material | Silicon | Silicon |
+| Maximum regions | 32 ordered contiguous regions | 32 ordered contiguous regions |
+| Doping profiles | Constant donor or acceptor concentration | Constant donor or acceptor concentration |
+| Contacts | Two endpoint ohmic contacts | Endpoint ohmic or metal work-function contacts |
+| Studies | Equilibrium and DC sweep | Equilibrium and DC sweep |
+| Maximum DC points | 10 | 10 |
+| Equations | Poisson, electron continuity, hole continuity | Poisson, electron continuity, hole continuity |
+| Statistics | Boltzmann | Boltzmann or Fermi |
+| Mobility | Constant mobility | Constant mobility and reviewed Sentaurus mobility mapping |
+| Recombination | SRH | SRH and Auger |
+| Band-gap narrowing | No | Yes |
+| Local execution budget | 120 seconds by default | Licensed runner policy will decide |
+
+DEVSIM currently normalizes these outputs:
+
+- terminal current density
+- electrostatic potential
+- electric field
+- electron density
+- hole density
+
+The Sentaurus result contract additionally represents terminal charge, space-charge density, conduction and valence bands, Fermi level, electron and hole current densities, electron and hole mobility, and recombination rate. Those fields become executable only after the licensed runner and native-result extractor pass conformance testing.
+
+### Interactive results workspace
+
+Completed simulations open inside the application rather than forcing researchers to download files. The results page provides:
+
+- simulator, version, run-state, field-count, and validation summary cards
+- built-in-potential and equilibrium-current metrics when applicable
+- field selection across every normalized spatial output
+- linear and logarithmic scales, zoom, position control, reset, and point hover readout
+- minimum, maximum, sample count, units, and simulated position range
+- terminal current and bias-point tables
+- the exact regions, extents, material, and doping that produced the result
+- searchable numerical samples for the selected field
+- every deterministic validation check and its status
+- collapsible evidence downloads for audit and external analysis
+
 ## Deliberate pilot limits
 
 Quiloo is currently intended for small exploratory drift-diffusion studies, architecture validation, and researcher workflow testing. It is not yet a fabrication-calibrated prediction system.
 
-The current boundary is:
+| Limitation | Current consequence |
+| --- | --- |
+| One spatial dimension | No lateral geometry, junction curvature, edge fields, trenches, fins, planar gates, or process topography |
+| Silicon only | No SiC, GaN, Ge, III-V, oxide, metal, or heterojunction region simulation |
+| Constant profiles only | No Gaussian, error-function, implanted, graded, tabulated, or process-derived doping |
+| Two endpoint contacts | No transistor gate terminal, body contact, internal electrode, or multi-terminal device operation |
+| Drift-diffusion only | No hydrodynamic, energy-balance, ballistic, quantum-correction, Monte Carlo, or density-gradient transport |
+| Electrical and isothermal | No self-heating, optical generation, radiation, stress, mechanics, or circuit co-simulation |
+| Small bounded sweeps | At most 10 DC points; no transient, AC, noise, breakdown search, continuation campaign, or multidimensional parameter sweep |
+| No calibration loop | Results are not automatically fitted to process measurements, compact models, or fabrication data |
+| Pilot clarification rules | Automatic pre-model questions currently recognize common silicon p/n thickness and aluminum contact ambiguity; less familiar omissions rely on the model and plan review |
+| Model intent extraction | Researchers must verify that every requested model and observable appears in the normalized plan. An omitted request must not be approved |
+| DEVSIM approximation | Metal work function, Fermi statistics, Auger, band-gap narrowing, band diagrams, mobility output, and recombination output are outside the reviewed local adapter |
+| Sentaurus host absent | Command generation and result contracts exist, but real licensed execution remains disabled |
 
-- one-dimensional, silicon-first structures
-- constant doping profiles
-- equilibrium and bounded DC studies
-- manifest-declared equations, models, contacts, and observables only
-- no arbitrary user or model-generated simulator syntax
-- no two-dimensional process geometry, heteromaterials, optical coupling, thermal coupling, hydrodynamic transport, or production calibration unless explicitly added through the portable contracts
-- no real Sentaurus execution until the licensed host, exact release, mesh procedure, native extraction, restricted knowledge, and golden conformance cases are reviewed
-
-Unsupported physics is reported explicitly. It is never silently removed to make a run pass.
+No arbitrary user or model-generated simulator syntax is executed. Adding a new material, model, profile, contact, study, or observable requires a schema change, capability declaration, deterministic adapter mapping, normalization, validation, and tests.
 
 ## Architecture
 
@@ -193,7 +246,7 @@ Supported settings:
 | `TCAD_SENTAURUS_ENDPOINT` | Approved licensed-runner HTTPS endpoint |
 | `TCAD_SENTAURUS_VERSION` | Exact configured licensed release |
 
-The pilot template currently selects the global Claude Sonnet 5 Bedrock inference profile in `ap-south-1`. A Bedrock API key must be generated in the same region. Keep credentials only in `.env` or a secret manager.
+The pilot template currently selects the global Claude Sonnet 4.6 Bedrock inference profile in `ap-south-1`. A Bedrock API key must be generated in the same region. Keep credentials only in `.env` or a secret manager.
 
 Never commit `.env`, API keys, signing keys, proprietary manuals, licensed examples, or generated local workspaces. Revoke and rotate any credential disclosed in a prompt, chat, log, report, or commit.
 
@@ -211,9 +264,9 @@ Or start it from a terminal:
 .venv/bin/tcad-agent-web
 ```
 
-The application binds only to [http://127.0.0.1:8765](http://127.0.0.1:8765). If a healthy instance is already running, the launcher reuses it.
+The application binds only to loopback, normally at [http://127.0.0.1:8765](http://127.0.0.1:8765). The launcher reuses an existing instance only when its source and non-secret model configuration match the current checkout. If an older instance owns that port, the updated application starts on the next available loopback port.
 
-For the main pilot demonstration, paste [the Al / p-Si / n-Si / Al prompt](examples/prompts/al-pn-al-equilibrium.md), select DEVSIM, and answer the requested thickness and contact questions. The local approximation is explicit about unsupported work-function and advanced-physics behavior.
+For the main pilot demonstration, paste [the Al / p-Si / n-Si / Al prompt](examples/prompts/al-pn-al-equilibrium.md), select DEVSIM, and answer the requested thickness and contact questions. The local run covers the DEVSIM-supported subset. Verify all omitted Sentaurus-only physics during plan review.
 
 ## CLI examples
 
@@ -222,6 +275,7 @@ Validate portable specifications:
 ```bash
 .venv/bin/tcad-agent validate examples/pn-junction.yaml
 .venv/bin/tcad-agent validate examples/pin-diode.yaml
+.venv/bin/tcad-agent validate examples/multiregion-equilibrium.yaml
 .venv/bin/tcad-agent validate examples/al-pn-al-equilibrium-devsim.yaml
 .venv/bin/tcad-agent validate examples/al-pn-al-equilibrium.yaml
 ```
@@ -269,10 +323,35 @@ Examples are ordinary specifications, not privileged device modes:
 | --- | --- |
 | `examples/pn-junction.yaml` | Two-region silicon PN reference with a bounded DC sweep |
 | `examples/pin-diode.yaml` | Three-region silicon PIN reference using the same generic path |
+| `examples/multiregion-equilibrium.yaml` | Four-region p+ / p / n / n+ silicon equilibrium study |
 | `examples/al-pn-al-equilibrium-devsim.yaml` | Explicit DEVSIM approximation of the pilot metal-contact equilibrium problem |
 | `examples/al-pn-al-equilibrium.yaml` | Full Sentaurus-targeted form with work functions and advanced requested models |
 
 Researchers can compose other supported one-dimensional silicon stacks by changing data. No named-device branch is required.
+
+### Copy-paste web prompts
+
+These prompts stay inside the enforced capability boundary:
+
+| Prompt | Backend | What it demonstrates |
+| --- | --- | --- |
+| [Silicon PN forward-bias sweep](examples/prompts/pn-dc-sweep.md) | DEVSIM | Two regions, asymmetric doping, three DC points, carrier and potential fields |
+| [Silicon PIN forward-bias sweep](examples/prompts/pin-dc-sweep.md) | DEVSIM | Three regions, near-intrinsic middle region, electric field and current |
+| [Four-region equilibrium stack](examples/prompts/multiregion-equilibrium.md) | DEVSIM | Generic p+ / p / n / n+ composition without a named-device code path |
+| [Al / p-Si / n-Si / Al equilibrium](examples/prompts/al-pn-al-equilibrium.md) | Sentaurus target, DEVSIM subset | Work-function contacts, advanced model intent, and explicit local limitations |
+
+Useful prompt pattern:
+
+~~~text
+Using the DEVSIM backend, simulate a one-dimensional silicon structure at
+300 K. List every region in left-to-right order with its extent, mesh spacing,
+donor or acceptor species, and concentration. Use ohmic endpoint contacts.
+Select equilibrium or define one driven contact with DC start, stop, and step.
+Request only terminal current, potential, electric field, electron density,
+and hole density. Use Boltzmann statistics, constant mobility, and SRH.
+~~~
+
+Prompts work best when they state explicit units, ordered region boundaries, contact locations and kinds, temperature, study bounds, models, and required outputs. Ambiguous prompts intentionally trigger clarification or refusal.
 
 ## Evidence and validation
 
@@ -286,13 +365,15 @@ A completed run produces an atomic bundle:
   logs/stderr.log
   native/native_result.json
   results/canonical.json
+  results/fields.csv
+  results/field-plots.svg
   validation/report.json
   report.md
   manifest.json
   events.jsonl
 ```
 
-Validation covers execution status, convergence, point counts, finite values, sweep ordering, terminal conservation, carrier bounds, requested-output completeness, and provenance. Mandatory failure produces a failed bundle state. Reports read structured results only; logs remain evidence and are not treated as a numeric source of truth.
+Validation covers execution status, convergence, point counts, finite values, sweep ordering, terminal conservation, carrier bounds, requested-output completeness, and provenance. Equilibrium runs additionally require every terminal current to approach zero. Reviewed 300 K abrupt silicon p-n cases compare the simulated potential range with the analytical built-in potential. Other structures receive the generic checks and mark that narrow analytical check not applicable. Each check distinguishes configured, simulator-observed, derived, and statically verified evidence. Mandatory failure produces a failed bundle state. Reports and the interactive viewer read structured canonical results only; logs remain evidence and are not treated as a numeric source of truth.
 
 ## Sentaurus integration path
 

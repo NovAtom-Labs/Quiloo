@@ -62,12 +62,34 @@ def test_http_workflow_runs_devsim_once_and_serves_artifacts(tmp_path: Path) -> 
         )
         assert first.json()["state"] == "completed"
         assert second.json()["state"] == "completed"
+        results = httpx.get(
+            f"{base_url}/api/requests/{request['id']}/results",
+            timeout=5,
+        )
+        assert results.status_code == 200
+        results_payload = results.json()
+        assert results_payload["result"]["status"] == "completed"
+        assert results_payload["result"]["fields"]["potential"]["unit"] == "V"
+        assert results_payload["validation"]["overall"] == "passed"
+        assert results_payload["experiment"]["name"] == "pn-junction-reference"
         report = httpx.get(
             f"{base_url}/api/requests/{request['id']}/artifacts/report.md",
             timeout=5,
         )
         assert report.status_code == 200
         assert "TCAD Report" in report.text
+        fields = httpx.get(
+            f"{base_url}/api/requests/{request['id']}/artifacts/results/fields.csv",
+            timeout=5,
+        )
+        plots = httpx.get(
+            f"{base_url}/api/requests/{request['id']}/artifacts/results/field-plots.svg",
+            timeout=5,
+        )
+        assert fields.status_code == 200
+        assert "field,position_m,value,unit" in fields.text
+        assert plots.status_code == 200
+        assert "<svg" in plots.text
         events = httpx.get(
             f"{base_url}/api/requests/{request['id']}/events", timeout=5
         )

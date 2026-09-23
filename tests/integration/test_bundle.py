@@ -7,7 +7,7 @@ from tcad_agent.bundles.writer import BundleWriter
 from tcad_agent.domain.models import ExperimentSpec
 from tcad_agent.events.ledger import EventLedger
 from tcad_agent.events.models import RunEventKind
-from tcad_agent.results.models import BiasPoint, CanonicalResult
+from tcad_agent.results.models import BiasPoint, CanonicalResult, FieldSeries
 from tcad_agent.runners.models import CompiledJob, NativeRunResult
 from tcad_agent.validation.engine import ValidationEngine
 
@@ -58,6 +58,18 @@ def bundle_inputs(tmp_path: Path, valid_spec: ExperimentSpec) -> BundleInputs:
                 terminal_currents_a_per_m2={"anode": 1.0, "cathode": -1.0},
             ),
         ),
+        fields={
+            "potential": FieldSeries(
+                positions_m=(0.0, 0.5e-6, 1.0e-6),
+                values=(0.0, 0.4, 0.8),
+                unit="V",
+            ),
+            "electron_density": FieldSeries(
+                positions_m=(0.0, 0.5e-6, 1.0e-6),
+                values=(1.0e16, 1.0e19, 1.0e23),
+                unit="m^-3",
+            ),
+        },
     )
     validation = ValidationEngine().validate(result)
     return BundleInputs(
@@ -82,6 +94,8 @@ def test_bundle_manifest_hashes_every_artifact_and_report_uses_structured_values
         "compiled/input.json",
         "logs/stdout.log",
         "results/canonical.json",
+        "results/fields.csv",
+        "results/field-plots.svg",
         "validation/report.json",
         "events.jsonl",
         "report.md",
@@ -90,4 +104,10 @@ def test_bundle_manifest_hashes_every_artifact_and_report_uses_structured_values
         data = (bundle.root / relative).read_bytes()
         assert hashlib.sha256(data).hexdigest() == item["sha256"]
     EventLedger(bundle.root / "events.jsonl").verify()
-    assert "1.000000e+00 A/m^2" in (bundle.root / "report.md").read_text()
+    report = (bundle.root / "report.md").read_text()
+    assert "1.000000e+00 A/m^2" in report
+    assert "Evidence origin" in report
+    assert "potential" in (bundle.root / "results" / "fields.csv").read_text()
+    plot = (bundle.root / "results" / "field-plots.svg").read_text()
+    assert "<svg" in plot
+    assert "electron_density" in plot

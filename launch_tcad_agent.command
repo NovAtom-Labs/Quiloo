@@ -10,4 +10,5 @@ if [[ -f .env ]]; then
   set +a
 fi
 
-exec .venv/bin/tcad-agent-web
+export PYTHONPATH="$script_dir/src${PYTHONPATH:+:$PYTHONPATH}"
+exec .venv/bin/python -m tcad_agent.web.launcher

@@ -14,7 +14,10 @@ DEVSIM_PYTHON = Path("/Users/satyagni/Documents/NovAtom Labs/devsim/.venv/bin/py
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("fixture_name", ["pn-junction.yaml", "pin-diode.yaml"])
+@pytest.mark.parametrize(
+    "fixture_name",
+    ["pn-junction.yaml", "pin-diode.yaml", "multiregion-equilibrium.yaml"],
+)
 def test_two_structures_run_through_one_backend_path(fixture_name: str, tmp_path) -> None:
     payload = yaml.safe_load((EXAMPLES / fixture_name).read_text())
     spec = ExperimentSpec.model_validate(payload)

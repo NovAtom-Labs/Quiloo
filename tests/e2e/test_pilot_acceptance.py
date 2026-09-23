@@ -83,6 +83,14 @@ def test_researcher_acceptance_runs_devsim_and_compiles_same_spec_for_sentaurus(
     assert events[-1].kind == "completed"
     assert (bundle / "report.md").is_file()
     assert (bundle / "results" / "canonical.json").is_file()
+    assert (bundle / "results" / "fields.csv").is_file()
+    assert (bundle / "results" / "field-plots.svg").is_file()
+    validation = json.loads((bundle / "validation" / "report.json").read_text())
+    checks = {check["id"]: check for check in validation["checks"]}
+    assert validation["overall"] == "passed"
+    assert checks["requested-observables-present"]["status"] == "passed"
+    assert checks["equilibrium-terminal-current"]["status"] == "passed"
+    assert checks["built-in-potential-reference"]["status"] == "passed"
 
 
 def test_full_sentaurus_example_compiles_without_a_licensed_machine(tmp_path: Path) -> None:

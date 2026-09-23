@@ -48,9 +48,11 @@ class RequestRecord(StrictModel):
 
 class RequestView(StrictModel):
     id: UUID
+    prompt: str
     state: RequestState
     revision: int
     backend: str
+    clarification_answers: dict[str, str] = Field(default_factory=dict)
     questions: tuple[ClarificationQuestion, ...] = ()
     plan_digest: str | None = None
     plan: dict[str, JsonValue] | None = None

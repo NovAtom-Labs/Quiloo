@@ -13,6 +13,7 @@ from tcad_agent.bundles.models import (
     BundleManifest,
     ExperimentBundle,
 )
+from tcad_agent.reporting.artifacts import FieldArtifactWriter
 from tcad_agent.reporting.markdown import MarkdownReport
 
 
@@ -39,6 +40,7 @@ class BundleWriter:
             staging / "results" / "canonical.json",
             inputs.result.model_dump_json(indent=2),
         )
+        FieldArtifactWriter().write(inputs.result, staging / "results")
         self._write_json(
             staging / "validation" / "report.json",
             inputs.validation.model_dump_json(indent=2),

@@ -11,7 +11,7 @@ from openhands.sdk.skills import load_skills_from_dir
 
 from tcad_agent.agent.tools import DomainTools, TcadDomainTool, build_tools
 
-DEFAULT_LLM_MODEL = "bedrock/global.anthropic.claude-sonnet-5"
+DEFAULT_LLM_MODEL = "bedrock/global.anthropic.claude-sonnet-4-6"
 
 
 @dataclass(frozen=True)

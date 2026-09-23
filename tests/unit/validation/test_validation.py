@@ -1,7 +1,12 @@
 import math
+from pathlib import Path
 
+import pytest
+import yaml
+
+from tcad_agent.domain.models import ExperimentSpec
 from tcad_agent.recovery.models import FailureKind
-from tcad_agent.results.models import BiasPoint, CanonicalResult
+from tcad_agent.results.models import BiasPoint, CanonicalResult, FieldSeries
 from tcad_agent.validation.engine import ValidationEngine
 
 
@@ -83,3 +88,114 @@ def test_validation_status_supports_not_applicable() -> None:
         message="No refined result was requested.",
     )
     assert check.status == "not_applicable"
+
+
+def equilibrium_spec() -> ExperimentSpec:
+    return ExperimentSpec.model_validate(
+        yaml.safe_load(Path("examples/al-pn-al-equilibrium-devsim.yaml").read_text())
+    )
+
+
+def equilibrium_result(
+    *,
+    potential_range_v: float = 0.8345,
+    terminal_current_a_per_m2: float = 1.0e-19,
+) -> CanonicalResult:
+    return CanonicalResult(
+        backend="devsim",
+        simulator_version="2.9.1",
+        status="completed",
+        terminals=("anode", "cathode"),
+        bias_points=(
+            BiasPoint(
+                bias_v=0.0,
+                converged=True,
+                terminal_currents_a_per_m2={
+                    "anode": terminal_current_a_per_m2,
+                    "cathode": -terminal_current_a_per_m2,
+                },
+            ),
+        ),
+        fields={
+            "potential": FieldSeries(
+                positions_m=(0.0, 1.0e-6, 2.0e-6),
+                values=(0.0, potential_range_v / 2.0, potential_range_v),
+                unit="V",
+            ),
+            "electric_field": FieldSeries(
+                positions_m=(0.5e-6, 1.5e-6),
+                values=(1.0e5, 1.0e5),
+                unit="V/m",
+            ),
+            "electron_density": FieldSeries(
+                positions_m=(0.0, 1.0e-6, 2.0e-6),
+                values=(1.0e16, 1.0e19, 1.0e23),
+                unit="m^-3",
+            ),
+            "hole_density": FieldSeries(
+                positions_m=(0.0, 1.0e-6, 2.0e-6),
+                values=(1.0e23, 1.0e19, 1.0e16),
+                unit="m^-3",
+            ),
+        },
+    )
+
+
+def test_equilibrium_checks_pass_for_physical_pn_result() -> None:
+    report = ValidationEngine().validate(
+        equilibrium_result(),
+        spec=equilibrium_spec(),
+    )
+    current = report.checks_by_id["equilibrium-terminal-current"]
+    built_in = report.checks_by_id["built-in-potential-reference"]
+    assert current.status == "passed"
+    assert current.evidence_origin == "derived"
+    assert built_in.status == "passed"
+    assert built_in.measured_value == pytest.approx(0.8345)
+    assert "0.833" in str(built_in.limit)
+
+
+def test_equal_and_opposite_nonzero_equilibrium_currents_fail() -> None:
+    report = ValidationEngine().validate(
+        equilibrium_result(terminal_current_a_per_m2=1.868e3),
+        spec=equilibrium_spec(),
+    )
+    assert report.checks_by_id["terminal-current-conservation"].status == "passed"
+    assert report.checks_by_id["equilibrium-terminal-current"].status == "failed"
+
+
+def test_converged_equilibrium_with_wrong_built_in_potential_fails() -> None:
+    result = equilibrium_result(potential_range_v=0.00501)
+    engine = ValidationEngine()
+    report = engine.validate(result, spec=equilibrium_spec())
+    failures = engine.classify_failures(result, spec=equilibrium_spec())
+    assert report.checks_by_id["built-in-potential-reference"].status == "failed"
+    assert FailureKind.PHYSICAL_SANITY in {failure.kind for failure in failures}
+
+
+def test_validation_checks_record_evidence_origin() -> None:
+    report = ValidationEngine().validate(canonical_result())
+    assert all(check.evidence_origin for check in report.checks)
+    assert report.checks_by_id["simulator-version-recorded"].evidence_origin == (
+        "simulator_observed"
+    )
+
+
+def test_missing_requested_observable_fails_validation() -> None:
+    result = equilibrium_result()
+    incomplete = result.model_copy(
+        update={
+            "fields": {
+                name: field
+                for name, field in result.fields.items()
+                if name != "electron_density"
+            }
+        }
+    )
+    engine = ValidationEngine()
+    report = engine.validate(incomplete, spec=equilibrium_spec())
+    failures = engine.classify_failures(incomplete, spec=equilibrium_spec())
+    check = report.checks_by_id["requested-observables-present"]
+    assert check.status == "failed"
+    assert check.measured_value == "missing: electron_density"
+    assert FailureKind.MALFORMED_OUTPUT in {failure.kind for failure in failures}
