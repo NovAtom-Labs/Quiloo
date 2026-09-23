@@ -1,0 +1,15 @@
+schema_version: "1.0"
+backend: devsim
+adapter_version: "0.1.0"
+execution_state: configured
+dimensions: [1]
+equations: [poisson, electron_continuity, hole_continuity]
+models: [boltzmann, constant_mobility, srh]
+profiles: [constant]
+contacts: [ohmic]
+studies: [equilibrium, dc]
+observables: [terminal_current, potential, electric_field, electron_density, hole_density]
+limits:
+  max_bias_points: 10
+  max_regions: 32
+
