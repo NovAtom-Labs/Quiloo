@@ -102,6 +102,7 @@ def test_devsim_request_completes_without_knowledge_index(tmp_path: Path) -> Non
         store=SqliteRequestStore(tmp_path / "requests.sqlite3"),
         gateway=ScriptedModelGateway((AgentProposal(kind="spec", spec=payload),)),
         workspace=tmp_path / "workspace",
+        knowledge_index=tmp_path / "missing-knowledge.sqlite3",
     )
     submitted = control.submit("simulate the complete approved reference", backend="devsim")
     assert "knowledge_index_missing" in submitted.warnings
