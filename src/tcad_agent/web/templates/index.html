@@ -3,49 +3,157 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
     <title>NovAtom TCAD Agent</title>
     <link rel="stylesheet" href="/static/styles.css">
   </head>
   <body>
-    <main>
-      <header>
-        <p class="eyebrow">NOVATOM LABS</p>
-        <h1>TCAD Agent</h1>
-        <p>Describe a device study. Review the normalized plan before any simulator runs.</p>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand" aria-label="NovAtom Labs TCAD Agent">
+          <svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true">
+            <circle cx="21" cy="21" r="4.5"></circle>
+            <circle cx="8" cy="13" r="3"></circle>
+            <circle cx="34" cy="12" r="3"></circle>
+            <circle cx="31" cy="33" r="3"></circle>
+            <path d="M10.5 14.5 17 19M25 19l6.5-5M23.5 25l5.5 6M9.5 15.5l8 16M33 14l-11 17"></path>
+          </svg>
+          <div>
+            <strong>NovAtom</strong>
+            <span>LABS</span>
+          </div>
+        </div>
+        <div class="system-status"><span></span> TCAD PILOT · LOCAL</div>
       </header>
 
-      <section class="panel">
-        <label for="prompt">Research request</label>
-        <textarea id="prompt" rows="12" placeholder="Describe geometry, materials, doping, contacts, physics, studies, and requested outputs."></textarea>
-        <div class="actions">
-          <select id="backend" aria-label="Simulation backend">
-            <option value="devsim">DEVSIM, local</option>
-            <option value="sentaurus">Sentaurus, licensed runner</option>
-          </select>
-          <button id="submit">Build plan</button>
-        </div>
-      </section>
+      <main>
+        <section class="intro" aria-labelledby="page-title">
+          <p class="eyebrow">AUTONOMOUS DEVICE RESEARCH</p>
+          <h1 id="page-title">From research intent to <em>validated</em> device evidence.</h1>
+          <p class="intro-copy">Describe the study. The agent resolves material assumptions, compiles an exact plan, and runs only after your approval.</p>
+        </section>
 
-      <section id="status-panel" class="panel hidden">
-        <div class="status-row">
-          <h2>Experiment state</h2>
-          <span id="state" class="badge"></span>
-        </div>
-        <p id="warning" class="warning"></p>
-        <div id="questions"></div>
-        <pre id="plan"></pre>
-        <div class="actions">
-          <button id="approve" class="hidden">Approve exact plan</button>
-          <button id="run" class="hidden">Run simulation</button>
-        </div>
-      </section>
+        <ol id="workflow-progress" class="workflow-progress" aria-label="Experiment workflow">
+          <li class="is-active" data-stage="request">
+            <span class="stage-number">01</span>
+            <div><strong>Request</strong><small>Define the study</small></div>
+          </li>
+          <li data-stage="clarify">
+            <span class="stage-number">02</span>
+            <div><strong>Clarify</strong><small>Resolve essentials</small></div>
+          </li>
+          <li data-stage="review">
+            <span class="stage-number">03</span>
+            <div><strong>Review</strong><small>Approve exact plan</small></div>
+          </li>
+          <li data-stage="results">
+            <span class="stage-number">04</span>
+            <div><strong>Results</strong><small>Validate evidence</small></div>
+          </li>
+        </ol>
 
-      <section id="results-panel" class="panel hidden">
-        <h2>Validation and artifacts</h2>
-        <pre id="validation"></pre>
-        <a id="report" class="button-link hidden">Download report</a>
-      </section>
-    </main>
+        <section class="workspace-panel" aria-labelledby="request-title">
+          <div class="panel-heading">
+            <div>
+              <p class="section-index">01 · RESEARCH REQUEST</p>
+              <h2 id="request-title">What should we simulate?</h2>
+            </div>
+            <p class="panel-note">Natural language in. Structured specification out.</p>
+          </div>
+
+          <label class="field-label" for="prompt">Device study</label>
+          <textarea id="prompt" rows="10" placeholder="Describe geometry, materials, doping, contacts, temperature, physics, study conditions, and requested outputs."></textarea>
+          <div class="request-footer">
+            <label class="backend-field" for="backend">
+              <span>Execution backend</span>
+              <select id="backend" aria-label="Simulation backend">
+                <option value="devsim">DEVSIM · Local</option>
+                <option value="sentaurus">Sentaurus · Licensed runner</option>
+              </select>
+            </label>
+            <div class="backend-note">
+              <span class="backend-dot"></span>
+              <span id="backend-description">Ready for local execution</span>
+            </div>
+            <button id="submit" class="primary-action" type="button">Build plan</button>
+          </div>
+        </section>
+
+        <section id="status-panel" class="workspace-panel hidden" aria-labelledby="status-title" aria-live="polite">
+          <div class="panel-heading compact">
+            <div>
+              <p class="section-index">ACTIVE EXPERIMENT</p>
+              <h2 id="status-title">Research workflow</h2>
+            </div>
+            <span id="state" class="state-badge"></span>
+          </div>
+
+          <p id="warning" class="notice hidden" role="alert"></p>
+
+          <div id="questions-section" class="workflow-section hidden">
+            <div class="section-copy">
+              <p class="section-index">02 · CLARIFY ESSENTIALS</p>
+              <h3>Resolve the consequential assumptions.</h3>
+              <p>These values affect the physical structure or contact treatment, so the agent will not invent them.</p>
+            </div>
+            <div id="questions" class="question-grid"></div>
+          </div>
+
+          <div id="plan-section" class="workflow-section hidden">
+            <div class="section-copy">
+              <p class="section-index">03 · REVIEW THE PLAN</p>
+              <h3>Confirm what will actually run.</h3>
+              <p>Review the normalized device, models, study, backend, and any declared approximation before execution.</p>
+            </div>
+            <div id="plan-summary" class="summary-grid"></div>
+            <div class="approval-callout">
+              <div>
+                <strong>Immutable plan digest</strong>
+                <p>Your approval applies only to this exact specification.</p>
+              </div>
+              <code id="plan-digest">Not generated</code>
+            </div>
+            <details class="technical-details">
+              <summary>Inspect full technical plan</summary>
+              <pre id="plan"></pre>
+            </details>
+          </div>
+
+          <div class="workflow-actions">
+            <button id="answer" class="primary-action hidden" type="button" disabled>Continue to plan</button>
+            <button id="approve" class="primary-action hidden" type="button">Approve exact plan</button>
+            <button id="run" class="primary-action hidden" type="button">Run simulation</button>
+          </div>
+        </section>
+
+        <section id="results-panel" class="workspace-panel hidden" aria-labelledby="results-title">
+          <div class="panel-heading compact">
+            <div>
+              <p class="section-index">04 · VALIDATED EVIDENCE</p>
+              <h2 id="results-title">Simulation results</h2>
+            </div>
+            <span id="validation-status" class="state-badge">PENDING</span>
+          </div>
+          <div id="validation-list" class="validation-list"></div>
+          <details id="validation-details" class="technical-details hidden">
+            <summary>Inspect validation record</summary>
+            <pre id="validation"></pre>
+          </details>
+          <div id="artifacts" class="artifacts hidden">
+            <div class="section-copy">
+              <p class="section-index">EVIDENCE BUNDLE</p>
+              <h3>Reproducible run artifacts</h3>
+            </div>
+            <div id="artifact-links" class="artifact-links"></div>
+          </div>
+        </section>
+      </main>
+
+      <footer>
+        <span>NX-TCAD · PILOT</span>
+        <span>Structured intent · Deterministic execution · Verified evidence</span>
+      </footer>
+    </div>
     <script src="/static/app.js" defer></script>
   </body>
 </html>

@@ -1,3 +1,4 @@
+from html.parser import HTMLParser
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -7,6 +8,33 @@ from tcad_agent.control.store import SqliteRequestStore
 from tcad_agent.model_gateway.base import ScriptedModelGateway
 from tcad_agent.web.app import create_app
 from tcad_agent.web.launcher import DEFAULT_HOST
+
+
+class ButtonTextParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.buttons: dict[str, str] = {}
+        self.elements: dict[str, str] = {}
+        self._current_button: str | None = None
+
+    def handle_starttag(
+        self, tag: str, attrs: list[tuple[str, str | None]]
+    ) -> None:
+        attributes = dict(attrs)
+        if attributes.get("id"):
+            self.elements[attributes["id"]] = tag
+        if tag == "button" and attributes.get("id"):
+            self._current_button = attributes["id"]
+
+    def handle_data(self, data: str) -> None:
+        if self._current_button is not None:
+            self.buttons[self._current_button] = (
+                self.buttons.get(self._current_button, "") + data
+            ).strip()
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "button":
+            self._current_button = None
 
 
 def client(tmp_path: Path) -> TestClient:
@@ -39,6 +67,25 @@ def test_create_request_enters_clarification(tmp_path: Path) -> None:
         "geometry.n_region_thickness",
         "contacts.treatment",
     }
+
+
+def test_clarification_form_has_explicit_continue_action(tmp_path: Path) -> None:
+    page = client(tmp_path).get("/")
+    parser = ButtonTextParser()
+    parser.feed(page.text)
+    assert parser.buttons["answer"] == "Continue to plan"
+
+
+def test_researcher_page_exposes_workflow_review_and_results_regions(
+    tmp_path: Path,
+) -> None:
+    page = client(tmp_path).get("/")
+    parser = ButtonTextParser()
+    parser.feed(page.text)
+    assert parser.elements["workflow-progress"] == "ol"
+    assert parser.elements["plan-summary"] == "div"
+    assert parser.elements["validation-list"] == "div"
+    assert parser.elements["artifacts"] == "div"
 
 
 def test_invalid_request_identifier_is_rejected(tmp_path: Path) -> None:
