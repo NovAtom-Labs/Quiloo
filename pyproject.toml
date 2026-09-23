@@ -33,7 +33,7 @@ dev = [
 ]
 
 [project.scripts]
-tcad-agent = "apps.cli:app"
+tcad-agent = "tcad_agent.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -43,6 +43,7 @@ tcad_agent = ["**/*.yaml", "**/*.j2"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 markers = ["integration: invokes an installed simulator or subprocess boundary"]
 
 [tool.ruff]
