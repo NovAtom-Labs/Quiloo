@@ -38,6 +38,9 @@ def test_generator_creates_reproducible_clean_repository_with_known_failures(
         assert (destination / "RESEARCH_TASK.md").is_file()
         assert (destination / "experiment.toml").is_file()
         assert (destination / "src/junction_lab/physics.py").is_file()
+        assert (destination / "tests/test_science.py").is_file()
+        assert not (destination / "tests/test_science.py.template").exists()
+        assert "researcher-owned input" in (destination / "AGENTS.md").read_text()
 
         branch = _run("git", "branch", "--show-current", cwd=destination)
         status = _run("git", "status", "--porcelain", cwd=destination)
