@@ -77,3 +77,25 @@ sources:
     )
     assert searched.exit_code == 0, searched.output
     assert "local-devsim" in searched.output
+
+
+def test_cli_refuses_malformed_knowledge_manifest(tmp_path) -> None:
+    manifest = tmp_path / "sources.yaml"
+    manifest.write_text("[]\n")
+
+    result = runner.invoke(
+        app,
+        [
+            "knowledge",
+            "build",
+            "--manifest",
+            str(manifest),
+            "--root",
+            str(tmp_path),
+            "--index",
+            str(tmp_path / "knowledge.sqlite3"),
+        ],
+    )
+
+    assert result.exit_code == 2
+    assert "knowledge build failed" in result.output

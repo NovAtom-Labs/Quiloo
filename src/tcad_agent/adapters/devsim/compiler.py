@@ -36,6 +36,7 @@ class DevsimAdapter:
             details = "; ".join(f"{issue.path}: {issue.message}" for issue in decision.issues)
             raise CapabilityError(details)
         payload = self._payload(spec)
+        workspace = workspace.resolve()
         input_bytes = (json.dumps(payload, sort_keys=True, indent=2) + "\n").encode()
         runtime_path = Path(runtime.__file__)
         runtime_bytes = runtime_path.read_bytes()
@@ -122,8 +123,10 @@ class DevsimAdapter:
         )
         fields: dict[str, FieldSeries] = {}
         for name, field in data["fields"].items():
-            scale = 1e6 if field["unit"] == "cm^-3" else 1.0
-            unit = "m^-3" if field["unit"] == "cm^-3" else field["unit"]
+            scale = {"cm^-3": 1e6, "V/cm": 1e2}.get(field["unit"], 1.0)
+            unit = {"cm^-3": "m^-3", "V/cm": "V/m"}.get(
+                field["unit"], field["unit"]
+            )
             fields[name] = FieldSeries(
                 positions_m=tuple(value * 1e-2 for value in field["positions_cm"]),
                 values=tuple(value * scale for value in field["values"]),

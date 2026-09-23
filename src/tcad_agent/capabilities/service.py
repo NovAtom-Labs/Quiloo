@@ -6,7 +6,7 @@ from tcad_agent.capabilities.models import (
     CapabilityManifest,
     CapabilityStatus,
 )
-from tcad_agent.domain.models import ExperimentSpec
+from tcad_agent.domain.models import DCStudy, ExperimentSpec
 
 
 class CapabilityService:
@@ -49,6 +49,24 @@ class CapabilityService:
             tuple(str(observable) for observable in spec.observables),
             manifest.observables,
         )
+        self._check_limit(
+            issues,
+            "regions",
+            len(spec.regions),
+            manifest.limits.get("max_regions"),
+        )
+        bias_points = 1
+        if isinstance(spec.study, DCStudy):
+            bias_points = round(
+                (spec.study.stop.to("V") - spec.study.start.to("V"))
+                / spec.study.step.to("V")
+            ) + 1
+        self._check_limit(
+            issues,
+            "study.bias_points",
+            bias_points,
+            manifest.limits.get("max_bias_points"),
+        )
         status = (
             CapabilityStatus.BACKEND_UNSUPPORTED if issues else CapabilityStatus.SUPPORTED
         )
@@ -82,3 +100,21 @@ class CapabilityService:
     ) -> None:
         for index, value in enumerate(requested):
             cls._check_one(issues, f"{path}[{index}]", value, supported)
+
+    @staticmethod
+    def _check_limit(
+        issues: list[CapabilityIssue],
+        path: str,
+        requested: int,
+        maximum: int | float | None,
+    ) -> None:
+        if maximum is not None and requested > maximum:
+            issues.append(
+                CapabilityIssue(
+                    path=path,
+                    code="backend_limit_exceeded",
+                    message=f"{requested} exceeds backend limit {maximum}",
+                    requested=requested,
+                    supported=(maximum,),
+                )
+            )

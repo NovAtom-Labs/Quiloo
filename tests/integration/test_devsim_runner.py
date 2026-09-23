@@ -4,7 +4,7 @@ import pytest
 import yaml
 
 from tcad_agent.adapters.devsim.compiler import DevsimAdapter
-from tcad_agent.domain.models import ExperimentSpec
+from tcad_agent.domain.models import ExperimentSpec, Observable
 from tcad_agent.runners.local import LocalRunner
 from tcad_agent.runners.models import RunBudget
 
@@ -26,3 +26,39 @@ def test_two_structures_run_through_one_backend_path(fixture_name: str, tmp_path
     assert result.bias_points
     assert all(point.converged for point in result.bias_points)
     assert set(result.terminals) == {"anode", "cathode"}
+
+
+@pytest.mark.integration
+def test_requested_electric_field_is_normalized_to_si(tmp_path) -> None:
+    payload = yaml.safe_load((EXAMPLES / "pn-junction.yaml").read_text())
+    spec = ExperimentSpec.model_validate(payload)
+    requested = spec.model_copy(
+        update={"observables": (*spec.observables, Observable.ELECTRIC_FIELD)}
+    )
+    adapter = DevsimAdapter.from_defaults()
+    job = adapter.compile(requested, tmp_path / "electric-field")
+
+    native = LocalRunner(devsim_python=DEVSIM_PYTHON).run(job, RunBudget(seconds=120))
+    result = adapter.normalize(native)
+
+    assert result.status == "completed", native.stderr_path.read_text()
+    field = result.fields["electric_field"]
+    assert field.unit == "V/m"
+    assert len(field.positions_m) == len(field.values)
+    assert field.values
+
+
+@pytest.mark.integration
+def test_relative_workspace_executes_from_runner_working_directory(
+    tmp_path, monkeypatch
+) -> None:
+    payload = yaml.safe_load((EXAMPLES / "pn-junction.yaml").read_text())
+    spec = ExperimentSpec.model_validate(payload)
+    monkeypatch.chdir(tmp_path)
+    adapter = DevsimAdapter.from_defaults()
+
+    job = adapter.compile(spec, Path("runs") / "relative-workspace")
+    native = LocalRunner(devsim_python=DEVSIM_PYTHON).run(job, RunBudget(seconds=120))
+
+    assert job.entrypoint.is_absolute()
+    assert native.status == "completed", native.stderr_path.read_text()

@@ -48,6 +48,10 @@ class KnowledgeIngestor:
             for item in path.rglob("*")
             if item.is_file() and item.suffix.lower() in self.TEXT_SUFFIXES
         ):
+            if not document.resolve().is_relative_to(path):
+                raise ValueError(
+                    f"knowledge document escapes the approved root: {document}"
+                )
             relative = document.relative_to(path).as_posix()
             text = f"Source file: {relative}\n\n{document.read_text(encoding='utf-8')}"
             for index, chunk in enumerate(self._chunks(text)):

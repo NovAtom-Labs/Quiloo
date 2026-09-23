@@ -22,7 +22,7 @@ class CapabilityIssue(StrictModel):
     code: str
     message: str
     requested: str | int | None = None
-    supported: tuple[str | int, ...] = ()
+    supported: tuple[str | int | float, ...] = ()
 
 
 class CapabilityDecision(StrictModel):

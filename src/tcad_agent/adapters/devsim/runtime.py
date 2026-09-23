@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import sys
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +40,7 @@ def main() -> int:
         create_device,
         finalize_mesh,
         get_contact_current,
+        get_edge_model_values,
         get_node_model_values,
         set_node_values,
         set_parameter,
@@ -150,6 +152,18 @@ def main() -> int:
                 ),
                 "unit": unit,
             }
+    if "electric_field" in payload["observables"]:
+        edge_values = list(
+            get_edge_model_values(device=device, region=region, name="ElectricField")
+        )
+        edge_positions = [
+            (left + right) / 2.0 for left, right in pairwise(positions_cm)
+        ]
+        fields["electric_field"] = {
+            "positions_cm": edge_positions,
+            "values": edge_values,
+            "unit": "V/cm",
+        }
 
     result = {
         "schema_version": "1.0",

@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from tcad_agent.knowledge.ingest import KnowledgeIngestor
 from tcad_agent.knowledge.models import Passage, SourceManifest
 from tcad_agent.knowledge.retrieve import KnowledgeIndex
@@ -94,3 +96,26 @@ def test_ingest_local_directory_indexes_authorized_text_files(tmp_path: Path) ->
     content = "\n".join(passage.content for passage in passages)
     assert "manual.md" in content
     assert "example.py" in content
+
+
+def test_ingest_local_directory_rejects_symlink_escape(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.md"
+    outside.write_text("restricted text")
+    (corpus / "escape.md").symlink_to(outside)
+    source = SourceManifest(
+        id="local-corpus",
+        title="Local corpus",
+        url="https://example.invalid/corpus",
+        license="internal",
+        access="restricted",
+        trust="internal-reviewed",
+        backend="portable",
+        version="1.0",
+        reviewed=True,
+        local_path="corpus",
+    )
+
+    with pytest.raises(ValueError, match="escapes the approved root"):
+        KnowledgeIngestor().ingest_local(source, tmp_path)

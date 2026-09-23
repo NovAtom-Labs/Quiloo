@@ -47,7 +47,6 @@ study:
   start: 0 V
   stop: 0.2 V
   step: 0.1 V
-observables: [terminal_current, potential, electron_density, hole_density]
+observables: [terminal_current, potential, electric_field, electron_density, hole_density]
 metadata:
   purpose: composition fixture with three regions
-

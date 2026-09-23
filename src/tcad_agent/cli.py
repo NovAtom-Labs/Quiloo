@@ -170,6 +170,8 @@ def build_knowledge_command(
     """Build an immutable lexical index from authorized local source entries."""
     try:
         document = yaml.safe_load(manifest.read_text())
+        if not isinstance(document, dict) or not isinstance(document.get("sources"), list):
+            raise ValueError("knowledge manifest must contain a sources list")
         sources = tuple(
             SourceManifest.model_validate(item) for item in document.get("sources", ())
         )
