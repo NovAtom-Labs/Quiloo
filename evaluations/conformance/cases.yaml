@@ -12,6 +12,42 @@ requirements:
     identical_mesh_required: false
     identical_values_required: false
 cases:
+  - id: al-pn-al-equilibrium
+    spec: ../../examples/al-pn-al-equilibrium.yaml
+    required_observables: [potential, electric_field, electron_density, hole_density]
+    compare:
+      - metric: qualitative_direction
+        points: [0.0]
+        unit: A/m^2
+        relative_tolerance: 0.05
+        absolute_tolerance: 1.0e-8
+      - metric: terminal_current_conservation
+        relative_tolerance: 1.0e-4
+        absolute_tolerance: 1.0e-8
+      - metric: built_in_potential
+        field: potential
+        unit: V
+        relative_tolerance: 0.10
+        absolute_tolerance: 0.02
+      - metric: field_extrema
+        field: electric_field
+        unit: V/m
+        relative_tolerance: 0.20
+        absolute_tolerance: 1.0e3
+      - metric: carrier_profile
+        field: electron_density
+        unit: m^-3
+        relative_tolerance: 0.35
+        absolute_tolerance: 1.0e12
+      - metric: carrier_profile
+        field: hole_density
+        unit: m^-3
+        relative_tolerance: 0.35
+        absolute_tolerance: 1.0e12
+      - metric: mesh_stability
+        relative_tolerance: 0.05
+        absolute_tolerance: 1.0e-8
+        applicable: false
   - id: two-region-junction-dc
     spec: ../../examples/pn-junction.yaml
     required_observables: [terminal_current, potential]

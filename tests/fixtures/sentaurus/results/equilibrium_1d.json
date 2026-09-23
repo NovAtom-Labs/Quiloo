@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "simulator_version": "S-2024.03",
+  "status": "completed",
+  "terminals": ["anode", "cathode"],
+  "current_density_unit": "A/cm^2",
+  "bias_points": [
+    {
+      "bias_v": 0.0,
+      "converged": true,
+      "terminal_current_density": {
+        "anode": 1.0e-16,
+        "cathode": -1.0e-16
+      }
+    }
+  ],
+  "fields": {
+    "potential": {
+      "position": [0.0, 0.5, 1.0, 1.5, 2.0],
+      "position_unit": "um",
+      "values": [0.0, 0.05, 0.35, 0.62, 0.7],
+      "unit": "V"
+    },
+    "electric_field": {
+      "position": [0.0, 0.5, 1.0, 1.5, 2.0],
+      "position_unit": "um",
+      "values": [0.0, -1000.0, -12500.0, -1500.0, 0.0],
+      "unit": "V/cm"
+    },
+    "electron_density": {
+      "position": [0.0, 0.5, 1.0, 1.5, 2.0],
+      "position_unit": "um",
+      "values": [1000.0, 100000.0, 1.0e12, 8.0e16, 1.0e17],
+      "unit": "cm^-3"
+    },
+    "hole_density": {
+      "position": [0.0, 0.5, 1.0, 1.5, 2.0],
+      "position_unit": "um",
+      "values": [1.0e17, 8.0e16, 1.0e12, 100000.0, 1000.0],
+      "unit": "cm^-3"
+    }
+  }
+}

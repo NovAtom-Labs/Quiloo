@@ -52,6 +52,7 @@ pythonpath = ["src"]
 markers = [
   "integration: invokes an installed simulator or subprocess boundary",
   "live_bedrock: invokes the configured Amazon Bedrock model",
+  "sentaurus: invokes the configured licensed Sentaurus runner",
 ]
 
 [tool.ruff]

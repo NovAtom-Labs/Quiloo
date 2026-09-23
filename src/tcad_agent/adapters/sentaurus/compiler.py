@@ -10,6 +10,7 @@ from pathlib import Path
 
 from jinja2 import Environment, StrictUndefined
 
+from tcad_agent.adapters.sentaurus.normalizer import SentaurusNormalizer
 from tcad_agent.adapters.sentaurus.runtime import (
     SentaurusJobManifest,
     SourceLocation,
@@ -24,7 +25,8 @@ from tcad_agent.domain.models import (
     ExperimentSpec,
     Observable,
 )
-from tcad_agent.runners.models import CompiledJob
+from tcad_agent.results.models import CanonicalResult
+from tcad_agent.runners.models import CompiledJob, NativeRunResult
 
 _SAFE_IDENTIFIER = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 _MODEL_LINES = {
@@ -170,6 +172,9 @@ class SentaurusAdapter:
             runtime_digest=runtime_digest,
             compiler_version=self.compiler_version,
         )
+
+    def normalize(self, native: NativeRunResult) -> CanonicalResult:
+        return SentaurusNormalizer().normalize(native)
 
     def _validate_safe_subset(self, spec: ExperimentSpec) -> None:
         identifiers = [spec.name]
