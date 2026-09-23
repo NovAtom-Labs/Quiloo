@@ -1,5 +1,15 @@
 schema_version: "1.0"
 sources:
+  - id: novatom-curated-tcad-foundation-0.1
+    title: NovAtom portable TCAD foundation
+    url: internal://knowledge/novatom-curated-tcad-foundation-0.1
+    license: NovAtom internal-use
+    access: restricted
+    trust: secondary
+    backend: portable
+    version: "0.1"
+    reviewed: false
+    local_path: TCAD Agent/knowledge-sources/curated
   - id: devsim-source-2.9.1
     title: DEVSIM source and examples
     url: https://github.com/devsim/devsim/tree/43b41ca845184c47e22b72d144db7e7db8509377
@@ -9,7 +19,7 @@ sources:
     backend: devsim
     version: "2.9.1"
     reviewed: true
-    local_path: ../devsim/source
+    local_path: devsim/source
   - id: devsim-manual-2.11.0
     title: DEVSIM Manual
     url: https://devsim.net/
@@ -28,4 +38,3 @@ sources:
     backend: sentaurus
     version: deployment-specific
     reviewed: false
-

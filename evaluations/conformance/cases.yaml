@@ -1,0 +1,41 @@
+schema_version: "1.0"
+purpose: Cross-backend semantic acceptance using ordinary experiment data
+requirements:
+  per_backend:
+    execution_status: completed
+    convergence: all_points
+    validation_overall: passed
+    provenance_required: true
+    artifact_hashes_required: true
+  cross_backend:
+    comparison: expert_reviewed_metrics
+    identical_mesh_required: false
+    identical_values_required: false
+cases:
+  - id: two-region-junction-dc
+    spec: ../../examples/pn-junction.yaml
+    required_observables: [terminal_current, potential]
+    compare:
+      - metric: terminal_current_density
+        points: [0.0, 0.1, 0.2]
+        unit: A/m^2
+        relative_tolerance: 0.25
+        absolute_tolerance: 1.0e-6
+      - metric: terminal_current_conservation
+        relative_tolerance: 1.0e-4
+        absolute_tolerance: 1.0e-6
+  - id: three-region-low-doped-interior-dc
+    spec: ../../examples/pin-diode.yaml
+    required_observables: [terminal_current, potential, electric_field]
+    compare:
+      - metric: terminal_current_density
+        points: [0.0, 0.1, 0.2]
+        unit: A/m^2
+        relative_tolerance: 0.30
+        absolute_tolerance: 1.0e-6
+      - metric: terminal_current_conservation
+        relative_tolerance: 1.0e-4
+        absolute_tolerance: 1.0e-6
+review:
+  tolerance_owner: TCAD domain lead
+  status: provisional_until_sentaurus_reference_runs

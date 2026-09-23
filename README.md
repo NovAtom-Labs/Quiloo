@@ -1,22 +1,96 @@
 # NovAtom TCAD Agent
 
-NovAtom TCAD Agent is a simulator-neutral research automation foundation for semiconductor device simulation. A typed `ExperimentSpec` describes regions, profiles, contacts, physics, studies, and observables. Backend adapters compile that contract for DEVSIM today and for a remote licensed Sentaurus installation before the pilot.
+NovAtom TCAD Agent is a simulator-neutral foundation for researcher-driven semiconductor device simulation. Researchers describe regions, doping profiles, contacts, physics, studies, and observables in a strict `ExperimentSpec`. Deterministic adapters translate that data into simulator inputs. DEVSIM works locally today. Sentaurus is represented by the same capability and execution contracts and remains disabled until the licensed machine is connected.
 
-The project is intentionally not a collection of named-device scripts. Example devices are ordinary data fixtures that exercise the same compiler path available to researchers.
+Named devices are examples, not execution modes. The PN and PIN examples pass through the same schema, compiler, runner, normalizer, validators, bundle writer, and report generator. A researcher can compose another supported one-dimensional silicon stack without adding product code.
 
-## Status
+## Current status
 
-This branch implements the local foundation described in the approved design. It is not yet a fabrication-calibrated tool and does not yet execute Sentaurus.
+Working now:
 
-## Development
+- strict units-aware experiment specifications
+- data-driven backend capability checks and explicit refusal
+- deterministic DEVSIM compilation and bounded execution
+- canonical results, physical checks, immutable evidence bundles, and reports
+- manifest-gated local knowledge retrieval with citations
+- eight TCAD operating skills and a typed OpenHands tool boundary
+- researcher CLI with an explicit execution approval gate
+
+Deliberate limits:
+
+- one-dimensional, silicon-first structures
+- constant donor and acceptor profiles
+- ohmic contacts, equilibrium, and bounded DC sweeps
+- exploratory output, not fabrication-calibrated prediction
+- no Sentaurus execution until its licensed machine, exact version, adapter, and runner are configured
+
+See [Architecture](docs/architecture.md), [DEVSIM operations](docs/operations/devsim.md), and [Sentaurus integration](docs/operations/sentaurus-integration.md).
+
+## Quick start
+
+Python 3.13 is required. From this repository:
 
 ```bash
 /usr/local/bin/python3.13 -m venv .venv
 .venv/bin/python -m pip install -r requirements.lock
-.venv/bin/python -m pip install -e . --no-deps
+.venv/bin/python -m pip install . --no-deps
 .venv/bin/pytest -q
 ```
 
-DEVSIM is installed separately at `/Users/satyagni/Documents/NovAtom Labs/devsim/.venv`. This keeps the simulator executable behind the same process boundary that will later be used by the Sentaurus remote runner.
+Validate both ordinary data fixtures:
 
-The installed simulator is DEVSIM `2.9.1`. Its accompanying Apache-2.0 source checkout is pinned at commit `43b41ca845184c47e22b72d144db7e7db8509377` under `/Users/satyagni/Documents/NovAtom Labs/devsim/source`.
+```bash
+.venv/bin/tcad-agent validate examples/pn-junction.yaml
+.venv/bin/tcad-agent validate examples/pin-diode.yaml
+```
+
+Run a study only after reviewing it:
+
+```bash
+.venv/bin/tcad-agent run examples/pn-junction.yaml \
+  --backend devsim \
+  --approve \
+  --output runs
+```
+
+Build the local DEVSIM knowledge index from the approved manifest:
+
+```bash
+.venv/bin/tcad-agent knowledge build \
+  --manifest knowledge-sources/manifests/sources.yaml \
+  --root "/Users/satyagni/Documents/NovAtom Labs"
+
+.venv/bin/tcad-agent knowledge search "ohmic contact equation" \
+  --backend devsim \
+  --version 2.9.1
+```
+
+The installed DEVSIM runtime is `2.9.1` at `/Users/satyagni/Documents/NovAtom Labs/devsim/.venv`. Its Apache-2.0 source checkout is pinned at commit `43b41ca845184c47e22b72d144db7e7db8509377` in `/Users/satyagni/Documents/NovAtom Labs/devsim/source`.
+
+## Configuration
+
+- `LLM_MODEL`: OpenHands model identifier. Default: `openai/gpt-5.6-terra`.
+- `TCAD_REASONING_EFFORT`: OpenHands reasoning effort. Default: `medium`.
+- `TCAD_DEVSIM_PYTHON`: optional DEVSIM Python executable override. The default is the sibling `devsim/.venv/bin/python` path.
+- model-provider credentials such as `OPENAI_API_KEY`: required only when starting an actual OpenHands conversation.
+
+The agent profile exposes only the `tcad_domain` tool. It does not expose a terminal. Simulation execution requires an approved plan identifier in agent workflows or `--approve` in the CLI.
+
+The knowledge build combines the pinned public DEVSIM source with NovAtom's curated portable TCAD guides. Curated guides are explicitly marked as awaiting domain-lead review. Sentaurus guidance remains closed until version-compatible licensed sources are available on the licensed machine.
+
+## Repository layout
+
+```text
+src/tcad_agent/domain/       portable experiment contract
+src/tcad_agent/capabilities/ backend support and refusal
+src/tcad_agent/adapters/     deterministic simulator translations
+src/tcad_agent/runners/      bounded local and remote execution boundaries
+src/tcad_agent/results/      canonical simulator-neutral results
+src/tcad_agent/validation/   numerical and physical checks
+src/tcad_agent/bundles/      immutable evidence packaging
+src/tcad_agent/knowledge/    authorized ingestion and retrieval
+src/tcad_agent/agent/        typed OpenHands tools and runtime profile
+skills/                      progressive TCAD operating knowledge
+examples/                    ordinary experiment fixtures
+evaluations/                 retrieval and cross-backend acceptance cases
+```

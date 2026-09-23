@@ -18,7 +18,7 @@ from openhands.sdk.tool import (
 )
 from pydantic import Field, ValidationError
 
-from tcad_agent.adapters.devsim.compiler import DevsimAdapter
+from tcad_agent.adapters.registry import BackendAdapterUnavailable, get_backend
 from tcad_agent.capabilities.models import CapabilityManifest, CapabilityStatus
 from tcad_agent.capabilities.service import CapabilityService
 from tcad_agent.domain.errors import CapabilityError
@@ -82,15 +82,13 @@ class DomainTools:
                 code="backend_unconfigured",
                 message=f"{backend} support is declared but its runner is not configured.",
             )
-        if backend != "devsim":
-            return ToolResponse(
-                status="refused",
-                code="compiler_unavailable",
-                message=f"No local compiler is installed for {backend}.",
-            )
         workspace = self.workspace / "compiled" / uuid4().hex
         try:
-            job = DevsimAdapter.from_defaults().compile(spec, workspace)
+            job = get_backend(backend).adapter.compile(spec, workspace)
+        except BackendAdapterUnavailable as exc:
+            return ToolResponse(
+                status="refused", code="compiler_unavailable", message=str(exc)
+            )
         except CapabilityError as exc:
             return ToolResponse(status="refused", code="capability_error", message=str(exc))
         return ToolResponse(

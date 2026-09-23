@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from tcad_agent.knowledge.models import Passage
+from tcad_agent.knowledge.ingest import KnowledgeIngestor
+from tcad_agent.knowledge.models import Passage, SourceManifest
 from tcad_agent.knowledge.retrieve import KnowledgeIndex
 
 
@@ -65,3 +66,31 @@ def test_backend_filter_excludes_sentaurus_text(tmp_path: Path) -> None:
     hits = index.search("mobility model", {"backend": "devsim"}, 5)
     assert hits
     assert all(hit.backend == "devsim" for hit in hits)
+
+
+def test_ingest_local_directory_indexes_authorized_text_files(tmp_path: Path) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "manual.md").write_text("# Contacts\n\nOhmic boundary equation.")
+    (corpus / "example.py").write_text("def create_contact():\n    pass\n")
+    (corpus / "ignored.bin").write_bytes(b"\x00\x01")
+    source = SourceManifest(
+        id="local-corpus",
+        title="Local corpus",
+        url="https://example.invalid/corpus",
+        license="Apache-2.0",
+        access="public",
+        trust="primary",
+        backend="devsim",
+        version="1.0",
+        reviewed=True,
+        local_path="corpus",
+    )
+
+    passages = KnowledgeIngestor().ingest_local(source, tmp_path)
+
+    assert len(passages) >= 2
+    assert len({passage.id for passage in passages}) == len(passages)
+    content = "\n".join(passage.content for passage in passages)
+    assert "manual.md" in content
+    assert "example.py" in content

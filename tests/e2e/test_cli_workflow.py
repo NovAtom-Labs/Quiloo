@@ -25,3 +25,55 @@ def test_cli_runs_example_to_completed_bundle(tmp_path) -> None:
     manifest = json.loads(manifest_path.read_text())
     assert manifest["state"] == "completed"
     assert (manifest_path.parent / "report.md").is_file()
+
+
+def test_cli_builds_and_searches_authorized_knowledge_index(tmp_path) -> None:
+    corpus = tmp_path / "corpus"
+    corpus.mkdir()
+    (corpus / "manual.md").write_text("Ohmic contact boundary conditions for DEVSIM.")
+    manifest = tmp_path / "sources.yaml"
+    manifest.write_text(
+        """schema_version: \"1.0\"
+sources:
+  - id: local-devsim
+    title: Local DEVSIM corpus
+    url: https://example.invalid/devsim
+    license: Apache-2.0
+    access: public
+    trust: primary
+    backend: devsim
+    version: \"2.9.1\"
+    reviewed: true
+    local_path: corpus
+"""
+    )
+    index = tmp_path / "knowledge.sqlite3"
+
+    built = runner.invoke(
+        app,
+        [
+            "knowledge",
+            "build",
+            "--manifest",
+            str(manifest),
+            "--root",
+            str(tmp_path),
+            "--index",
+            str(index),
+        ],
+    )
+    assert built.exit_code == 0, built.output
+    searched = runner.invoke(
+        app,
+        [
+            "knowledge",
+            "search",
+            "ohmic contact",
+            "--index",
+            str(index),
+            "--backend",
+            "devsim",
+        ],
+    )
+    assert searched.exit_code == 0, searched.output
+    assert "local-devsim" in searched.output

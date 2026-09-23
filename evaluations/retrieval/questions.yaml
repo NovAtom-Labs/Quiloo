@@ -9,6 +9,21 @@ questions:
     backend: devsim
     version: "2.9.1"
     required_source_ids: [devsim-source-2.9.1]
+  - id: portable-no-device-taxonomy
+    query: Why must experiments avoid named device execution modes?
+    backend: portable
+    version: "0.1"
+    required_source_ids: [novatom-curated-tcad-foundation-0.1]
+  - id: portable-current-density-units
+    query: When can a one-dimensional result be called total current instead of current density?
+    backend: portable
+    version: "0.1"
+    required_source_ids: [novatom-curated-tcad-foundation-0.1]
+  - id: portable-recovery-boundary
+    query: Which solver recovery changes preserve scientific intent?
+    backend: portable
+    version: "0.1"
+    required_source_ids: [novatom-curated-tcad-foundation-0.1]
   - id: sentaurus-boundary
     query: Generate a Sentaurus contact block for the pilot version.
     backend: sentaurus

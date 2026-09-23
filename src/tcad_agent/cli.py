@@ -11,14 +11,15 @@ import typer
 import yaml
 from pydantic import ValidationError
 
-from tcad_agent.adapters.devsim.compiler import DevsimAdapter
+from tcad_agent.adapters.registry import BackendAdapterUnavailable, get_backend
 from tcad_agent.bundles.models import BundleInputs
 from tcad_agent.bundles.writer import BundleWriter
 from tcad_agent.capabilities.models import CapabilityManifest, CapabilityStatus
 from tcad_agent.capabilities.service import CapabilityService
 from tcad_agent.domain.models import DCStudy, ExperimentSpec
+from tcad_agent.knowledge.ingest import KnowledgeIngestor
+from tcad_agent.knowledge.models import SourceManifest
 from tcad_agent.knowledge.retrieve import KnowledgeIndex
-from tcad_agent.runners.local import LocalRunner
 from tcad_agent.runners.models import RunBudget
 from tcad_agent.validation.engine import ValidationEngine
 
@@ -26,7 +27,6 @@ app = typer.Typer(help="Validate, compile, run, and report simulator-neutral TCA
 knowledge_app = typer.Typer(help="Search the authorized versioned TCAD knowledge index.")
 app.add_typer(knowledge_app, name="knowledge")
 
-DEVSIM_PYTHON = Path("/Users/satyagni/Documents/NovAtom Labs/devsim/.venv/bin/python")
 DEFAULT_COMPILED_OUTPUT = Path("compiled")
 DEFAULT_RUN_OUTPUT = Path("runs")
 DEFAULT_KNOWLEDGE_INDEX = Path("knowledge-sources/index/knowledge.sqlite3")
@@ -74,10 +74,11 @@ def compile_command(
     """Compile a supported specification without executing it."""
     spec = _load_spec(spec_path)
     _require_backend(spec, backend)
-    if backend != "devsim":
-        typer.echo(f"compiler unavailable for {backend}", err=True)
-        raise typer.Exit(2)
-    job = DevsimAdapter.from_defaults().compile(spec, output)
+    try:
+        job = get_backend(backend).adapter.compile(spec, output)
+    except BackendAdapterUnavailable as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from exc
     typer.echo(json.dumps(job.model_dump(mode="json"), sort_keys=True, indent=2))
 
 
@@ -95,14 +96,16 @@ def run_command(
         raise typer.Exit(2)
     spec = _load_spec(spec_path)
     _require_backend(spec, backend)
-    if backend != "devsim":
-        typer.echo(f"compiler unavailable for {backend}", err=True)
-        raise typer.Exit(2)
     run_id = f"run-{uuid4().hex[:12]}"
     work = output / ".work" / run_id
-    adapter = DevsimAdapter.from_defaults()
+    try:
+        binding = get_backend(backend)
+    except BackendAdapterUnavailable as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from exc
+    adapter = binding.adapter
     job = adapter.compile(spec, work)
-    native = LocalRunner(DEVSIM_PYTHON).run(job, RunBudget(seconds=timeout_seconds))
+    native = binding.runner.run(job, RunBudget(seconds=timeout_seconds))
     result = adapter.normalize(native)
     expected_points = 1
     if isinstance(spec.study, DCStudy):
@@ -155,3 +158,37 @@ def search_knowledge_command(
     }
     hits = KnowledgeIndex(index).search(query, filters, limit)
     typer.echo(json.dumps([hit.model_dump(mode="json") for hit in hits], indent=2))
+
+
+@knowledge_app.command("build")
+def build_knowledge_command(
+    manifest: Annotated[Path, typer.Option("--manifest")],
+    root: Annotated[Path, typer.Option("--root")],
+    index: Annotated[Path, typer.Option("--index")] = DEFAULT_KNOWLEDGE_INDEX,
+    source_id: Annotated[str | None, typer.Option("--source-id")] = None,
+) -> None:
+    """Build an immutable lexical index from authorized local source entries."""
+    try:
+        document = yaml.safe_load(manifest.read_text())
+        sources = tuple(
+            SourceManifest.model_validate(item) for item in document.get("sources", ())
+        )
+        selected = tuple(
+            source
+            for source in sources
+            if source.local_path is not None
+            and (source_id is None or source.id == source_id)
+        )
+        if not selected:
+            raise ValueError("manifest contains no matching local knowledge source")
+        ingestor = KnowledgeIngestor()
+        passages = tuple(
+            passage
+            for source in selected
+            for passage in ingestor.ingest_local(source, root)
+        )
+        KnowledgeIndex.build(index, passages)
+    except (OSError, ValueError, ValidationError, yaml.YAMLError) as exc:
+        typer.echo(f"knowledge build failed: {exc}", err=True)
+        raise typer.Exit(2) from exc
+    typer.echo(f"indexed {len(passages)} passages at {index}")
