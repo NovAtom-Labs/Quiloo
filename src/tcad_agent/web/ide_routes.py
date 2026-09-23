@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import time
 from collections.abc import AsyncIterator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import UUID
 
@@ -42,6 +42,12 @@ class IDEServices:
     workspaces: WorkspaceManager
     conversations: ConversationService
     events: EventFeed
+    store: SqliteIDEStore = field(init=False)
+    runtime_root: Path = field(init=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "store", self.conversations.store)
+        object.__setattr__(self, "runtime_root", self.conversations.store.path.parent)
 
 
 def build_default_ide_services() -> IDEServices:

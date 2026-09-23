@@ -341,6 +341,42 @@ class SqliteIDEStore:
             ).fetchall()
         return tuple(self._run(row) for row in rows)
 
+    def list_runs_for_workspace(
+        self, workspace_id: UUID
+    ) -> tuple[AgentRunRecord, ...]:
+        self.get_workspace(workspace_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT agent_runs.*
+                FROM agent_runs
+                JOIN conversations
+                  ON conversations.id = agent_runs.conversation_id
+                WHERE conversations.workspace_id = ?
+                ORDER BY agent_runs.created_at ASC, agent_runs.id ASC
+                """,
+                (str(workspace_id),),
+            ).fetchall()
+        return tuple(self._run(row) for row in rows)
+
+    def list_runs_in_states(
+        self, states: set[RunState]
+    ) -> tuple[AgentRunRecord, ...]:
+        if not states:
+            return ()
+        values = tuple(state.value for state in states)
+        placeholders = ",".join("?" for _ in values)
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT * FROM agent_runs
+                WHERE state IN ({placeholders})
+                ORDER BY created_at ASC, id ASC
+                """,
+                values,
+            ).fetchall()
+        return tuple(self._run(row) for row in rows)
+
     def transition_run(
         self, run_id: UUID, expected_revision: int, state: RunState
     ) -> AgentRunRecord:
