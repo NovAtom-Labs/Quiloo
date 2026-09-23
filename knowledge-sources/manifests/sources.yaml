@@ -1,0 +1,31 @@
+schema_version: "1.0"
+sources:
+  - id: devsim-source-2.9.1
+    title: DEVSIM source and examples
+    url: https://github.com/devsim/devsim/tree/43b41ca845184c47e22b72d144db7e7db8509377
+    license: Apache-2.0
+    access: public
+    trust: primary
+    backend: devsim
+    version: "2.9.1"
+    reviewed: true
+    local_path: ../devsim/source
+  - id: devsim-manual-2.11.0
+    title: DEVSIM Manual
+    url: https://devsim.net/
+    license: documentation terms require review before redistribution
+    access: public
+    trust: primary
+    backend: devsim
+    version: "2.11.0"
+    reviewed: false
+  - id: sentaurus-licensed-documentation
+    title: Synopsys Sentaurus Device documentation
+    url: licensed-machine-only
+    license: proprietary
+    access: restricted
+    trust: primary
+    backend: sentaurus
+    version: deployment-specific
+    reviewed: false
+

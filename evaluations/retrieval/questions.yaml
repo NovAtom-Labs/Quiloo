@@ -1,0 +1,15 @@
+schema_version: "1.0"
+questions:
+  - id: devsim-ohmic-contact
+    query: How is an ohmic drift-diffusion contact defined in DEVSIM?
+    backend: devsim
+    required_source_ids: [devsim-source-2.9.1]
+  - id: version-filter
+    query: Which contact equation applies to the installed simulator version?
+    backend: devsim
+    version: "2.9.1"
+    required_source_ids: [devsim-source-2.9.1]
+  - id: sentaurus-boundary
+    query: Generate a Sentaurus contact block for the pilot version.
+    backend: sentaurus
+    expected_behavior: refuse_without_version_compatible_licensed_source
