@@ -262,6 +262,19 @@ The layout adapts to narrower screens but is optimized for a desktop Linux brows
 guided request, clarification, review, run, and results pages remain available as a focused TCAD
 workflow. They become views within the larger workspace instead of the primary navigation model.
 
+### 5.9 Delegated subagents
+
+The primary OpenHands agent may delegate bounded work through the SDK task tool. Quiloo registers
+the SDK's code-explorer, command-runner, and general-purpose agent definitions, plus reviewed
+project agent definitions stored under `.agents/agents`. Delegated work inherits the parent
+workspace, model, persistence directory, budgets, and confirmation policy.
+
+Subagents are not a permission bypass. Their tool actions pass through the same confirmation and
+event pipeline as parent actions, and their activity is attributed to the subagent task in the
+browser. Parallel read-only investigation is allowed. Concurrent write-capable delegation is
+limited to avoid conflicting edits in one repository, and the primary agent remains responsible
+for reviewing delegated output and validating the final workspace state.
+
 ## 6. Agent Execution Lifecycle
 
 ### 6.1 Starting a task
