@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+from tcad_agent.recovery.models import FailureKind, FailureRecord
 from tcad_agent.results.models import CanonicalResult
 from tcad_agent.validation.models import ValidationCheck, ValidationReport, ValidationStatus
 
@@ -135,6 +136,63 @@ class ValidationEngine:
         elif any(check.status == "warning" for check in checks):
             overall = "warning"
         return ValidationReport(overall=overall, checks=tuple(checks))
+
+    def classify_failures(self, result: CanonicalResult) -> tuple[FailureRecord, ...]:
+        if result.status == "execution_failed":
+            return (
+                FailureRecord(
+                    kind=FailureKind.EXECUTION,
+                    evidence=result.error or result.status,
+                ),
+            )
+        if result.status == "timed_out":
+            return (
+                FailureRecord(
+                    kind=FailureKind.TIMEOUT,
+                    evidence=result.error or result.status,
+                ),
+            )
+        if result.status == "malformed_result":
+            return (
+                FailureRecord(
+                    kind=FailureKind.MALFORMED_OUTPUT,
+                    evidence=result.error or result.status,
+                ),
+            )
+
+        failures: list[FailureRecord] = []
+        if result.bias_points and not all(point.converged for point in result.bias_points):
+            failures.append(
+                FailureRecord(
+                    kind=FailureKind.NON_CONVERGENCE,
+                    evidence="one or more bias points did not converge",
+                )
+            )
+        if not self._all_values_finite(result):
+            failures.append(
+                FailureRecord(
+                    kind=FailureKind.NONFINITE_RESULT,
+                    evidence="canonical result contains NaN or infinite values",
+                )
+            )
+            return tuple(failures)
+
+        report = self.validate(result)
+        if report.checks_by_id["terminal-current-conservation"].status == "failed":
+            failures.append(
+                FailureRecord(
+                    kind=FailureKind.CONSERVATION,
+                    evidence="terminal current conservation check failed",
+                )
+            )
+        if report.checks_by_id["nonnegative-carrier-density"].status == "failed":
+            failures.append(
+                FailureRecord(
+                    kind=FailureKind.PHYSICAL_SANITY,
+                    evidence="carrier density sanity check failed",
+                )
+            )
+        return tuple(failures)
 
     def _current_imbalance(self, result: CanonicalResult) -> tuple[float, float]:
         worst_imbalance = 0.0

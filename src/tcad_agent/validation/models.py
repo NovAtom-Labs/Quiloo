@@ -4,7 +4,7 @@ from typing import Literal
 
 from tcad_agent.domain.models import StrictModel
 
-ValidationStatus = Literal["passed", "warning", "failed"]
+ValidationStatus = Literal["passed", "warning", "failed", "not_applicable"]
 
 
 class ValidationCheck(StrictModel):
@@ -24,4 +24,3 @@ class ValidationReport(StrictModel):
     @property
     def checks_by_id(self) -> dict[str, ValidationCheck]:
         return {check.id: check for check in self.checks}
-
