@@ -1,5 +1,7 @@
 """Canonical parsing and conversion for physical quantities."""
 
+import math
+from collections.abc import Mapping
 from typing import Any, Self
 
 import pint
@@ -25,6 +27,8 @@ class QuantityValue(BaseModel):
     def parse_quantity(cls, value: Any) -> Any:
         if isinstance(value, cls):
             return value
+        if isinstance(value, Mapping):
+            return value
         if not isinstance(value, str) or not value.strip():
             raise UnitError("physical quantities require an explicit value and unit")
         try:
@@ -36,6 +40,18 @@ class QuantityValue(BaseModel):
             "si_unit": str(quantity.units),
             "dimensionality": str(quantity.dimensionality),
         }
+
+    @model_validator(mode="after")
+    def validate_canonical_quantity(self) -> Self:
+        if not math.isfinite(self.magnitude_si):
+            raise UnitError("physical quantity magnitude must be finite")
+        try:
+            quantity = UNIT_REGISTRY.Quantity(self.magnitude_si, self.si_unit)
+        except (pint.UndefinedUnitError, ValueError) as exc:
+            raise UnitError(f"invalid canonical SI unit: {self.si_unit!r}") from exc
+        if str(quantity.dimensionality) != self.dimensionality:
+            raise UnitError("canonical quantity dimensionality does not match its unit")
+        return self
 
     def is_compatible_with(self, unit: str) -> bool:
         quantity = UNIT_REGISTRY.Quantity(self.magnitude_si, self.si_unit)

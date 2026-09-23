@@ -5,13 +5,8 @@ from typing import Literal, Protocol
 
 from pydantic import Field, JsonValue, model_validator
 
-from tcad_agent.control.models import ResearchRequest
+from tcad_agent.control.models import ClarificationQuestion, ResearchRequest
 from tcad_agent.domain.models import StrictModel
-
-
-class ClarificationQuestion(StrictModel):
-    field: str = Field(min_length=1)
-    prompt: str = Field(min_length=1)
 
 
 class AgentContextPacket(StrictModel):

@@ -26,6 +26,16 @@ class ResearchRequest(StrictModel):
     prompt: str = Field(min_length=1, max_length=100_000)
 
 
+class ClarificationQuestion(StrictModel):
+    field: str = Field(min_length=1)
+    prompt: str = Field(min_length=1)
+
+
+class ClarificationAnswer(StrictModel):
+    field: str = Field(min_length=1)
+    value: str = Field(min_length=1)
+
+
 class RequestRecord(StrictModel):
     id: UUID
     request: ResearchRequest
@@ -34,3 +44,18 @@ class RequestRecord(StrictModel):
     data: dict[str, JsonValue]
     created_at: datetime
     updated_at: datetime
+
+
+class RequestView(StrictModel):
+    id: UUID
+    state: RequestState
+    revision: int
+    backend: str
+    questions: tuple[ClarificationQuestion, ...] = ()
+    plan_digest: str | None = None
+    spec: dict[str, JsonValue] | None = None
+    validation: dict[str, JsonValue] | None = None
+    bundle_path: str | None = None
+    warnings: tuple[str, ...] = ()
+    error_code: str | None = None
+    error_message: str | None = None

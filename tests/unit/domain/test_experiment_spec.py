@@ -76,6 +76,11 @@ def test_normalization_is_independent_of_input_units() -> None:
     assert first == second
 
 
+def test_normalized_spec_round_trips_through_persistence() -> None:
+    spec = ExperimentSpec.model_validate(minimal_spec())
+    assert ExperimentSpec.model_validate(spec.normalized()) == spec
+
+
 def test_default_temperature_is_validated_as_a_quantity() -> None:
     spec = ExperimentSpec.model_validate(minimal_spec())
     assert spec.physics.temperature.to("K") == 300.0
