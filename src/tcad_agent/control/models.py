@@ -53,6 +53,7 @@ class RequestView(StrictModel):
     backend: str
     questions: tuple[ClarificationQuestion, ...] = ()
     plan_digest: str | None = None
+    plan: dict[str, JsonValue] | None = None
     spec: dict[str, JsonValue] | None = None
     validation: dict[str, JsonValue] | None = None
     bundle_path: str | None = None

@@ -28,7 +28,7 @@ from tcad_agent.control.models import (
 from tcad_agent.control.store import ConcurrentTransitionError, RequestStore
 from tcad_agent.domain.models import ExperimentSpec
 from tcad_agent.events.ledger import EventLedger
-from tcad_agent.events.models import RunEventKind
+from tcad_agent.events.models import RunEvent, RunEventKind
 from tcad_agent.model_gateway.base import AgentContextPacket, AgentProposal, ModelGateway
 from tcad_agent.recovery.models import RecoveryBudget
 from tcad_agent.recovery.policy import RecoveryPolicy
@@ -295,6 +295,10 @@ class ControlService:
     def get(self, request_id: UUID) -> RequestView:
         return self._view(self.store.get(request_id))
 
+    def events(self, request_id: UUID) -> tuple[RunEvent, ...]:
+        self.store.get(request_id)
+        return self._ledger(request_id).verify()
+
     def _apply_proposal(self, record: RequestRecord, proposal: AgentProposal) -> RequestView:
         ledger = self._ledger(record.id)
         if proposal.kind == "refusal":
@@ -392,6 +396,7 @@ class ControlService:
             else ()
         )
         spec_value = record.data.get("spec")
+        plan_value = record.data.get("plan")
         validation_value = record.data.get("validation")
         return RequestView(
             id=record.id,
@@ -402,6 +407,7 @@ class ControlService:
             plan_digest=(
                 str(record.data["plan_digest"]) if "plan_digest" in record.data else None
             ),
+            plan=dict(plan_value) if isinstance(plan_value, dict) else None,
             spec=dict(spec_value) if isinstance(spec_value, dict) else None,
             validation=(
                 dict(validation_value) if isinstance(validation_value, dict) else None

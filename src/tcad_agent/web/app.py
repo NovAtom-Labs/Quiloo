@@ -1,0 +1,190 @@
+"""FastAPI surface for the local TCAD researcher workflow."""
+
+from __future__ import annotations
+
+import json
+import os
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Protocol
+from uuid import UUID
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from tcad_agent.control.models import (
+    ClarificationAnswer,
+    RequestView,
+    ResearchRequest,
+)
+from tcad_agent.control.service import (
+    ControlService,
+    ControlServiceError,
+    InvalidRequestStateError,
+    PlanDigestMismatchError,
+)
+from tcad_agent.control.store import RequestNotFoundError, SqliteRequestStore
+from tcad_agent.events.models import RunEvent
+from tcad_agent.model_gateway.base import AgentContextPacket, AgentProposal, ModelGateway
+from tcad_agent.model_gateway.openhands import (
+    ModelConfigurationError,
+    OpenHandsBedrockGateway,
+)
+from tcad_agent.web.schemas import AnswerRequest, ApprovalRequest, CreateResearchRequest
+
+
+class UnavailableGateway:
+    def __init__(self, message: str) -> None:
+        self.message = message
+
+    def propose(
+        self, request: ResearchRequest, context: AgentContextPacket
+    ) -> AgentProposal:
+        del request, context
+        raise ModelConfigurationError(self.message)
+
+
+class ControlAPI(Protocol):
+    def submit(self, prompt: str, *, backend: str = "devsim") -> RequestView: ...
+
+    def answer(
+        self, request_id: UUID, answers: Sequence[ClarificationAnswer]
+    ) -> RequestView: ...
+
+    def approve(self, request_id: UUID, plan_digest: str) -> RequestView: ...
+
+    def execute(self, request_id: UUID) -> RequestView: ...
+
+    def get(self, request_id: UUID) -> RequestView: ...
+
+    def events(self, request_id: UUID) -> tuple[RunEvent, ...]: ...
+
+
+def build_default_control() -> ControlService:
+    workspace = Path(os.getenv("TCAD_WORKSPACE", Path.cwd() / ".tcad-agent")).resolve()
+    try:
+        gateway: ModelGateway = OpenHandsBedrockGateway.from_environment()
+    except ModelConfigurationError as exc:
+        gateway = UnavailableGateway(str(exc))
+    return ControlService(
+        store=SqliteRequestStore(workspace / "requests.sqlite3"),
+        gateway=gateway,
+        workspace=workspace,
+    )
+
+
+def create_app(control: ControlAPI | None = None) -> FastAPI:
+    service = control or build_default_control()
+    package_root = Path(__file__).parent
+    templates = Jinja2Templates(directory=package_root / "templates")
+    app = FastAPI(title="NovAtom TCAD Agent", docs_url=None, redoc_url=None)
+    app.mount("/static", StaticFiles(directory=package_root / "static"), name="static")
+
+    @app.exception_handler(RequestNotFoundError)
+    async def request_not_found(_request: Request, _exc: RequestNotFoundError) -> JSONResponse:
+        return JSONResponse(
+            status_code=404,
+            content={"code": "request_not_found", "message": "The request was not found."},
+        )
+
+    @app.exception_handler(PlanDigestMismatchError)
+    async def plan_mismatch(_request: Request, _exc: PlanDigestMismatchError) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={"code": "plan_digest_mismatch", "message": "The approved plan changed."},
+        )
+
+    @app.exception_handler(InvalidRequestStateError)
+    @app.exception_handler(ControlServiceError)
+    async def invalid_state(_request: Request, exc: ControlServiceError) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={"code": "invalid_request_state", "message": str(exc)},
+        )
+
+    @app.exception_handler(ModelConfigurationError)
+    async def model_configuration(
+        _request: Request, _exc: ModelConfigurationError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=503,
+            content={
+                "code": "model_configuration_error",
+                "message": "The configured Bedrock model is unavailable. Check local credentials.",
+            },
+        )
+
+    @app.exception_handler(Exception)
+    async def internal_error(_request: Request, _exc: Exception) -> JSONResponse:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "code": "internal_error",
+                "message": (
+                    "The request failed without exposing provider or credential details."
+                ),
+            },
+        )
+
+    @app.get("/health")
+    def health() -> dict[str, str]:
+        return {"status": "ok"}
+
+    @app.get("/")
+    def index(request: Request) -> Response:
+        return templates.TemplateResponse(request, "index.html", {})
+
+    @app.post("/api/requests", status_code=201)
+    def create_request(payload: CreateResearchRequest) -> RequestView:
+        return service.submit(payload.prompt, backend=payload.backend)
+
+    @app.get("/api/requests/{request_id}")
+    def get_request(request_id: UUID) -> RequestView:
+        return service.get(request_id)
+
+    @app.post("/api/requests/{request_id}/answers")
+    def answer_request(request_id: UUID, payload: AnswerRequest) -> RequestView:
+        return service.answer(request_id, payload.answers)
+
+    @app.post("/api/requests/{request_id}/approve")
+    def approve_request(request_id: UUID, payload: ApprovalRequest) -> RequestView:
+        return service.approve(request_id, payload.plan_digest)
+
+    @app.post("/api/requests/{request_id}/run")
+    def run_request(request_id: UUID) -> RequestView:
+        return service.execute(request_id)
+
+    @app.get("/api/requests/{request_id}/events")
+    def request_events(request_id: UUID) -> StreamingResponse:
+        events = service.events(request_id)
+        rows = [
+            "event: stage\ndata: "
+            + json.dumps(event.model_dump(mode="json"), sort_keys=True)
+            + "\n\n"
+            for event in events
+        ]
+        return StreamingResponse(iter(rows), media_type="text/event-stream")
+
+    @app.get("/api/requests/{request_id}/artifacts/{name:path}")
+    def artifact(request_id: UUID, name: str) -> FileResponse:
+        view = service.get(request_id)
+        if view.bundle_path is None:
+            raise HTTPException(status_code=404, detail="bundle is not available")
+        if not name or Path(name).is_absolute() or ".." in Path(name).parts:
+            raise HTTPException(status_code=400, detail="invalid artifact path")
+        root = Path(view.bundle_path).resolve()
+        manifest_path = root / "manifest.json"
+        if not manifest_path.is_file():
+            raise HTTPException(status_code=404, detail="bundle manifest is missing")
+        manifest = json.loads(manifest_path.read_text())
+        allowed = set(manifest.get("artifacts", {})) | {"manifest.json"}
+        if name not in allowed:
+            raise HTTPException(status_code=404, detail="artifact is not allowlisted")
+        target = (root / name).resolve()
+        if not target.is_relative_to(root) or not target.is_file():
+            raise HTTPException(status_code=404, detail="artifact is unavailable")
+        return FileResponse(target, filename=target.name)
+
+    return app

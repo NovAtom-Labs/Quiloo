@@ -9,12 +9,14 @@ description = "Simulator-neutral TCAD research agent foundation"
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+  "fastapi>=0.116,<1",
   "jinja2>=3.1,<4",
   "numpy>=2.2,<3",
   "pint>=0.26,<0.27",
   "pydantic>=2.12,<3",
   "pyyaml>=6.0,<7",
   "typer>=0.16,<1",
+  "uvicorn>=0.35,<1",
 ]
 
 [project.optional-dependencies]
@@ -25,6 +27,7 @@ agent = [
 ]
 dev = [
   "mypy>=1.18,<2",
+  "httpx>=0.28,<1",
   "pip-tools==7.5.2",
   "pytest>=8.4,<10",
   "pytest-cov>=7,<8",
@@ -34,12 +37,13 @@ dev = [
 
 [project.scripts]
 tcad-agent = "tcad_agent.cli:app"
+tcad-agent-web = "tcad_agent.web.launcher:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-tcad_agent = ["**/*.yaml", "**/*.j2"]
+tcad_agent = ["**/*.yaml", "**/*.j2", "web/templates/*.html", "web/static/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

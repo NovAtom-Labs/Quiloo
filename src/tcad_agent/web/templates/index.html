@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>NovAtom TCAD Agent</title>
+    <link rel="stylesheet" href="/static/styles.css">
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">NOVATOM LABS</p>
+        <h1>TCAD Agent</h1>
+        <p>Describe a device study. Review the normalized plan before any simulator runs.</p>
+      </header>
+
+      <section class="panel">
+        <label for="prompt">Research request</label>
+        <textarea id="prompt" rows="12" placeholder="Describe geometry, materials, doping, contacts, physics, studies, and requested outputs."></textarea>
+        <div class="actions">
+          <select id="backend" aria-label="Simulation backend">
+            <option value="devsim">DEVSIM, local</option>
+            <option value="sentaurus">Sentaurus, licensed runner</option>
+          </select>
+          <button id="submit">Build plan</button>
+        </div>
+      </section>
+
+      <section id="status-panel" class="panel hidden">
+        <div class="status-row">
+          <h2>Experiment state</h2>
+          <span id="state" class="badge"></span>
+        </div>
+        <p id="warning" class="warning"></p>
+        <div id="questions"></div>
+        <pre id="plan"></pre>
+        <div class="actions">
+          <button id="approve" class="hidden">Approve exact plan</button>
+          <button id="run" class="hidden">Run simulation</button>
+        </div>
+      </section>
+
+      <section id="results-panel" class="panel hidden">
+        <h2>Validation and artifacts</h2>
+        <pre id="validation"></pre>
+        <a id="report" class="button-link hidden">Download report</a>
+      </section>
+    </main>
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
