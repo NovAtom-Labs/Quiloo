@@ -69,6 +69,12 @@ function formatQuantity(value) {
       return `${formatNumber(magnitude / 1e6)} cm⁻³`;
     }
     if (value.si_unit === "kelvin") return `${formatNumber(magnitude)} K`;
+    if (value.si_unit === "kilogram * meter ** 2 / ampere / second ** 3") {
+      return `${formatNumber(magnitude)} V`;
+    }
+    if (value.si_unit === "kilogram * meter ** 2 / second ** 2") {
+      return `${formatNumber(magnitude / 1.602176634e-19)} eV`;
+    }
     return `${formatNumber(magnitude)} ${value.si_unit}`;
   }
   return formatLabel(value);
@@ -148,6 +154,20 @@ function regionThickness(region) {
   return formatQuantity({magnitude_si: end - start, si_unit: "meter"});
 }
 
+function studyReview(study) {
+  const entries = [["Mode", formatLabel(study.kind || "Not specified")]];
+  if (study.kind === "dc") {
+    entries.push(
+      ["Driven contact", formatLabel(study.contact || "Not specified")],
+      ["Sweep", `${formatQuantity(study.start)} to ${formatQuantity(study.stop)}`],
+      ["Step", formatQuantity(study.step)],
+    );
+  } else if (study.kind === "equilibrium") {
+    entries.push(["External bias", "None"]);
+  }
+  return reviewGroup("Study", entries);
+}
+
 function renderPlan(view) {
   const spec = view.spec || view.plan?.spec;
   planSummary.replaceChildren();
@@ -184,6 +204,7 @@ function renderPlan(view) {
       formatLabel(contact.id),
       `${formatLabel(contact.kind)} · ${formatLabel(contact.location)}${contact.work_function ? ` · ${formatQuantity(contact.work_function)}` : ""}`,
     ])),
+    studyReview(study),
     reviewGroup("Physics and outputs", [
       ["Equations", equations.map(formatLabel).join(", ") || "None declared"],
       ["Models", models.map(formatLabel).join(", ") || "None declared"],
