@@ -1,2 +1,5 @@
-"""Sentaurus adapter boundary; native implementation lives on the licensed runner."""
+"""Deterministic Sentaurus adapter; execution remains on the licensed runner."""
 
+from tcad_agent.adapters.sentaurus.compiler import SentaurusAdapter
+
+__all__ = ["SentaurusAdapter"]
