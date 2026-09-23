@@ -22,7 +22,7 @@ from openhands.sdk.event.conversation_error import ConversationErrorEvent
 from openhands.sdk.llm import content_to_str
 from openhands.sdk.security import SecurityRisk
 from openhands.tools.file_editor.definition import FileEditorAction
-from openhands.tools.task.definition import TaskAction
+from openhands.tools.task.definition import TaskAction, TaskObservation
 from openhands.tools.terminal.definition import TerminalAction
 from pydantic import JsonValue
 
@@ -145,17 +145,26 @@ class AgentEventBridge:
             )
 
     def _observation(self, event: ObservationEvent) -> None:
+        payload: dict[str, JsonValue] = {
+            **self._base(event),
+            "action_id": event.action_id,
+            "is_error": event.observation.is_error,
+            "output": self._safe(event.observation.text),
+            "tool_call_id": event.tool_call_id,
+            "tool_name": event.tool_name,
+        }
+        if isinstance(event.observation, TaskObservation):
+            payload.update(
+                {
+                    "task_id": event.observation.task_id,
+                    "subagent": event.observation.subagent,
+                    "task_status": event.observation.status,
+                }
+            )
         self.events.append(
             self.conversation_id,
             "tool_call_completed",
-            {
-                **self._base(event),
-                "action_id": event.action_id,
-                "is_error": event.observation.is_error,
-                "output": self._safe(event.observation.text),
-                "tool_call_id": event.tool_call_id,
-                "tool_name": event.tool_name,
-            },
+            payload,
         )
 
     def _message(self, event: MessageEvent) -> None:

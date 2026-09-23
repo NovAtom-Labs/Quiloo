@@ -6,25 +6,62 @@ import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
 from openhands.sdk import LLM, Agent, AgentContext, Conversation, Tool
 from openhands.sdk.conversation.impl.local_conversation import LocalConversation
 from openhands.sdk.event import Event
-from openhands.sdk.security import ConfirmRisky
+from openhands.sdk.security import ConfirmRisky, SecurityRisk
 from openhands.sdk.skills import load_skills_from_dir
 from openhands.sdk.subagent import register_file_agents
+from openhands.sdk.tool import ToolDefinition, register_tool
 from openhands.tools.preset.default import (
     get_default_condenser,
     get_default_tools,
     register_builtins_agents,
 )
+from openhands.tools.task import TaskToolSet
+from openhands.tools.task.manager import ConfirmationHandler
 
-from tcad_agent.agent.policy import WorkspaceSecurityAnalyzer
+from tcad_agent.agent.policy import WorkspaceSecurityAnalyzer, classify_action
+from tcad_agent.agent.supervisor import RuntimeConversation
 from tcad_agent.agent.tools import DomainTools, TcadDomainTool, build_tools
 
 DEFAULT_LLM_MODEL = "bedrock/global.anthropic.claude-sonnet-4-6"
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+if TYPE_CHECKING:
+    from openhands.sdk.conversation.state import ConversationState
+    from openhands.sdk.event import ActionEvent
+
+
+class WorkspaceTaskToolSet(TaskToolSet):
+    """Native task delegation with child actions constrained to the workspace."""
+
+    @classmethod
+    def create(  # type: ignore[override]
+        cls,
+        conv_state: ConversationState,
+        confirmation_handler: ConfirmationHandler | None = None,
+    ) -> list[ToolDefinition[Any, Any]]:
+        del confirmation_handler
+        workspace = Path(conv_state.workspace.working_dir).resolve()
+
+        def confirm_child_actions(
+            _task_id: str, actions: list[ActionEvent]
+        ) -> bool:
+            return all(
+                classify_action(workspace, action) is not SecurityRisk.HIGH
+                for action in actions
+            )
+
+        return super().create(
+            conv_state, confirmation_handler=confirm_child_actions
+        )
+
+
+register_tool(WorkspaceTaskToolSet.name, WorkspaceTaskToolSet)
 
 
 @dataclass(frozen=True)
@@ -39,7 +76,8 @@ class OpenHandsRuntimeProfile:
 def build_runtime(workspace: Path) -> OpenHandsRuntimeProfile:
     _, _, skills = load_skills_from_dir(workspace / "skills")
     context = AgentContext(skills=list(skills.values()))
-    tools = get_default_tools(enable_browser=False, enable_sub_agents=True)
+    tools = get_default_tools(enable_browser=False, enable_sub_agents=False)
+    tools.append(Tool(name=WorkspaceTaskToolSet.name))
     tools.append(Tool(name=TcadDomainTool.name))
     return OpenHandsRuntimeProfile(
         context=context,
@@ -53,23 +91,25 @@ def build_runtime(workspace: Path) -> OpenHandsRuntimeProfile:
 class OpenHandsRuntimeFactory:
     """Create or reconstruct persistent local OpenHands conversations."""
 
-    def __init__(self, runtime_root: Path) -> None:
+    def __init__(self, runtime_root: Path, *, llm: LLM | None = None) -> None:
         self.runtime_root = runtime_root.resolve()
+        self.llm = llm
 
     def create(
         self,
         workspace: Path,
         conversation_id: UUID,
         callback: Callable[[Event], None],
-    ) -> LocalConversation:
+    ) -> RuntimeConversation:
         profile = build_runtime(workspace)
         register_builtins_agents(enable_browser=False)
+        register_file_agents(PROJECT_ROOT)
         register_file_agents(workspace)
-        llm = LLM(
-            model=profile.model,
-            aws_region_name=os.getenv("AWS_REGION_NAME", "us-east-1"),
-            reasoning_effort=cast(Any, profile.reasoning_effort),
-        )
+        llm = self.llm or LLM(
+                model=profile.model,
+                aws_region_name=os.getenv("AWS_REGION_NAME", "us-east-1"),
+                reasoning_effort=cast(Any, profile.reasoning_effort),
+            )
         agent = Agent(
             llm=llm,
             tools=list(profile.tools),
@@ -98,4 +138,4 @@ class OpenHandsRuntimeFactory:
             WorkspaceSecurityAnalyzer(workspace=workspace.resolve())
         )
         conversation.set_confirmation_policy(ConfirmRisky())
-        return conversation
+        return cast(RuntimeConversation, conversation)
