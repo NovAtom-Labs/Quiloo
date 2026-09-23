@@ -1,12 +1,17 @@
+import platform
+import shutil
+import subprocess
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
 from tcad_agent.ide.store import SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
+from tcad_agent.web import ide_routes
 from tcad_agent.web.app import create_app
 from tcad_agent.web.ide_routes import IDEServices
 
@@ -51,6 +56,79 @@ def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:
     )
     assert sent.status_code == 201
     assert sent.json()["role"] == "user"
+
+
+def test_local_directory_picker_returns_selected_directory(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "selected-repository"
+    root.mkdir()
+    monkeypatch.setattr(
+        ide_routes,
+        "select_directory",
+        lambda: root,
+        raising=False,
+    )
+
+    response = ide_client(tmp_path).post("/api/system/directories/select")
+
+    assert response.status_code == 200
+    assert response.json() == {"path": str(root)}
+
+
+def test_local_directory_picker_reports_cancellation(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(
+        ide_routes,
+        "select_directory",
+        lambda: None,
+        raising=False,
+    )
+
+    response = ide_client(tmp_path).post("/api/system/directories/select")
+
+    assert response.status_code == 200
+    assert response.json() == {"path": None}
+
+
+def test_linux_directory_picker_uses_available_native_dialog(
+    tmp_path: Path, monkeypatch
+) -> None:
+    root = tmp_path / "chosen"
+    root.mkdir()
+    monkeypatch.setattr(platform, "system", lambda: "Linux")
+    monkeypatch.setenv("DISPLAY", ":0")
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.setattr(
+        shutil,
+        "which",
+        lambda command: "/usr/bin/zenity" if command == "zenity" else None,
+    )
+
+    def run_dialog(
+        command: list[str], **_options: object
+    ) -> subprocess.CompletedProcess[str]:
+        assert command == [
+            "/usr/bin/zenity",
+            "--file-selection",
+            "--directory",
+            "--title=Open repository folder",
+        ]
+        return subprocess.CompletedProcess(command, 0, f"{root}\n", "")
+
+    monkeypatch.setattr(subprocess, "run", run_dialog)
+
+    assert ide_routes.select_directory() == root.resolve()
+
+
+def test_headless_linux_directory_picker_has_safe_error(monkeypatch) -> None:
+    monkeypatch.setattr(platform, "system", lambda: "Linux")
+    monkeypatch.delenv("DISPLAY", raising=False)
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+
+    with pytest.raises(RuntimeError, match="graphical desktop"):
+        ide_routes.select_directory()
 
 
 def test_sse_reconnect_honors_last_event_id_without_duplicates(

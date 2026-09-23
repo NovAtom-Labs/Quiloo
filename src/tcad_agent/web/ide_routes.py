@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+import platform
+import shutil
+import subprocess
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
@@ -28,6 +31,10 @@ from tcad_agent.web.schemas import (
     CreateMessageRequest,
     OpenWorkspaceRequest,
 )
+
+
+class DirectoryPickerUnavailable(RuntimeError):
+    """Raised when the host cannot present a graphical directory chooser."""
 
 
 @dataclass(frozen=True)
@@ -63,8 +70,104 @@ def _event_cursor(request: Request, after: int) -> int:
     return cursor
 
 
+def select_directory() -> Path | None:
+    """Return a locally selected directory, or None when selection is cancelled."""
+
+    system = platform.system()
+    commands: list[list[str]] = []
+
+    if system == "Linux":
+        if not (os.getenv("DISPLAY") or os.getenv("WAYLAND_DISPLAY")):
+            raise DirectoryPickerUnavailable(
+                "A graphical desktop is required for the folder picker. "
+                "Enter the repository path manually."
+            )
+        zenity = shutil.which("zenity")
+        kdialog = shutil.which("kdialog")
+        if zenity:
+            commands.append(
+                [
+                    zenity,
+                    "--file-selection",
+                    "--directory",
+                    "--title=Open repository folder",
+                ]
+            )
+        if kdialog:
+            commands.append([kdialog, "--getexistingdirectory", str(Path.home())])
+    elif system == "Darwin":
+        if osascript := shutil.which("osascript"):
+            commands.append(
+                [
+                    osascript,
+                    "-e",
+                    'POSIX path of (choose folder with prompt "Open repository folder")',
+                ]
+            )
+    elif system == "Windows":
+        powershell = shutil.which("powershell") or shutil.which("pwsh")
+        if powershell:
+            commands.append(
+                [
+                    powershell,
+                    "-NoProfile",
+                    "-Command",
+                    (
+                        "Add-Type -AssemblyName System.Windows.Forms; "
+                        "$dialog = New-Object System.Windows.Forms.FolderBrowserDialog; "
+                        "$dialog.Description = 'Open repository folder'; "
+                        "if ($dialog.ShowDialog() -eq 'OK') { $dialog.SelectedPath }"
+                    ),
+                ]
+            )
+
+    if not commands:
+        raise DirectoryPickerUnavailable(
+            "No native folder picker is available. Enter the repository path manually."
+        )
+
+    for command in commands:
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        except OSError:
+            continue
+        if completed.returncode == 1:
+            return None
+        if completed.returncode != 0:
+            continue
+        raw_path = completed.stdout.strip()
+        if not raw_path:
+            return None
+        selected = Path(raw_path).expanduser().resolve()
+        if selected.is_dir():
+            return selected
+        raise DirectoryPickerUnavailable(
+            "The selected folder is unavailable. Choose another folder or enter its path."
+        )
+
+    raise DirectoryPickerUnavailable(
+        "The native folder picker could not open. Enter the repository path manually."
+    )
+
+
 def build_ide_router(services: IDEServices) -> APIRouter:
     router = APIRouter(prefix="/api")
+
+    @router.post("/system/directories/select")
+    def select_local_directory(request: Request) -> dict[str, str | None]:
+        client_host = request.client.host if request.client else ""
+        if client_host not in {"127.0.0.1", "::1", "localhost", "testclient"}:
+            raise HTTPException(status_code=403, detail="Folder selection is local only.")
+        try:
+            selected = select_directory()
+        except DirectoryPickerUnavailable as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return {"path": str(selected) if selected is not None else None}
 
     @router.post("/workspaces", status_code=201)
     def open_workspace(payload: OpenWorkspaceRequest) -> WorkspaceRecord:

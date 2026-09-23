@@ -2,6 +2,7 @@
 
 const workspaceForm = document.querySelector("#workspace-form");
 const workspacePath = document.querySelector("#workspace-path");
+const browseWorkspace = document.querySelector("#browse-workspace");
 const workspaceStatus = document.querySelector("#workspace-status");
 const gitState = document.querySelector("#git-state");
 const repositoryTree = document.querySelector("#repository-tree");
@@ -83,7 +84,7 @@ function selectEntry(entry) {
   label.textContent = entry.kind.toUpperCase();
   heading.textContent = entry.name;
   copy.textContent = entry.kind === "file"
-    ? "File viewing and editing connect in the next vertical slice. The repository path is already tracked safely."
+    ? "Repository file selected."
     : "Select a child entry or return to the repository root.";
 }
 
@@ -230,17 +231,38 @@ async function restoreRoute() {
   }
 }
 
+async function openWorkspace(path) {
+  const workspace = await api("/api/workspaces", {
+    method: "POST",
+    body: JSON.stringify({path}),
+  });
+  navigate(`/workspaces/${workspace.id}`);
+}
+
 workspaceForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   showError();
   try {
-    const workspace = await api("/api/workspaces", {
-      method: "POST",
-      body: JSON.stringify({path: workspacePath.value}),
-    });
-    navigate(`/workspaces/${workspace.id}`);
+    await openWorkspace(workspacePath.value);
   } catch (error) {
     showError(error.message);
+  }
+});
+
+browseWorkspace.addEventListener("click", async () => {
+  showError();
+  browseWorkspace.disabled = true;
+  browseWorkspace.textContent = "Choosing folder…";
+  try {
+    const selection = await api("/api/system/directories/select", {method: "POST"});
+    if (!selection.path) return;
+    workspacePath.value = selection.path;
+    await openWorkspace(selection.path);
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    browseWorkspace.disabled = false;
+    browseWorkspace.textContent = "Open folder";
   }
 });
 

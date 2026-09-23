@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260924-3">
+    <link rel="stylesheet" href="/static/ide.css?v=20260924-4">
   </head>
   <body>
     <div class="ide-shell">
@@ -36,11 +36,12 @@
           <span id="git-state">NOT OPEN</span>
         </div>
         <form id="workspace-form" class="workspace-form">
-          <label for="workspace-path">Repository path</label>
+          <label for="workspace-path">Repository folder</label>
           <div class="path-entry">
             <input id="workspace-path" name="path" autocomplete="off" placeholder="/home/research/project" required>
-            <button id="open-workspace" type="submit">Open</button>
+            <button id="open-workspace" type="submit">Open path</button>
           </div>
+          <button id="browse-workspace" class="browse-workspace" type="button">Open folder</button>
         </form>
         <div id="conversation-list" class="conversation-list" aria-label="Conversations"></div>
         <div id="repository-tree" class="repository-tree" role="tree">
@@ -62,10 +63,6 @@
             <div><dt>Session storage</dt><dd>Local and persistent</dd></div>
             <div><dt>Simulation</dt><dd>DEVSIM ready</dd></div>
           </dl>
-          <div class="foundation-note">
-            <strong>Current runtime</strong>
-            <span>Repository context and prompts are persistent. File editing and terminal execution connect in the next runtime slice.</span>
-          </div>
         </section>
       </main>
 
@@ -103,6 +100,6 @@
       </form>
     </dialog>
     <script src="/static/ide-state.js?v=20260924-2" defer></script>
-    <script src="/static/ide.js?v=20260924-2" defer></script>
+    <script src="/static/ide.js?v=20260924-3" defer></script>
   </body>
 </html>

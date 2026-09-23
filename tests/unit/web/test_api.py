@@ -71,6 +71,7 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert parser.elements["conversation-messages"] == "div"
     assert parser.elements["agent-activity"] == "div"
     assert parser.elements["open-workspace"] == "button"
+    assert parser.elements["browse-workspace"] == "button"
     assert parser.elements["create-conversation"] == "button"
 
 
