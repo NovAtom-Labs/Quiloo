@@ -71,6 +71,47 @@ class ConversationMessage(StrictModel):
     created_at: datetime
 
 
+class RunState(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
+    WAITING_FOR_APPROVAL = "waiting_for_approval"
+    WAITING_FOR_USER = "waiting_for_user"
+    PAUSED = "paused"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    BLOCKED = "blocked"
+    CANCELLED = "cancelled"
+
+
+class ApprovalDecision(StrEnum):
+    APPROVE = "approve"
+    DENY = "deny"
+
+
+class AgentRunRecord(StrictModel):
+    id: UUID
+    conversation_id: UUID
+    sdk_conversation_id: UUID
+    state: RunState
+    revision: int = Field(ge=0)
+    created_at: datetime
+    updated_at: datetime
+
+
+class ApprovalRequestRecord(StrictModel):
+    id: UUID
+    run_id: UUID
+    action_id: str
+    tool_name: str
+    risk: str
+    summary: str
+    payload: dict[str, JsonValue]
+    decision: ApprovalDecision | None = None
+    revision: int = Field(ge=0)
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+
 class IDEEvent(StrictModel):
     id: int = Field(ge=1)
     conversation_id: UUID

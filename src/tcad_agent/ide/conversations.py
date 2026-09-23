@@ -60,6 +60,21 @@ class ConversationService:
         )
         return message
 
+    def add_assistant_message(
+        self, conversation_id: UUID, content: str
+    ) -> ConversationMessage:
+        message = self.store.append_message(
+            conversation_id,
+            "assistant",
+            _normalized_text(content, label="message", maximum=100_000),
+        )
+        self.events.append(
+            conversation_id,
+            "message_created",
+            {"message_id": str(message.id), "role": message.role},
+        )
+        return message
+
     def messages(
         self, conversation_id: UUID
     ) -> tuple[ConversationMessage, ...]:

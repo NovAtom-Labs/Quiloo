@@ -12,12 +12,16 @@ from uuid import UUID, uuid4
 from pydantic import JsonValue
 
 from tcad_agent.ide.models import (
+    AgentRunRecord,
+    ApprovalDecision,
+    ApprovalRequestRecord,
     ConversationMessage,
     ConversationRecord,
     ConversationState,
     GitSnapshot,
     IDEEvent,
     RepositorySnapshot,
+    RunState,
     WorkspaceRecord,
 )
 
@@ -76,6 +80,36 @@ class SqliteIDEStore:
                     payload_json TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
+
+                CREATE TABLE IF NOT EXISTS agent_runs (
+                    id TEXT PRIMARY KEY,
+                    conversation_id TEXT NOT NULL REFERENCES conversations(id),
+                    sdk_conversation_id TEXT NOT NULL,
+                    state TEXT NOT NULL,
+                    revision INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS approval_requests (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT NOT NULL REFERENCES agent_runs(id),
+                    action_id TEXT NOT NULL,
+                    tool_name TEXT NOT NULL,
+                    risk TEXT NOT NULL,
+                    summary TEXT NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    decision TEXT,
+                    revision INTEGER NOT NULL,
+                    created_at TEXT NOT NULL,
+                    resolved_at TEXT
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_agent_runs_conversation
+                ON agent_runs(conversation_id, created_at);
+
+                CREATE INDEX IF NOT EXISTS idx_approvals_run_pending
+                ON approval_requests(run_id, decision, created_at);
                 """
             )
 
@@ -254,6 +288,219 @@ class SqliteIDEStore:
             ).fetchall()
         return tuple(self._message(row) for row in rows)
 
+    def create_run(
+        self, conversation_id: UUID, sdk_conversation_id: UUID
+    ) -> AgentRunRecord:
+        self.get_conversation(conversation_id)
+        now = datetime.now(UTC)
+        run_id = uuid4()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO agent_runs (
+                    id, conversation_id, sdk_conversation_id, state, revision,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 0, ?, ?)
+                """,
+                (
+                    str(run_id),
+                    str(conversation_id),
+                    str(sdk_conversation_id),
+                    RunState.QUEUED.value,
+                    now.isoformat(),
+                    now.isoformat(),
+                ),
+            )
+        run = self.get_run(run_id)
+        self.append_event(
+            conversation_id,
+            "run_created",
+            {"run_id": str(run.id), "state": run.state.value},
+        )
+        return run
+
+    def get_run(self, run_id: UUID) -> AgentRunRecord:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM agent_runs WHERE id = ?", (str(run_id),)
+            ).fetchone()
+        if row is None:
+            raise IDEStoreError(f"agent run does not exist: {run_id}")
+        return self._run(row)
+
+    def list_runs(self, conversation_id: UUID) -> tuple[AgentRunRecord, ...]:
+        self.get_conversation(conversation_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM agent_runs
+                WHERE conversation_id = ?
+                ORDER BY created_at ASC, id ASC
+                """,
+                (str(conversation_id),),
+            ).fetchall()
+        return tuple(self._run(row) for row in rows)
+
+    def transition_run(
+        self, run_id: UUID, expected_revision: int, state: RunState
+    ) -> AgentRunRecord:
+        now = datetime.now(UTC)
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE agent_runs
+                SET state = ?, revision = revision + 1, updated_at = ?
+                WHERE id = ? AND revision = ?
+                """,
+                (state.value, now.isoformat(), str(run_id), expected_revision),
+            )
+        if cursor.rowcount != 1:
+            raise IDEStoreError(f"stale run revision for {run_id}")
+        run = self.get_run(run_id)
+        self.append_event(
+            run.conversation_id,
+            "run_state_changed",
+            {"run_id": str(run.id), "state": run.state.value},
+        )
+        return run
+
+    def create_approval(
+        self,
+        run_id: UUID,
+        action_id: str,
+        tool_name: str,
+        risk: str,
+        summary: str,
+        payload: dict[str, JsonValue],
+    ) -> ApprovalRequestRecord:
+        payload_json = self._payload_json(payload)
+        now = datetime.now(UTC)
+        approval_id = uuid4()
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            run_row = connection.execute(
+                "SELECT * FROM agent_runs WHERE id = ?", (str(run_id),)
+            ).fetchone()
+            if run_row is None:
+                raise IDEStoreError(f"agent run does not exist: {run_id}")
+            connection.execute(
+                """
+                INSERT INTO approval_requests (
+                    id, run_id, action_id, tool_name, risk, summary,
+                    payload_json, decision, revision, created_at, resolved_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, NULL)
+                """,
+                (
+                    str(approval_id),
+                    str(run_id),
+                    action_id,
+                    tool_name,
+                    risk,
+                    summary,
+                    payload_json,
+                    now.isoformat(),
+                ),
+            )
+            cursor = connection.execute(
+                """
+                UPDATE agent_runs
+                SET state = ?, revision = revision + 1, updated_at = ?
+                WHERE id = ? AND revision = ?
+                """,
+                (
+                    RunState.WAITING_FOR_APPROVAL.value,
+                    now.isoformat(),
+                    str(run_id),
+                    run_row["revision"],
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise IDEStoreError(f"stale run revision for {run_id}")
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+        approval = self.get_approval(approval_id)
+        run = self.get_run(run_id)
+        self.append_event(
+            run.conversation_id,
+            "approval_requested",
+            {
+                "approval_id": str(approval.id),
+                "run_id": str(run_id),
+                "risk": approval.risk,
+                "summary": approval.summary,
+                "tool_name": approval.tool_name,
+            },
+        )
+        return approval
+
+    def get_approval(self, approval_id: UUID) -> ApprovalRequestRecord:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM approval_requests WHERE id = ?", (str(approval_id),)
+            ).fetchone()
+        if row is None:
+            raise IDEStoreError(f"approval request does not exist: {approval_id}")
+        return self._approval(row)
+
+    def list_pending_approvals(
+        self, conversation_id: UUID
+    ) -> tuple[ApprovalRequestRecord, ...]:
+        self.get_conversation(conversation_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT approval_requests.*
+                FROM approval_requests
+                JOIN agent_runs ON agent_runs.id = approval_requests.run_id
+                WHERE agent_runs.conversation_id = ?
+                  AND approval_requests.decision IS NULL
+                ORDER BY approval_requests.created_at ASC, approval_requests.id ASC
+                """,
+                (str(conversation_id),),
+            ).fetchall()
+        return tuple(self._approval(row) for row in rows)
+
+    def resolve_approval(
+        self,
+        approval_id: UUID,
+        expected_revision: int,
+        decision: ApprovalDecision,
+    ) -> ApprovalRequestRecord:
+        now = datetime.now(UTC)
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE approval_requests
+                SET decision = ?, revision = revision + 1, resolved_at = ?
+                WHERE id = ? AND revision = ? AND decision IS NULL
+                """,
+                (
+                    decision.value,
+                    now.isoformat(),
+                    str(approval_id),
+                    expected_revision,
+                ),
+            )
+        if cursor.rowcount != 1:
+            raise IDEStoreError(f"stale approval revision for {approval_id}")
+        approval = self.get_approval(approval_id)
+        run = self.get_run(approval.run_id)
+        self.append_event(
+            run.conversation_id,
+            "approval_resolved",
+            {
+                "approval_id": str(approval.id),
+                "decision": decision.value,
+                "run_id": str(run.id),
+            },
+        )
+        return approval
+
     def append_event(
         self,
         conversation_id: UUID,
@@ -355,3 +602,46 @@ class SqliteIDEStore:
             payload=payload,
             created_at=datetime.fromisoformat(row["created_at"]),
         )
+
+    @staticmethod
+    def _run(row: sqlite3.Row) -> AgentRunRecord:
+        return AgentRunRecord(
+            id=UUID(row["id"]),
+            conversation_id=UUID(row["conversation_id"]),
+            sdk_conversation_id=UUID(row["sdk_conversation_id"]),
+            state=RunState(row["state"]),
+            revision=row["revision"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            updated_at=datetime.fromisoformat(row["updated_at"]),
+        )
+
+    @staticmethod
+    def _approval(row: sqlite3.Row) -> ApprovalRequestRecord:
+        decision = row["decision"]
+        return ApprovalRequestRecord(
+            id=UUID(row["id"]),
+            run_id=UUID(row["run_id"]),
+            action_id=row["action_id"],
+            tool_name=row["tool_name"],
+            risk=row["risk"],
+            summary=row["summary"],
+            payload=cast(dict[str, JsonValue], json.loads(row["payload_json"])),
+            decision=ApprovalDecision(decision) if decision is not None else None,
+            revision=row["revision"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+            resolved_at=(
+                datetime.fromisoformat(row["resolved_at"])
+                if row["resolved_at"] is not None
+                else None
+            ),
+        )
+
+    @staticmethod
+    def _payload_json(payload: dict[str, JsonValue]) -> str:
+        try:
+            encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+        except (TypeError, ValueError) as error:
+            raise IDEStoreError("approval payload must be JSON-safe") from error
+        if len(encoded.encode("utf-8")) > 16_000:
+            raise IDEStoreError("approval payload must not exceed 16000 bytes")
+        return encoded

@@ -28,3 +28,24 @@ def test_conversation_messages_and_events_survive_restart(tmp_path: Path) -> Non
         "conversation_created",
         "message_created",
     ]
+
+
+def test_assistant_message_is_persisted_with_lifecycle_event(tmp_path: Path) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    workspace = WorkspaceManager(store).open(tmp_path)
+    service = ConversationService(store, EventFeed(store))
+    conversation = service.create(workspace.id, "Agent task")
+
+    message = service.add_assistant_message(conversation.id, "Tests pass")
+
+    assert service.messages(conversation.id) == (message,)
+    assert message.role == "assistant"
+    events = EventFeed(store).list_after(conversation.id, after_id=0)
+    assert [event.kind for event in events] == [
+        "conversation_created",
+        "message_created",
+    ]
+    assert events[-1].payload == {
+        "message_id": str(message.id),
+        "role": "assistant",
+    }
