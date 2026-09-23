@@ -1,4 +1,4 @@
-"""Loopback-only launcher used by the CLI and macOS command file."""
+"""Loopback-only launcher used by Linux, the CLI, and compatibility scripts."""
 
 from __future__ import annotations
 
@@ -37,23 +37,25 @@ def _healthy(url: str, expected_fingerprint: str) -> bool:
     return _health_fingerprint(url) == expected_fingerprint
 
 
-def _port_available(port: int) -> bool:
+def _port_available(host: str, port: int) -> bool:
     with socket.socket() as probe:
         try:
-            probe.bind((DEFAULT_HOST, port))
+            probe.bind((host, port))
         except OSError:
             return False
     return True
 
 
-def _select_port(default_port: int, expected_fingerprint: str) -> tuple[int, bool]:
-    default_url = f"http://{DEFAULT_HOST}:{default_port}"
+def _select_port(
+    host: str, default_port: int, expected_fingerprint: str
+) -> tuple[int, bool]:
+    default_url = f"http://{host}:{default_port}"
     if _healthy(default_url, expected_fingerprint):
         return default_port, True
-    if _port_available(default_port):
+    if _port_available(host, default_port):
         return default_port, False
     for port in range(default_port + 1, default_port + 101):
-        if _port_available(port):
+        if _port_available(host, port):
             return port, False
     raise RuntimeError("no local port is available for the TCAD Agent web application")
 
@@ -66,21 +68,34 @@ def _open_when_ready(url: str, expected_fingerprint: str) -> None:
         time.sleep(0.05)
 
 
-def main() -> None:
+def run_server(
+    host: str = DEFAULT_HOST,
+    port: int = DEFAULT_PORT,
+    *,
+    open_browser: bool = True,
+) -> None:
+    if host != DEFAULT_HOST:
+        raise ValueError("the pilot server must bind to 127.0.0.1")
     fingerprint = runtime_fingerprint()
-    port, reused = _select_port(DEFAULT_PORT, fingerprint)
-    url = f"http://{DEFAULT_HOST}:{port}"
+    selected_port, reused = _select_port(host, port, fingerprint)
+    url = f"http://{host}:{selected_port}"
     if reused:
-        webbrowser.open(url)
+        if open_browser:
+            webbrowser.open(url)
         return
-    threading.Thread(
-        target=_open_when_ready,
-        args=(url, fingerprint),
-        daemon=True,
-    ).start()
+    if open_browser:
+        threading.Thread(
+            target=_open_when_ready,
+            args=(url, fingerprint),
+            daemon=True,
+        ).start()
     uvicorn.run(
         create_app(runtime_id=fingerprint),
-        host=DEFAULT_HOST,
-        port=port,
+        host=host,
+        port=selected_port,
         log_level="info",
     )
+
+
+def main() -> None:
+    run_server()

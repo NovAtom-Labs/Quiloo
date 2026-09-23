@@ -50,7 +50,11 @@ Natural-language research request
  Evidence bundle, report, hashes, and audit ledger
 ```
 
-In the local web application, the researcher:
+The local application now opens into a Linux-first repository IDE. A researcher can open a local
+Git or non-Git repository, inspect its directory tree and Git state, create a persistent
+conversation, and return to the same conversation URL after a browser or service restart.
+
+The `Guided simulation` view retains the established TCAD workflow. In that view, the researcher:
 
 1. Describes the intended device study and selects a backend.
 2. Answers missing values that affect the physical structure or boundary conditions.
@@ -67,7 +71,8 @@ Each stage has a persistent URL. Refreshing or revisiting a clarification, revie
 
 | Area | Current capability |
 | --- | --- |
-| Research interface | Four sequential local pages for request, clarification, plan approval, and interactive results |
+| Repository IDE | Three-panel local workspace with canonical repository paths, Git state, directory inspection, persistent conversations, activity streaming, and stable URLs |
+| Guided research interface | Four sequential local pages for request, clarification, plan approval, and interactive results at `/simulate` |
 | Portable specification | Strict one-dimensional `ExperimentSpec` with dimensional quantities and rejection of unknown fields |
 | Structures | Composable ordered silicon regions, without named-device execution branches |
 | Doping | Constant donor and acceptor profiles |
@@ -76,7 +81,7 @@ Each stage has a persistent URL. Refreshing or revisiting a clarification, revie
 | DEVSIM | Deterministic compilation, local subprocess isolation, normalization, validation, reports, and evidence bundles |
 | Sentaurus | Deterministic `sdevice.cmd` compilation, source maps, hashes, signed remote protocol, strict result normalization, and conformance rules |
 | Knowledge | Manifest-gated retrieval with source metadata, review state, backend/version filters, content hashes, and citations |
-| Agent boundary | Eight TCAD skills and one typed `tcad_domain` tool; no terminal exposed to the model |
+| Agent boundary | Eight TCAD skills and one typed `tcad_domain` tool; persisted IDE prompts are ready for the next OpenHands file and terminal integration slice |
 | Recovery | Bounded, allowlisted recovery policy with explicit failure classification |
 | Auditability | Persistent request states, immutable plan digests, event ledgers, artifact SHA-256 values, and atomic bundles |
 
@@ -163,7 +168,8 @@ The stable product is the experiment and evidence workflow. DEVSIM and Sentaurus
 | `results` | Canonical simulator-neutral numerical results |
 | `validation` | Numerical, physical, conservation, provenance, and completeness checks |
 | `bundles` | Atomic evidence packaging, reports, manifests, and artifact hashes |
-| `web` | Minimal local researcher application |
+| `ide` | Canonical local workspaces, persistent conversations, messages, and ordered activity events |
+| `web` | Browser IDE, guided TCAD workflow, local HTTP API, and Server-Sent Events |
 
 Every backend implements the same conceptual boundary:
 
@@ -198,7 +204,7 @@ Public DEVSIM material can be indexed locally. Proprietary Sentaurus manuals and
 
 ## Requirements
 
-- macOS or Linux for the current local launcher and runner workflow
+- Linux for the supported local IDE and runner workflow
 - Python `3.13`
 - a DEVSIM Python environment for real local simulations
 - an Amazon Bedrock API key for the natural-language model gateway
@@ -250,21 +256,45 @@ The pilot template currently selects the global Claude Sonnet 4.6 Bedrock infere
 
 Never commit `.env`, API keys, signing keys, proprietary manuals, licensed examples, or generated local workspaces. Revoke and rotate any credential disclosed in a prompt, chat, log, report, or commit.
 
-## Run the local web application
+## Run the Linux-local application
 
-On macOS, double-click:
-
-```text
-launch_tcad_agent.command
-```
-
-Or start it from a terminal:
+Start the supported Linux entrypoint from the repository:
 
 ```bash
-.venv/bin/tcad-agent-web
+.venv/bin/tcad-agent serve
 ```
 
-The application binds only to loopback, normally at [http://127.0.0.1:8765](http://127.0.0.1:8765). The launcher reuses an existing instance only when its source and non-secret model configuration match the current checkout. If an older instance owns that port, the updated application starts on the next available loopback port.
+Use `--no-browser` on a headless Linux session and open the printed loopback address manually:
+
+```bash
+.venv/bin/tcad-agent serve --no-browser
+```
+
+The application binds only to `127.0.0.1`, normally at
+[http://127.0.0.1:8765](http://127.0.0.1:8765). The launcher reuses an existing instance only when
+its source and non-secret model configuration match the current checkout. If an older instance
+owns that port, the updated application starts on the next available loopback port. The legacy
+`tcad-agent-web` entrypoint remains available for compatibility.
+
+### Open and resume a repository workspace
+
+1. Enter an absolute repository or directory path in the left panel.
+2. Select `Open` to register its canonical path and inspect its top-level entries.
+3. Select `New conversation`, provide a title, and send the first prompt.
+4. Bookmark or reload the resulting `/workspaces/<id>/conversations/<id>` URL to restore the
+   workspace, conversation, messages, and activity stream.
+5. Select `Guided simulation` to open the validated TCAD workflow at `/simulate`.
+
+The current foundation persists repository context and user prompts. It does not yet give the
+OpenHands model file-editing or terminal tools. Atomic file changes, repository search, bounded
+commands, diffs, checkpoints, external-path approvals, and autonomous iterative execution are the
+next implementation slices. The existing guided TCAD workflow remains fully operational now.
+
+Workspace metadata, conversations, messages, and IDE events are stored in
+`.tcad-agent/ide.sqlite3` by default. Guided requests remain in
+`.tcad-agent/requests.sqlite3`, and simulation bundles remain below the same runtime root. Change
+the root with `TCAD_WORKSPACE`. Stop the local service before copying that directory for backup so
+the SQLite database and write-ahead log remain consistent.
 
 For the main pilot demonstration, paste [the Al / p-Si / n-Si / Al prompt](examples/prompts/al-pn-al-equilibrium.md), select DEVSIM, and answer the requested thickness and contact questions. The local run covers the DEVSIM-supported subset. Verify all omitted Sentaurus-only physics during plan review.
 
@@ -430,6 +460,7 @@ src/tcad_agent/domain/            portable experiment contract
 src/tcad_agent/capabilities/      backend support and refusal
 src/tcad_agent/model_gateway/     structured online-model boundary
 src/tcad_agent/knowledge/         authorized ingestion and retrieval
+src/tcad_agent/ide/               local workspaces, conversations, and activity events
 src/tcad_agent/control/           request lifecycle and orchestration
 src/tcad_agent/adapters/          deterministic simulator translations
 src/tcad_agent/runners/           bounded local and remote execution
@@ -451,11 +482,15 @@ tests/                            unit, integration, and end-to-end verification
 
 ### Before the pilot
 
-1. Connect the licensed Sentaurus machine and record the exact release and executable identity.
-2. Complete the reviewed structure or mesh generation and native-result extraction procedures.
-3. Run expert-reviewed golden cases through the signed remote runner.
-4. Pass the cross-backend conformance suite without hiding warnings or loosening tolerances without approval.
-5. Replace exploratory long-term credentials with short-term or role-based production authentication.
+1. Connect OpenHands file, search, terminal, Git diff, checkpoint, and approval tools to the
+   persisted workspace and conversation contracts.
+2. Connect the licensed Sentaurus machine and record the exact release and executable identity.
+3. Complete the reviewed structure or mesh generation and native-result extraction procedures.
+4. Run expert-reviewed golden cases through the signed remote runner.
+5. Pass the cross-backend conformance suite without hiding warnings or loosening tolerances
+   without approval.
+6. Replace exploratory long-term credentials with short-term or role-based production
+   authentication.
 
 ### After the pilot
 

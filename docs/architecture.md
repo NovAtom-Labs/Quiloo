@@ -21,6 +21,43 @@ research request
 
 Retrieval supports specification and explanation, but it cannot override the schema, capability manifest, approval gate, compiler, or validators.
 
+## Linux-local repository IDE
+
+The primary application shell is a local browser IDE backed by a loopback-only FastAPI service.
+The browser is the interface, while repository paths, Git inspection, conversations, event
+history, simulator execution, knowledge, and credentials remain on the researcher's Linux
+machine.
+
+The first delivered slice establishes these contracts:
+
+```text
+repository path
+  -> canonical WorkspaceRecord
+  -> persistent ConversationRecord
+  -> ordered ConversationMessage and IDEEvent records
+  -> HTTP resources and resumable Server-Sent Events
+  -> three-panel browser workspace
+```
+
+`WorkspaceManager` accepts Git and non-Git directories. It canonicalizes each path before using it
+as workspace identity, reports Git branch and dirty state when available, and lists directory
+entries without traversing external symlinks. Reopening the same canonical path reuses its stable
+workspace UUID.
+
+One local SQLite database stores workspaces, conversations, messages, and monotonically ordered
+IDE events. Conversation pages use stable URLs. An SSE client resumes strictly after its last
+event identifier, so browser reconnection does not duplicate earlier activity. State is persisted
+before it is streamed.
+
+The root route serves the IDE. The existing guided request flow remains at `/simulate`, and its
+request-specific clarification, review, and results URLs remain unchanged.
+
+This foundation does not yet expose repository file writes or a terminal to OpenHands. The next
+slice adds atomic editing, repository search, bounded process execution, diffs, and recoverable
+checkpoints against these persisted records. A later permission slice adds exact, auditable
+external-path grants. Until those slices land, IDE prompts are stored but not autonomously
+executed.
+
 ## Stable contracts
 
 ### ExperimentSpec
@@ -75,6 +112,12 @@ Reports read structured data only. Logs remain evidence, not a source of numeric
 ## Agent boundary
 
 OpenHands receives eight small skills for specification, capability checks, DEVSIM compilation, recovery, validation, citation, reporting, and Sentaurus policy. Its custom `tcad_domain` tool exposes typed actions only. The production profile does not expose a terminal. The agent may propose a plan, but execution remains approval-gated.
+
+The repository IDE does not weaken this existing boundary. The planned workspace-agent profile
+will add file, search, terminal, Git, and approval-broker tools around the same OpenHands
+conversation runtime. Supported TCAD studies will still pass through `ExperimentSpec`, capability
+checks, deterministic adapters, canonical results, and validation rather than directly executing
+model-written simulator syntax.
 
 This separation makes the model replaceable. Model reasoning helps interpret intent and choose tools. Deterministic software owns units, support, simulator syntax, execution, checks, provenance, and output.
 

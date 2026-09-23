@@ -1,6 +1,7 @@
 import socket
 
-from tcad_agent.web.launcher import _select_port
+from tcad_agent.web import launcher
+from tcad_agent.web.launcher import DEFAULT_HOST, _select_port
 from tcad_agent.web.runtime import runtime_fingerprint
 
 
@@ -24,6 +25,31 @@ def test_select_port_uses_next_free_port_when_default_is_occupied() -> None:
     with socket.socket() as occupied:
         occupied.bind(("127.0.0.1", 0))
         port = occupied.getsockname()[1]
-        selected, reused = _select_port(port, expected_fingerprint="new-runtime")
+        selected, reused = _select_port(
+            DEFAULT_HOST, port, expected_fingerprint="new-runtime"
+        )
     assert selected != port
     assert reused is False
+
+
+def test_run_server_can_launch_without_opening_browser(monkeypatch) -> None:
+    calls: dict[str, object] = {}
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = int(probe.getsockname()[1])
+
+    def fake_run(app, *, host, port, log_level) -> None:
+        calls.update(app=app, host=host, port=port, log_level=log_level)
+
+    monkeypatch.setattr(launcher.uvicorn, "run", fake_run)
+    monkeypatch.setattr(
+        launcher.webbrowser,
+        "open",
+        lambda _url: calls.update(browser_opened=True),
+    )
+
+    launcher.run_server("127.0.0.1", port, open_browser=False)
+
+    assert calls["host"] == "127.0.0.1"
+    assert calls["port"] == port
+    assert "browser_opened" not in calls

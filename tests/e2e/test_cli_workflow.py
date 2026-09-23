@@ -7,6 +7,16 @@ from tcad_agent.cli import app
 runner = CliRunner()
 
 
+def test_serve_command_exposes_linux_local_options() -> None:
+    result = runner.invoke(app, ["serve", "--help"])
+
+    assert result.exit_code == 0
+    assert "--host" in result.stdout
+    assert "--port" in result.stdout
+    assert "--no-browser" in result.stdout
+    assert "127.0.0.1" in result.stdout
+
+
 def test_cli_runs_example_to_completed_bundle(tmp_path) -> None:
     result = runner.invoke(
         app,
