@@ -96,6 +96,7 @@ def test_http_client_submits_signed_bundle_and_materializes_result(tmp_path: Pat
     assert result.result_path is not None
     assert result.result_path.read_bytes() == b"tdr"
     assert seen["required_simulator_version"] == "S-2024.03"
+    assert seen["timeout_seconds"] == 30
     assert seen["signature_b64"]
     assert seen["bundle_b64"]
 

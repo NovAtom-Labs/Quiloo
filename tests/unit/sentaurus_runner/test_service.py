@@ -34,6 +34,15 @@ class StubExecutor:
         )
 
 
+class NestedOutputExecutor(StubExecutor):
+    def execute(self, job_dir: Path, *, timeout_seconds: float) -> ExecutorResult:
+        result = super().execute(job_dir, timeout_seconds=timeout_seconds)
+        nested = job_dir / "unexpected"
+        nested.mkdir()
+        (nested / "output.txt").write_text("not allowlisted\n")
+        return result
+
+
 def archive(files: dict[str, bytes]) -> bytes:
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w", compression=zipfile.ZIP_STORED) as bundle:
@@ -75,14 +84,19 @@ def configured(tmp_path: Path):
         max_upload_bytes=4096,
     )
     client = TestClient(create_app(settings, executor=StubExecutor()))
-    return client, private
+    return client, private, settings
 
 
-def valid_bundle(*, expected_outputs: list[str] | None = None) -> bytes:
+def valid_bundle(
+    *,
+    expected_outputs: list[str] | None = None,
+    input_hashes: dict[str, str] | None = None,
+) -> bytes:
     manifest = {
         "backend": "sentaurus",
         "command_file": "sdevice.cmd",
         "expected_outputs": expected_outputs or ["sdevice.log", "sdevice.tdr"],
+        "inputs": input_hashes or {},
     }
     return archive(
         {
@@ -93,7 +107,7 @@ def valid_bundle(*, expected_outputs: list[str] | None = None) -> bytes:
 
 
 def test_valid_job_can_be_retrieved(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     request = request_for(private, valid_bundle())
     response = client.post("/v1/jobs", json=request.model_dump(mode="json"))
     assert response.status_code == 201, response.text
@@ -104,20 +118,20 @@ def test_valid_job_can_be_retrieved(configured) -> None:
 
 
 def test_wrong_backend_is_rejected(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     body = request_for(private, valid_bundle()).model_dump(mode="json")
     body["backend"] = "devsim"
     assert client.post("/v1/jobs", json=body).status_code == 422
 
 
 def test_version_mismatch_is_rejected(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     request = request_for(private, valid_bundle(), version="S-2023.12")
     assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 409
 
 
 def test_expired_request_is_rejected(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     now = datetime.now(UTC)
     request = request_for(
         private,
@@ -129,7 +143,7 @@ def test_expired_request_is_rejected(configured) -> None:
 
 
 def test_replayed_job_id_is_rejected(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     request = request_for(private, valid_bundle())
     body = request.model_dump(mode="json")
     assert client.post("/v1/jobs", json=body).status_code == 201
@@ -137,35 +151,70 @@ def test_replayed_job_id_is_rejected(configured) -> None:
 
 
 def test_archive_path_traversal_is_rejected(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     bundle = archive({"../escape": b"bad", "job-manifest.json": b"{}"})
     request = request_for(private, bundle)
     assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 400
 
 
 def test_oversized_upload_is_rejected(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     bundle = archive({"huge.bin": b"x" * 5000})
     request = request_for(private, bundle)
     assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 413
 
 
 def test_hash_mismatch_is_rejected(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     request = request_for(private, valid_bundle())
     request = request.model_copy(update={"bundle_b64": base64.b64encode(b"changed").decode()})
     assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 400
 
 
 def test_untrusted_signature_is_rejected(configured) -> None:
-    client, _private = configured
+    client, _private, _settings = configured
     outsider = Ed25519PrivateKey.generate()
     request = request_for(outsider, valid_bundle())
     assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 401
 
 
 def test_non_allowlisted_output_is_rejected(configured) -> None:
-    client, private = configured
+    client, private, _settings = configured
     bundle = valid_bundle(expected_outputs=["sdevice.log", "secret.txt"])
+    request = request_for(private, bundle)
+    assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 400
+
+
+def test_validity_window_is_bounded(configured) -> None:
+    client, private, _settings = configured
+    now = datetime.now(UTC)
+    request = request_for(
+        private,
+        valid_bundle(),
+        issued_at=now,
+        expires_at=now + timedelta(hours=1),
+    )
+    assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 401
+
+
+def test_job_id_replay_is_rejected_after_service_restart(configured) -> None:
+    client, private, settings = configured
+    request = request_for(private, valid_bundle())
+    body = request.model_dump(mode="json")
+    assert client.post("/v1/jobs", json=body).status_code == 201
+    restarted = TestClient(create_app(settings, executor=StubExecutor()))
+    assert restarted.post("/v1/jobs", json=body).status_code == 409
+
+
+def test_nested_runner_output_is_rejected(configured) -> None:
+    _client, private, settings = configured
+    client = TestClient(create_app(settings, executor=NestedOutputExecutor()))
+    request = request_for(private, valid_bundle())
+    assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 400
+
+
+def test_manifest_input_hash_is_verified(configured) -> None:
+    client, private, _settings = configured
+    bundle = valid_bundle(input_hashes={"sdevice.cmd": "0" * 64})
     request = request_for(private, bundle)
     assert client.post("/v1/jobs", json=request.model_dump(mode="json")).status_code == 400

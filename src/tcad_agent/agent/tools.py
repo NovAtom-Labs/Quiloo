@@ -76,12 +76,6 @@ class DomainTools:
                 message="Requested experiment is unsupported by the selected backend.",
                 data={"decision": decision.model_dump(mode="json")},
             )
-        if manifest.execution_state != "configured":
-            return ToolResponse(
-                status="refused",
-                code="backend_unconfigured",
-                message=f"{backend} support is declared but its runner is not configured.",
-            )
         workspace = self.workspace / "compiled" / uuid4().hex
         try:
             job = get_backend(backend).adapter.compile(spec, workspace)

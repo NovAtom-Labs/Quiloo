@@ -94,7 +94,6 @@ class RemoteSentaurusRunner:
         self._workspaces: dict[UUID, Path] = {}
 
     def submit(self, job: CompiledJob, budget: RunBudget) -> RemoteJobHandle:
-        del budget
         self._require_configured()
         if job.backend != "sentaurus":
             raise ValueError("remote Sentaurus runner accepts only sentaurus jobs")
@@ -112,6 +111,7 @@ class RemoteSentaurusRunner:
             bundle_b64=base64.b64encode(bundle).decode(),
             issued_at=now,
             expires_at=now + timedelta(minutes=5),
+            timeout_seconds=budget.seconds,
         )
         request = sign_submit_request(payload, self.config.signing_private_key)
         response = self._client.post(self._url("/v1/jobs"), json=request.model_dump(mode="json"))

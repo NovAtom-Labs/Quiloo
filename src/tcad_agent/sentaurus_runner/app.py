@@ -60,6 +60,7 @@ class RunnerManifest(StrictModel):
     backend: Literal["sentaurus"]
     command_file: Literal["sdevice.cmd"] = "sdevice.cmd"
     expected_outputs: tuple[str, ...]
+    inputs: dict[str, str] = Field(default_factory=dict)
 
 
 class _StoredJob:
@@ -148,7 +149,13 @@ def create_app(
         assert settings.trusted_public_key is not None
         assert settings.exact_version is not None
         now = datetime.now(UTC)
-        if request.issued_at > now or request.expires_at < now:
+        maximum_validity_seconds = 10 * 60
+        validity_seconds = (request.expires_at - request.issued_at).total_seconds()
+        if (
+            request.issued_at > now
+            or request.expires_at < now
+            or validity_seconds > maximum_validity_seconds
+        ):
             raise HTTPException(status_code=401, detail="request is outside its validity window")
         try:
             verify_submit_request(request, settings.trusted_public_key)
@@ -164,6 +171,8 @@ def create_app(
         job_dir = (settings.job_root / str(request.job_id)).resolve()
         if not job_dir.is_relative_to(settings.job_root.resolve()):
             raise HTTPException(status_code=400, detail="invalid job ID")
+        if job_dir.exists():
+            raise HTTPException(status_code=409, detail="job ID has already been used")
         job_dir.mkdir(mode=0o700, exist_ok=False)
         try:
             input_names = _safe_extract(bundle, job_dir, settings)
@@ -177,16 +186,34 @@ def create_app(
                         "backend": raw_manifest.get("backend"),
                         "command_file": raw_manifest.get("command_file", "sdevice.cmd"),
                         "expected_outputs": raw_manifest.get("expected_outputs"),
+                        "inputs": raw_manifest.get("inputs", {}),
                     }
                 )
             except (json.JSONDecodeError, AttributeError, ValueError) as exc:
                 raise HTTPException(status_code=400, detail="job manifest is invalid") from exc
             if not (job_dir / manifest.command_file).is_file():
                 raise HTTPException(status_code=400, detail="command file is missing")
+            for name, expected_digest in manifest.inputs.items():
+                path = job_dir / name
+                if (
+                    Path(name).name != name
+                    or len(expected_digest) != 64
+                    or any(character not in "0123456789abcdef" for character in expected_digest)
+                    or not path.is_file()
+                    or hashlib.sha256(path.read_bytes()).hexdigest() != expected_digest
+                ):
+                    raise HTTPException(
+                        status_code=400, detail="manifest input digest does not match"
+                    )
             if set(manifest.expected_outputs) - set(settings.output_allowlist):
                 raise HTTPException(status_code=400, detail="requested output is not allowlisted")
 
-            execution = runner.execute(job_dir, timeout_seconds=settings.execution_timeout_seconds)
+            execution = runner.execute(
+                job_dir,
+                timeout_seconds=min(
+                    request.timeout_seconds, settings.execution_timeout_seconds
+                ),
+            )
             allowed_files = (
                 input_names
                 | set(manifest.expected_outputs)
@@ -195,8 +222,11 @@ def create_app(
                     "runner.stderr.log",
                 }
             )
-            produced = {path.name for path in job_dir.iterdir() if path.is_file()}
-            if produced - allowed_files:
+            produced = set(job_dir.iterdir())
+            if any(
+                path.is_symlink() or not path.is_file() or path.name not in allowed_files
+                for path in produced
+            ):
                 raise HTTPException(
                     status_code=400, detail="runner produced a non-allowlisted file"
                 )

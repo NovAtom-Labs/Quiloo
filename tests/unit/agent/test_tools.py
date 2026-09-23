@@ -18,9 +18,10 @@ def test_run_tool_requires_validated_plan(tmp_path: Path) -> None:
     assert response.code == "approval_required"
 
 
-def test_sentaurus_run_refuses_without_configured_remote(tmp_path: Path) -> None:
+def test_sentaurus_compiles_without_configured_remote(tmp_path: Path) -> None:
     response = build_tools(tmp_path).compile_experiment(
         valid_spec_payload(), backend="sentaurus"
     )
-    assert response.status == "refused"
-    assert response.code == "backend_unconfigured"
+    assert response.status == "ok"
+    assert response.code == "compiled"
+    assert response.data["job"]["backend"] == "sentaurus"

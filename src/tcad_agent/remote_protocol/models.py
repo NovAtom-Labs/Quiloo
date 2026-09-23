@@ -19,6 +19,7 @@ class SubmitJobPayload(StrictModel):
     bundle_b64: str = Field(min_length=1)
     issued_at: datetime
     expires_at: datetime
+    timeout_seconds: float = Field(default=120, gt=0, le=3600)
 
     @field_validator("issued_at", "expires_at")
     @classmethod

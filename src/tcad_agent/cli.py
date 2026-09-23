@@ -23,6 +23,7 @@ from tcad_agent.knowledge.ingest import KnowledgeIngestor
 from tcad_agent.knowledge.models import SourceManifest
 from tcad_agent.knowledge.retrieve import KnowledgeIndex
 from tcad_agent.runners.models import RunBudget
+from tcad_agent.runners.remote import BackendUnconfiguredError, RemoteProtocolError
 from tcad_agent.validation.engine import ValidationEngine
 
 app = typer.Typer(help="Validate, compile, run, and report simulator-neutral TCAD studies.")
@@ -56,9 +57,6 @@ def _require_backend(spec: ExperimentSpec, backend: str) -> CapabilityManifest:
     if decision.status is not CapabilityStatus.SUPPORTED:
         for issue in decision.issues:
             typer.echo(f"{issue.path}: {issue.message}", err=True)
-        raise typer.Exit(2)
-    if manifest.execution_state != "configured":
-        typer.echo(f"{backend} runner is not configured", err=True)
         raise typer.Exit(2)
     return manifest
 
@@ -114,7 +112,11 @@ def run_command(
     ledger.append(RunEventKind.REQUESTED, {"run_id": run_id})
     ledger.append(RunEventKind.COMPILED, {"backend": backend})
     ledger.append(RunEventKind.STARTED, {"timeout_seconds": timeout_seconds})
-    native = binding.runner.run(job, RunBudget(seconds=timeout_seconds))
+    try:
+        native = binding.runner.run(job, RunBudget(seconds=timeout_seconds))
+    except (BackendUnconfiguredError, RemoteProtocolError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(2) from exc
     result = adapter.normalize(native)
     expected_points = 1
     if isinstance(spec.study, DCStudy):

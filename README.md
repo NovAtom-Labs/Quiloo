@@ -18,7 +18,8 @@ Working now:
 - signed remote-runner protocol with replay, path, size, version, and output controls
 - strict Sentaurus result normalization and case-scoped cross-backend conformance
 - canonical results, physical checks, immutable evidence bundles, and reports
-- manifest-gated local knowledge retrieval with citations
+- manifest-gated local knowledge retrieval with citations, injected into each model request
+- backend-specific TCAD skill context and clarification answers injected into the model request
 - eight TCAD operating skills and a typed OpenHands tool boundary
 - researcher CLI and web app with an explicit execution approval gate
 
@@ -69,6 +70,16 @@ Run a study only after reviewing it:
   --approve \
   --output runs
 ```
+
+Compile the full Sentaurus example without requiring the licensed runner:
+
+```bash
+.venv/bin/tcad-agent compile examples/al-pn-al-equilibrium.yaml \
+  --backend sentaurus \
+  --output compiled/al-pn-al-sentaurus
+```
+
+Compilation is available offline. Execution remains blocked until the licensed runner is configured.
 
 Build the local DEVSIM knowledge index from the approved manifest:
 

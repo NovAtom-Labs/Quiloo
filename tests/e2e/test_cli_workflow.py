@@ -110,3 +110,38 @@ def test_cli_shows_user_copyable_agent_evaluation_prompt() -> None:
     assert result.exit_code == 0, result.output
     assert "Equilibrium Al / p-Si / n-Si / Al" in result.output
     assert "both contacts maintained at 0 V" in result.output
+
+
+def test_cli_compiles_sentaurus_deck_without_licensed_runner(tmp_path) -> None:
+    output = tmp_path / "sentaurus"
+    result = runner.invoke(
+        app,
+        [
+            "compile",
+            "examples/al-pn-al-equilibrium.yaml",
+            "--backend",
+            "sentaurus",
+            "--output",
+            str(output),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert (output / "sdevice.cmd").is_file()
+
+
+def test_cli_reports_unconfigured_sentaurus_runner_without_traceback(tmp_path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "examples/al-pn-al-equilibrium.yaml",
+            "--backend",
+            "sentaurus",
+            "--approve",
+            "--output",
+            str(tmp_path),
+        ],
+    )
+    assert result.exit_code == 2
+    assert "Sentaurus runner requires" in result.output
+    assert "Traceback" not in result.output

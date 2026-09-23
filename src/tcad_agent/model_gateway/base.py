@@ -7,11 +7,21 @@ from pydantic import Field, JsonValue, model_validator
 
 from tcad_agent.control.models import ClarificationQuestion, ResearchRequest
 from tcad_agent.domain.models import StrictModel
+from tcad_agent.knowledge.models import Citation
+
+
+class KnowledgeExcerpt(StrictModel):
+    content: str = Field(min_length=1, max_length=1600)
+    citation: Citation
+    reviewed: bool
 
 
 class AgentContextPacket(StrictModel):
     citations: tuple[str, ...] = ()
     capabilities: dict[str, JsonValue] = Field(default_factory=dict)
+    clarification_answers: dict[str, str] = Field(default_factory=dict)
+    knowledge: tuple[KnowledgeExcerpt, ...] = ()
+    procedures: tuple[str, ...] = ()
 
 
 class AgentProposal(StrictModel):

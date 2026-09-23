@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 from typing import cast
@@ -29,11 +31,17 @@ from tcad_agent.control.store import ConcurrentTransitionError, RequestStore
 from tcad_agent.domain.models import ExperimentSpec
 from tcad_agent.events.ledger import EventLedger
 from tcad_agent.events.models import RunEvent, RunEventKind
-from tcad_agent.model_gateway.base import AgentContextPacket, AgentProposal, ModelGateway
+from tcad_agent.knowledge.retrieve import KnowledgeIndex
+from tcad_agent.model_gateway.base import (
+    AgentContextPacket,
+    AgentProposal,
+    KnowledgeExcerpt,
+    ModelGateway,
+)
 from tcad_agent.recovery.models import RecoveryBudget
 from tcad_agent.recovery.policy import RecoveryPolicy
 from tcad_agent.runners.models import CompiledJob, RunBudget
-from tcad_agent.runners.remote import BackendUnconfiguredError
+from tcad_agent.runners.remote import BackendUnconfiguredError, RemoteProtocolError
 from tcad_agent.validation.engine import ValidationEngine
 
 
@@ -88,12 +96,21 @@ class ControlService:
         workspace: Path,
         backend_resolver: Callable[[str], BackendBinding] = get_backend,
         run_budget_seconds: float = 120.0,
+        knowledge_index: Path | None = None,
+        skills_root: Path | None = None,
     ) -> None:
         self.store = store
         self.gateway = gateway
         self.workspace = workspace
         self.backend_resolver = backend_resolver
         self.run_budget_seconds = run_budget_seconds
+        configured_index = os.getenv("TCAD_KNOWLEDGE_INDEX")
+        self.knowledge_index = knowledge_index or Path(
+            configured_index or "knowledge-sources/index/knowledge.sqlite3"
+        )
+        self.skills_root = skills_root or Path(
+            os.getenv("TCAD_SKILLS_ROOT") or "skills"
+        )
         self.clarifications = ClarificationGate()
         self.workspace.mkdir(parents=True, exist_ok=True)
 
@@ -233,6 +250,18 @@ class ControlService:
                     "error_message": (
                         "Sentaurus execution requires the configured licensed runner."
                     ),
+                },
+            )
+            return self._view(failed)
+        except (RemoteProtocolError, OSError) as exc:
+            ledger.append(RunEventKind.FAILED, {"code": "execution_transport"})
+            failed = self.store.transition(
+                running.id,
+                running.revision,
+                RequestState.FAILED,
+                {
+                    "error_code": "execution_transport",
+                    "error_message": f"Simulator execution transport failed: {exc}",
                 },
             )
             return self._view(failed)
@@ -390,15 +419,71 @@ class ControlService:
 
     def _propose(self, record: RequestRecord) -> AgentProposal:
         warnings = _string_tuple(record.data.get("warnings"))
+        backend = str(record.data["backend"])
+        knowledge = self._retrieve_knowledge(record.request.prompt, backend)
+        procedures = self._load_procedures(backend)
         context = AgentContextPacket(
-            citations=(),
-            capabilities={"backend": str(record.data["backend"]), "warnings": list(warnings)},
+            citations=tuple(
+                f"{item.citation.source_id}:{item.citation.content_hash}"
+                for item in knowledge
+            ),
+            capabilities={"backend": backend, "warnings": list(warnings)},
+            clarification_answers=_string_mapping(record.data.get("answers")),
+            knowledge=knowledge,
+            procedures=procedures,
         )
         return self.gateway.propose(record.request, context)
 
     def _context_warnings(self) -> tuple[str, ...]:
-        index = self.workspace / "knowledge" / "knowledge.sqlite3"
-        return () if index.is_file() else ("knowledge_index_missing",)
+        warnings: list[str] = []
+        if not self.knowledge_index.is_file():
+            warnings.append("knowledge_index_missing")
+        if not self.skills_root.is_dir():
+            warnings.append("skill_context_missing")
+        return tuple(warnings)
+
+    def _retrieve_knowledge(
+        self, query: str, backend: str
+    ) -> tuple[KnowledgeExcerpt, ...]:
+        if not self.knowledge_index.is_file():
+            return ()
+        try:
+            backend_hits = KnowledgeIndex(self.knowledge_index).search(
+                query, {"backend": backend}, limit=4
+            )
+            portable_hits = KnowledgeIndex(self.knowledge_index).search(
+                query, {"backend": "portable"}, limit=2
+            )
+        except (OSError, sqlite3.DatabaseError, ValueError):
+            return ()
+        excerpts: list[KnowledgeExcerpt] = []
+        seen: set[str] = set()
+        for hit in (*backend_hits, *portable_hits):
+            if hit.id in seen:
+                continue
+            seen.add(hit.id)
+            review_label = "REVIEWED" if hit.reviewed else "UNREVIEWED SECONDARY"
+            excerpts.append(
+                KnowledgeExcerpt(
+                    content=f"[{review_label}] {hit.content}"[:1600],
+                    citation=hit.citation,
+                    reviewed=hit.reviewed,
+                )
+            )
+        return tuple(excerpts[:4])
+
+    def _load_procedures(self, backend: str) -> tuple[str, ...]:
+        names = ["specification", "capability-checking", "source-citation"]
+        names.append("devsim-compilation" if backend == "devsim" else "sentaurus-boundary")
+        procedures: list[str] = []
+        for name in names:
+            path = self.skills_root / name / "SKILL.md"
+            try:
+                content = path.read_text(encoding="utf-8")
+            except OSError:
+                continue
+            procedures.append(content[:4000])
+        return tuple(procedures)
 
     def _view(self, record: RequestRecord) -> RequestView:
         question_data = record.data.get("questions")
