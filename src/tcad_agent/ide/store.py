@@ -38,6 +38,10 @@ class ConversationNotFoundError(IDEStoreError):
     pass
 
 
+class MessageNotFoundError(IDEStoreError):
+    pass
+
+
 class SqliteIDEStore:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -287,6 +291,16 @@ class SqliteIDEStore:
                 (str(conversation_id),),
             ).fetchall()
         return tuple(self._message(row) for row in rows)
+
+    def get_message(self, message_id: UUID) -> ConversationMessage:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM conversation_messages WHERE id = ?",
+                (str(message_id),),
+            ).fetchone()
+        if row is None:
+            raise MessageNotFoundError(f"message does not exist: {message_id}")
+        return self._message(row)
 
     def create_run(
         self, conversation_id: UUID, sdk_conversation_id: UUID

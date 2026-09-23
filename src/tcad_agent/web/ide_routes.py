@@ -16,25 +16,42 @@ from uuid import UUID
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 
+from tcad_agent.agent.supervisor import AgentRunConflictError, AgentSupervisor
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed, format_sse
 from tcad_agent.ide.models import (
+    AgentRunRecord,
+    ApprovalRequestRecord,
     ConversationMessage,
     ConversationRecord,
+    RunState,
     WorkspaceEntry,
     WorkspaceRecord,
 )
-from tcad_agent.ide.store import SqliteIDEStore
+from tcad_agent.ide.store import IDEStoreError, MessageNotFoundError, SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
 from tcad_agent.web.schemas import (
     CreateConversationRequest,
     CreateMessageRequest,
+    DenyAgentApprovalRequest,
     OpenWorkspaceRequest,
+    ResolveAgentApprovalRequest,
+    StartAgentRunRequest,
 )
 
 
 class DirectoryPickerUnavailable(RuntimeError):
     """Raised when the host cannot present a graphical directory chooser."""
+
+
+class AgentAPIError(RuntimeError):
+    """Stable, sanitized error returned by the repository-agent API."""
+
+    def __init__(self, status_code: int, code: str, message: str) -> None:
+        super().__init__(message)
+        self.status_code = status_code
+        self.code = code
+        self.message = message
 
 
 @dataclass(frozen=True)
@@ -161,7 +178,9 @@ def select_directory() -> Path | None:
     )
 
 
-def build_ide_router(services: IDEServices) -> APIRouter:
+def build_ide_router(
+    services: IDEServices, supervisor: AgentSupervisor
+) -> APIRouter:
     router = APIRouter(prefix="/api")
 
     @router.post("/system/directories/select")
@@ -218,6 +237,93 @@ def build_ide_router(services: IDEServices) -> APIRouter:
         conversation_id: UUID, payload: CreateMessageRequest
     ) -> ConversationMessage:
         return services.conversations.add_user_message(conversation_id, payload.content)
+
+    @router.post("/conversations/{conversation_id}/runs", status_code=202)
+    def start_agent_run(
+        conversation_id: UUID, payload: StartAgentRunRequest
+    ) -> AgentRunRecord:
+        try:
+            message = services.store.get_message(payload.message_id)
+        except MessageNotFoundError as exc:
+            raise AgentAPIError(
+                404, "message_not_found", "The message was not found."
+            ) from exc
+        if message.conversation_id != conversation_id or message.role != "user":
+            raise AgentAPIError(
+                400,
+                "invalid_run_message",
+                "The run must reference a user message in this conversation.",
+            )
+        try:
+            return supervisor.start(
+                conversation_id, message.content, persist_message=False
+            )
+        except AgentRunConflictError as exc:
+            raise AgentAPIError(
+                409,
+                "agent_run_conflict",
+                "This workspace already has an active agent run.",
+            ) from exc
+
+    @router.get("/conversations/{conversation_id}/runs/active")
+    def active_agent_run(conversation_id: UUID) -> AgentRunRecord | None:
+        active_states = {
+            RunState.QUEUED,
+            RunState.RUNNING,
+            RunState.WAITING_FOR_APPROVAL,
+            RunState.WAITING_FOR_USER,
+            RunState.PAUSED,
+        }
+        runs = services.store.list_runs(conversation_id)
+        return next((run for run in reversed(runs) if run.state in active_states), None)
+
+    @router.post("/runs/{run_id}/pause")
+    def pause_agent_run(run_id: UUID) -> AgentRunRecord:
+        return supervisor.pause(run_id)
+
+    @router.post("/runs/{run_id}/resume")
+    def resume_agent_run(run_id: UUID) -> AgentRunRecord:
+        return supervisor.resume(run_id)
+
+    @router.post("/runs/{run_id}/stop")
+    def stop_agent_run(run_id: UUID) -> AgentRunRecord:
+        return supervisor.stop(run_id)
+
+    @router.get("/conversations/{conversation_id}/approvals")
+    def pending_approvals(
+        conversation_id: UUID,
+    ) -> tuple[ApprovalRequestRecord, ...]:
+        return services.store.list_pending_approvals(conversation_id)
+
+    def resolve_approval_error(exc: IDEStoreError) -> AgentAPIError:
+        code = "stale_revision" if "stale" in str(exc).lower() else "approval_not_found"
+        status = 409 if code == "stale_revision" else 404
+        message = (
+            "The approval changed. Refresh before deciding again."
+            if code == "stale_revision"
+            else "The approval request was not found."
+        )
+        return AgentAPIError(status, code, message)
+
+    @router.post("/approvals/{approval_id}/approve")
+    def approve_agent_action(
+        approval_id: UUID, payload: ResolveAgentApprovalRequest
+    ) -> AgentRunRecord:
+        try:
+            return supervisor.approve(approval_id, payload.expected_revision)
+        except IDEStoreError as exc:
+            raise resolve_approval_error(exc) from exc
+
+    @router.post("/approvals/{approval_id}/deny")
+    def deny_agent_action(
+        approval_id: UUID, payload: DenyAgentApprovalRequest
+    ) -> AgentRunRecord:
+        try:
+            return supervisor.deny(
+                approval_id, payload.expected_revision, payload.reason
+            )
+        except IDEStoreError as exc:
+            raise resolve_approval_error(exc) from exc
 
     @router.get("/conversations/{conversation_id}/events")
     async def conversation_events(

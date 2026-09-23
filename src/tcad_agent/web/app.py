@@ -14,6 +14,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+from tcad_agent.agent.runtime import OpenHandsRuntimeFactory
+from tcad_agent.agent.supervisor import AgentSupervisor
 from tcad_agent.control.models import (
     ClarificationAnswer,
     RequestView,
@@ -36,6 +38,7 @@ from tcad_agent.model_gateway.openhands import (
     OpenHandsBedrockGateway,
 )
 from tcad_agent.web.ide_routes import (
+    AgentAPIError,
     IDEServices,
     build_default_ide_services,
     build_ide_router,
@@ -94,15 +97,28 @@ def create_app(
     *,
     runtime_id: str | None = None,
     ide: IDEServices | None = None,
+    agent_supervisor: AgentSupervisor | None = None,
 ) -> FastAPI:
     service = control or build_default_control()
     ide_services = ide or build_default_ide_services()
+    active_supervisor = agent_supervisor or AgentSupervisor(
+        ide_services, OpenHandsRuntimeFactory(ide_services.runtime_root)
+    )
     active_runtime_id = runtime_id or runtime_fingerprint()
     package_root = Path(__file__).parent
     templates = Jinja2Templates(directory=package_root / "templates")
     app = FastAPI(title="NovAtom TCAD Agent", docs_url=None, redoc_url=None)
     app.mount("/static", StaticFiles(directory=package_root / "static"), name="static")
-    app.include_router(build_ide_router(ide_services))
+    app.include_router(build_ide_router(ide_services, active_supervisor))
+
+    @app.exception_handler(AgentAPIError)
+    async def agent_api_error(
+        _request: Request, exc: AgentAPIError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={"code": exc.code, "message": exc.message},
+        )
 
     @app.exception_handler(WorkspacePathError)
     async def invalid_workspace_path(

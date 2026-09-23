@@ -1,6 +1,7 @@
 """HTTP request contracts for the local researcher interface."""
 
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
@@ -40,3 +41,15 @@ class CreateConversationRequest(WebRequest):
 
 class CreateMessageRequest(WebRequest):
     content: str = Field(min_length=1, max_length=100_000)
+
+
+class StartAgentRunRequest(WebRequest):
+    message_id: UUID
+
+
+class ResolveAgentApprovalRequest(WebRequest):
+    expected_revision: int = Field(ge=0)
+
+
+class DenyAgentApprovalRequest(ResolveAgentApprovalRequest):
+    reason: str = Field(min_length=1, max_length=2_000)

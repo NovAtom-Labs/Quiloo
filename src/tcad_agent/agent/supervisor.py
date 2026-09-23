@@ -56,11 +56,20 @@ class RuntimeFactory(Protocol):
 
 
 class SupervisorServices(Protocol):
-    store: SqliteIDEStore
-    events: EventFeed
-    workspaces: WorkspaceManager
-    conversations: ConversationService
-    runtime_root: Path
+    @property
+    def store(self) -> SqliteIDEStore: ...
+
+    @property
+    def events(self) -> EventFeed: ...
+
+    @property
+    def workspaces(self) -> WorkspaceManager: ...
+
+    @property
+    def conversations(self) -> ConversationService: ...
+
+    @property
+    def runtime_root(self) -> Path: ...
 
 
 _ACTIVE_STATES = {
@@ -84,7 +93,13 @@ class AgentSupervisor:
         self._workspace_locks: dict[Path, threading.Lock] = {}
         self._recover_interrupted_runs()
 
-    def start(self, conversation_id: UUID, prompt: str) -> AgentRunRecord:
+    def start(
+        self,
+        conversation_id: UUID,
+        prompt: str,
+        *,
+        persist_message: bool = True,
+    ) -> AgentRunRecord:
         conversation = self.services.conversations.get(conversation_id)
         workspace = self.services.workspaces.get(conversation.workspace_id)
         with self._guard:
@@ -95,7 +110,8 @@ class AgentSupervisor:
                 raise AgentRunConflictError(
                     "the workspace already has an active agent run"
                 )
-            self.services.conversations.add_user_message(conversation_id, prompt)
+            if persist_message:
+                self.services.conversations.add_user_message(conversation_id, prompt)
             run = self.services.store.create_run(conversation_id, conversation_id)
             bridge = AgentEventBridge(
                 conversation_id,
@@ -103,6 +119,7 @@ class AgentSupervisor:
                 self.services.store,
                 self.services.events,
                 self.services.conversations,
+                workspace=workspace.root,
             )
             runtime = self.runtime_factory.create(
                 workspace.root, run.sdk_conversation_id, bridge
@@ -184,6 +201,7 @@ class AgentSupervisor:
                 self.services.store,
                 self.services.events,
                 self.services.conversations,
+                workspace=workspace.root,
             )
             runtime = self.runtime_factory.create(
                 workspace.root, run.sdk_conversation_id, bridge

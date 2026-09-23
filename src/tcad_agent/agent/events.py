@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import re
 from collections.abc import Mapping
+from pathlib import Path
 from typing import cast
 from uuid import UUID
 
@@ -26,7 +27,7 @@ from openhands.tools.task.definition import TaskAction, TaskObservation
 from openhands.tools.terminal.definition import TerminalAction
 from pydantic import JsonValue
 
-from tcad_agent.agent.policy import action_summary
+from tcad_agent.agent.policy import action_summary, classify_action
 from tcad_agent.agent.tools import TcadDomainAction
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
@@ -72,6 +73,7 @@ class AgentEventBridge:
         events: EventFeed,
         conversations: ConversationService,
         *,
+        workspace: Path | None = None,
         secret_values: tuple[str, ...] | None = None,
     ) -> None:
         self.conversation_id = conversation_id
@@ -79,6 +81,7 @@ class AgentEventBridge:
         self.store = store
         self.events = events
         self.conversations = conversations
+        self.workspace = workspace.resolve() if workspace is not None else None
         self.secret_values = secret_values or tuple(
             value
             for name in _SECRET_ENV_NAMES
@@ -118,10 +121,15 @@ class AgentEventBridge:
             )
 
     def _action(self, event: ActionEvent) -> None:
+        risk = (
+            classify_action(self.workspace, event)
+            if self.workspace is not None
+            else event.security_risk
+        )
         payload: dict[str, JsonValue] = {
             **self._base(event),
             "action_id": event.id,
-            "risk": event.security_risk.value,
+            "risk": risk.value,
             "summary": self._safe(action_summary(event)),
             "tool_call_id": event.tool_call_id,
             "tool_name": event.tool_name,
@@ -131,7 +139,7 @@ class AgentEventBridge:
             payload["arguments"] = normalized
         self.events.append(self.conversation_id, "tool_call_started", payload)
         if (
-            event.security_risk is SecurityRisk.HIGH
+            risk is SecurityRisk.HIGH
             and event.id not in self._approval_actions
         ):
             self._approval_actions.add(event.id)
@@ -139,7 +147,7 @@ class AgentEventBridge:
                 self.run_id,
                 event.id,
                 event.tool_name,
-                event.security_risk.value,
+                risk.value,
                 self._safe(action_summary(event)),
                 normalized,
             )
