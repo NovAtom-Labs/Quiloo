@@ -1,0 +1,81 @@
+import pytest
+from pydantic import ValidationError
+
+from tcad_agent.domain.models import ExperimentSpec
+
+
+def minimal_spec() -> dict:
+    return {
+        "schema_version": "1.0",
+        "name": "two-region-study",
+        "dimension": 1,
+        "regions": [
+            {"id": "left", "material": "silicon", "x0": "0 um", "x1": "0.5 um"},
+            {"id": "right", "material": "silicon", "x0": "0.5 um", "x1": "1 um"},
+        ],
+        "profiles": [
+            {
+                "kind": "constant",
+                "region": "left",
+                "species": "acceptor",
+                "value": "1e17 cm^-3",
+            },
+            {
+                "kind": "constant",
+                "region": "right",
+                "species": "donor",
+                "value": "1e16 cm^-3",
+            },
+        ],
+        "contacts": [
+            {"id": "anode", "location": "x_min", "kind": "ohmic"},
+            {"id": "cathode", "location": "x_max", "kind": "ohmic"},
+        ],
+        "physics": {"equations": ["poisson", "electron_continuity", "hole_continuity"]},
+        "study": {
+            "kind": "dc",
+            "contact": "anode",
+            "start": "0 V",
+            "stop": "0.2 V",
+            "step": "0.1 V",
+        },
+        "observables": [
+            "terminal_current",
+            "potential",
+            "electron_density",
+            "hole_density",
+        ],
+    }
+
+
+def test_rejects_unknown_keys() -> None:
+    data = minimal_spec() | {"device_type": "pn_diode"}
+    with pytest.raises(ValidationError, match="device_type"):
+        ExperimentSpec.model_validate(data)
+
+
+def test_rejects_incompatible_units() -> None:
+    data = minimal_spec()
+    data["regions"][0]["x1"] = "5 V"
+    with pytest.raises(ValidationError, match="length"):
+        ExperimentSpec.model_validate(data)
+
+
+def test_rejects_gaps_between_regions() -> None:
+    data = minimal_spec()
+    data["regions"][1]["x0"] = "0.6 um"
+    with pytest.raises(ValidationError, match="contiguous"):
+        ExperimentSpec.model_validate(data)
+
+
+def test_normalization_is_independent_of_input_units() -> None:
+    first = ExperimentSpec.model_validate(minimal_spec()).normalized()
+    second_data = minimal_spec()
+    second_data["regions"][0]["x1"] = "500 nm"
+    second = ExperimentSpec.model_validate(second_data).normalized()
+    assert first == second
+
+
+def test_default_temperature_is_validated_as_a_quantity() -> None:
+    spec = ExperimentSpec.model_validate(minimal_spec())
+    assert spec.physics.temperature.to("K") == 300.0
