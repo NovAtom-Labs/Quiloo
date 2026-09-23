@@ -1,0 +1,19 @@
+[device]
+name = "abrupt-silicon-pn-equilibrium"
+temperature_k = 300.0
+
+[material]
+relative_permittivity = 11.7
+intrinsic_density_cm3 = 1.0e10
+
+[doping]
+acceptor_cm3 = 1.0e17
+donor_cm3 = 1.0e17
+
+[validation]
+reference_built_in_potential_v = 0.8334
+built_in_relative_tolerance = 0.02
+
+[provenance]
+method = "analytic-depletion-approximation"
+model_version = "analytic-equilibrium-v1"

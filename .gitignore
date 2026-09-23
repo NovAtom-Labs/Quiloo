@@ -19,3 +19,4 @@ knowledge-sources/index/
 .env.*
 !.env.example
 .superpowers/sdd/
+/test-workspaces/

@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+import hashlib
+import sys
+import unittest
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
+
+from junction_lab.config import load_experiment
+from junction_lab.physics import summarize
+from junction_lab.report import render_report
+from junction_lab.validation import within_relative_tolerance
+
+
+class EquilibriumStudyTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.input_path = ROOT / "experiment.toml"
+        self.experiment = load_experiment(self.input_path)
+        self.summary = summarize(self.experiment)
+
+    def test_built_in_potential_matches_reviewed_reference(self) -> None:
+        self.assertAlmostEqual(
+            float(self.summary["built_in_potential_v"]),
+            0.8334,
+            delta=0.002,
+        )
+
+    def test_equilibrium_current_density_is_zero(self) -> None:
+        self.assertEqual(
+            float(self.summary["equilibrium_current_density_a_per_m2"]),
+            0.0,
+        )
+
+    def test_peak_electric_field_is_reported_in_v_per_m(self) -> None:
+        field = float(self.summary["peak_electric_field_v_per_m"])
+        self.assertGreater(field, 1.0e7)
+        self.assertLess(field, 1.3e7)
+
+    def test_validation_tolerance_is_a_fraction(self) -> None:
+        self.assertTrue(within_relative_tolerance(0.825, 0.8334, 0.02))
+
+    def test_report_records_input_provenance(self) -> None:
+        digest = hashlib.sha256(self.input_path.read_bytes()).hexdigest()
+        report = render_report(self.summary, input_sha256=digest)
+        self.assertIn(digest, report)
+        self.assertIn("analytic-equilibrium-v1", report)
+
+
+if __name__ == "__main__":
+    unittest.main()
