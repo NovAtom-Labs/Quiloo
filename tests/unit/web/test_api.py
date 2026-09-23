@@ -84,6 +84,7 @@ def test_researcher_page_exposes_workflow_review_and_results_regions(
     parser.feed(page.text)
     assert parser.elements["workflow-progress"] == "ol"
     assert parser.elements["plan-summary"] == "div"
+    assert parser.elements["review-details"] == "div"
     assert parser.elements["validation-list"] == "div"
     assert parser.elements["artifacts"] == "div"
 

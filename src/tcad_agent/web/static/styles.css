@@ -143,6 +143,13 @@ textarea:focus, input:focus, select:focus { outline: 3px solid rgba(71, 116, 246
 .summary-card small { display: block; margin-top: 8px; color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
 .summary-card:last-child:nth-child(5) { grid-column: 1 / -1; min-height: auto; }
 
+.review-details { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.review-group { padding: 18px; border: 1px solid var(--border); border-radius: 12px; background: #090f19; }
+.review-group h4 { margin: 0 0 13px; color: #7797ff; font-size: 0.67rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.review-row { display: grid; grid-template-columns: minmax(110px, 0.35fr) 1fr; gap: 16px; padding: 10px 0; border-top: 1px solid var(--border); }
+.review-row > span { color: var(--muted); font-size: 0.72rem; line-height: 1.5; }
+.review-row > strong { color: #d9e0ea; font-size: 0.73rem; font-weight: 650; line-height: 1.55; overflow-wrap: anywhere; }
+
 .approval-callout { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-top: 16px; padding: 18px; border: 1px solid rgba(95, 132, 245, 0.22); border-radius: 12px; background: var(--blue-soft); }
 .approval-callout strong { font-size: 0.84rem; }
 .approval-callout p { margin: 5px 0 0; color: var(--muted); font-size: 0.72rem; }
@@ -180,6 +187,7 @@ footer { display: flex; justify-content: space-between; gap: 24px; padding: 28px
   .request-footer { grid-template-columns: 1fr 1fr; }
   .request-footer .primary-action { grid-column: 1 / -1; }
   .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .review-details { grid-template-columns: 1fr; }
   .artifact-links { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -196,6 +204,7 @@ footer { display: flex; justify-content: space-between; gap: 24px; padding: 28px
   .panel-heading, .approval-callout, footer { align-items: flex-start; flex-direction: column; }
   .panel-note { max-width: none; text-align: left; }
   .request-footer, .question-grid, .summary-grid, .artifact-links { grid-template-columns: 1fr; }
+  .review-row { grid-template-columns: 1fr; gap: 4px; }
   .backend-note { min-height: auto; }
   .question-field:last-child:nth-child(odd), .summary-card:last-child:nth-child(5) { grid-column: auto; }
   .approval-callout code { max-width: 100%; width: 100%; }

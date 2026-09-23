@@ -13,6 +13,7 @@ const questionsSection = document.querySelector("#questions-section");
 const questions = document.querySelector("#questions");
 const planSection = document.querySelector("#plan-section");
 const planSummary = document.querySelector("#plan-summary");
+const reviewDetails = document.querySelector("#review-details");
 const planDigest = document.querySelector("#plan-digest");
 const plan = document.querySelector("#plan");
 const validationStatus = document.querySelector("#validation-status");
@@ -58,21 +59,46 @@ function formatQuantity(value) {
     return `${value.magnitude} ${value.unit}`;
   }
   if (value && typeof value === "object" && "magnitude_si" in value && "si_unit" in value) {
-    return `${value.magnitude_si} ${value.si_unit}`;
+    const magnitude = Number(value.magnitude_si);
+    if (value.si_unit === "meter") {
+      if (Math.abs(magnitude) >= 1e-3) return `${formatNumber(magnitude * 1e3)} mm`;
+      if (Math.abs(magnitude) >= 1e-6) return `${formatNumber(magnitude * 1e6)} µm`;
+      if (Math.abs(magnitude) >= 1e-9) return `${formatNumber(magnitude * 1e9)} nm`;
+    }
+    if (value.si_unit === "1 / meter ** 3") {
+      return `${formatNumber(magnitude / 1e6)} cm⁻³`;
+    }
+    if (value.si_unit === "kelvin") return `${formatNumber(magnitude)} K`;
+    return `${formatNumber(magnitude)} ${value.si_unit}`;
   }
   return formatLabel(value);
 }
 
-function activeStage(state) {
+function formatNumber(value) {
+  if (!Number.isFinite(value)) return String(value);
+  const absolute = Math.abs(value);
+  if (absolute >= 1e6 || (absolute > 0 && absolute < 1e-3)) {
+    return value.toExponential(3).replace(/\.0+e/, "e").replace(/(\.\d*?)0+e/, "$1e").replace("e+", "e");
+  }
+  return Number(value.toPrecision(6)).toString();
+}
+
+function activeStage(view) {
+  const state = view.state;
   if (state === "needs_clarification") return "clarify";
+  if (state === "failed") {
+    if (view.validation || view.bundle_path) return "results";
+    if (view.spec || view.plan) return "review";
+    return "request";
+  }
   if (["spec_drafted", "spec_validated", "user_confirmation_required", "compiled"].includes(state)) return "review";
-  if (["running", "validating", "completed", "failed"].includes(state)) return "results";
+  if (["running", "validating", "completed"].includes(state)) return "results";
   return "request";
 }
 
-function renderProgress(state) {
+function renderProgress(view) {
   const order = ["request", "clarify", "review", "results"];
-  const currentIndex = order.indexOf(activeStage(state));
+  const currentIndex = order.indexOf(activeStage(view));
   for (const item of progressStages) {
     const index = order.indexOf(item.dataset.stage);
     item.classList.toggle("is-active", index === currentIndex);
@@ -96,6 +122,32 @@ function summaryCard(label, value, detail = "") {
   return card;
 }
 
+function reviewGroup(title, entries) {
+  const group = document.createElement("section");
+  group.className = "review-group";
+  const heading = document.createElement("h4");
+  heading.textContent = title;
+  group.appendChild(heading);
+  for (const [label, value] of entries) {
+    const row = document.createElement("div");
+    row.className = "review-row";
+    const name = document.createElement("span");
+    name.textContent = label;
+    const detail = document.createElement("strong");
+    detail.textContent = value;
+    row.append(name, detail);
+    group.appendChild(row);
+  }
+  return group;
+}
+
+function regionThickness(region) {
+  const start = Number(region.x0?.magnitude_si);
+  const end = Number(region.x1?.magnitude_si);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return "Not specified";
+  return formatQuantity({magnitude_si: end - start, si_unit: "meter"});
+}
+
 function renderPlan(view) {
   const spec = view.spec || view.plan?.spec;
   planSummary.replaceChildren();
@@ -104,17 +156,40 @@ function renderPlan(view) {
     return;
   }
   const regions = spec.regions || [];
+  const profiles = spec.profiles || [];
   const contacts = spec.contacts || [];
+  const equations = spec.physics?.equations || [];
   const models = spec.physics?.models || [];
+  const observables = spec.observables || [];
   const study = spec.study || {};
+  const materials = [...new Set(regions.map((region) => formatLabel(region.material)))];
   planSummary.append(
     summaryCard("Backend", String(view.backend).toUpperCase(), view.backend === "devsim" ? "Local deterministic runner" : "Licensed remote runner"),
-    summaryCard("Structure", `${regions.length} silicon region${regions.length === 1 ? "" : "s"}`, `${spec.dimension || 1}D · ${contacts.length} contacts`),
+    summaryCard("Structure", `${regions.length} region${regions.length === 1 ? "" : "s"}`, `${materials.join(", ") || "Material not specified"} · ${spec.dimension || 1}D · ${contacts.length} contacts`),
     summaryCard("Physics", formatQuantity(spec.physics?.temperature || "Not specified"), `${models.length} declared models`),
     summaryCard("Study", formatLabel(study.kind || "Not specified"), study.kind === "equilibrium" ? "No external bias sweep" : "Bounded bias study"),
   );
   const limitation = spec.metadata?.limitation;
   if (limitation) planSummary.append(summaryCard("Declared limitation", "Approximation in use", limitation));
+  reviewDetails.replaceChildren(
+    reviewGroup("Geometry", regions.map((region) => [
+      formatLabel(region.id),
+      `${formatLabel(region.material)} · ${regionThickness(region)} · mesh ${formatQuantity(region.mesh_spacing || "Not specified")}`,
+    ])),
+    reviewGroup("Doping", profiles.map((profile) => [
+      formatLabel(profile.region),
+      `${formatLabel(profile.species)} · ${formatQuantity(profile.value)}`,
+    ])),
+    reviewGroup("Contacts", contacts.map((contact) => [
+      formatLabel(contact.id),
+      `${formatLabel(contact.kind)} · ${formatLabel(contact.location)}${contact.work_function ? ` · ${formatQuantity(contact.work_function)}` : ""}`,
+    ])),
+    reviewGroup("Physics and outputs", [
+      ["Equations", equations.map(formatLabel).join(", ") || "None declared"],
+      ["Models", models.map(formatLabel).join(", ") || "None declared"],
+      ["Observables", observables.map(formatLabel).join(", ") || "None declared"],
+    ]),
+  );
   planDigest.textContent = view.plan_digest || "Not generated";
   plan.textContent = JSON.stringify(view.plan || {spec}, null, 2);
   setHidden(planSection, false);
@@ -155,7 +230,7 @@ function updateAnswerReadiness() {
 function renderValidation(view) {
   validationList.replaceChildren();
   const report = view.validation;
-  const states = ["running", "validating", "completed", "failed"];
+  const states = ["running", "validating", "completed"];
   const showResults = Boolean(report || view.bundle_path || states.includes(view.state));
   setHidden(resultsPanel, !showResults);
   if (!showResults) return;
@@ -216,7 +291,7 @@ function render(view) {
   statusPanel.classList.remove("hidden");
   stateLabel.textContent = formatLabel(view.state);
   stateLabel.dataset.status = view.state;
-  renderProgress(view.state);
+  renderProgress(view);
   renderQuestions(view);
   renderPlan(view);
   renderValidation(view);
