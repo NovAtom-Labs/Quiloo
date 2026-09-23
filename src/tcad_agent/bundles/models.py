@@ -16,6 +16,7 @@ class BundleInputs(StrictModel):
     native: NativeRunResult
     result: CanonicalResult
     validation: ValidationReport
+    events_path: Path
 
 
 class ArtifactRecord(StrictModel):
@@ -39,4 +40,3 @@ class ExperimentBundle(StrictModel):
     run_id: str
     state: Literal["failed", "completed"]
     root: Path
-

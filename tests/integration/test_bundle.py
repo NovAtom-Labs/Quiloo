@@ -1,9 +1,12 @@
+import hashlib
 import json
 from pathlib import Path
 
 from tcad_agent.bundles.models import BundleInputs
 from tcad_agent.bundles.writer import BundleWriter
 from tcad_agent.domain.models import ExperimentSpec
+from tcad_agent.events.ledger import EventLedger
+from tcad_agent.events.models import RunEventKind
 from tcad_agent.results.models import BiasPoint, CanonicalResult
 from tcad_agent.runners.models import CompiledJob, NativeRunResult
 from tcad_agent.validation.engine import ValidationEngine
@@ -22,6 +25,10 @@ def bundle_inputs(tmp_path: Path, valid_spec: ExperimentSpec) -> BundleInputs:
     stdout_path.write_text("solver completed\n")
     stderr_path.write_text("")
     native_path.write_text("{}")
+    events_path = compiled / "events.jsonl"
+    ledger = EventLedger(events_path)
+    ledger.append(RunEventKind.REQUESTED, {"run_id": "run-0001"})
+    ledger.append(RunEventKind.COMPLETED, {"status": "completed"})
     job = CompiledJob(
         backend="devsim",
         entrypoint=runtime_path,
@@ -60,6 +67,7 @@ def bundle_inputs(tmp_path: Path, valid_spec: ExperimentSpec) -> BundleInputs:
         native=native,
         result=result,
         validation=validation,
+        events_path=events_path,
     )
 
 
@@ -75,7 +83,11 @@ def test_bundle_manifest_hashes_every_artifact_and_report_uses_structured_values
         "logs/stdout.log",
         "results/canonical.json",
         "validation/report.json",
+        "events.jsonl",
         "report.md",
     }
-    assert all(item["sha256"] for item in manifest["artifacts"].values())
+    for relative, item in manifest["artifacts"].items():
+        data = (bundle.root / relative).read_bytes()
+        assert hashlib.sha256(data).hexdigest() == item["sha256"]
+    EventLedger(bundle.root / "events.jsonl").verify()
     assert "1.000000e+00 A/m^2" in (bundle.root / "report.md").read_text()

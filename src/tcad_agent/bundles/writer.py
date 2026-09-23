@@ -43,6 +43,9 @@ class BundleWriter:
             staging / "validation" / "report.json",
             inputs.validation.model_dump_json(indent=2),
         )
+        if not inputs.events_path.is_file():
+            raise FileNotFoundError(f"event ledger does not exist: {inputs.events_path}")
+        shutil.copy2(inputs.events_path, staging / "events.jsonl")
         report = MarkdownReport().render(inputs.spec, inputs.result, inputs.validation)
         (staging / "report.md").write_text(report)
         state: Literal["failed", "completed"] = (
