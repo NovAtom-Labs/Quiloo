@@ -24,6 +24,7 @@ const workspaceWelcome = document.querySelector("#workspace-welcome");
 let activeWorkspace = null;
 let activeConversation = null;
 let eventSource = null;
+const navigationGuard = window.QuilooIDEState.createNavigationGuard();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -86,15 +87,17 @@ function selectEntry(entry) {
     : "Select a child entry or return to the repository root.";
 }
 
-async function loadEntries(relative = ".") {
-  const entries = await api(`/api/workspaces/${activeWorkspace.id}/entries?path=${encodeURIComponent(relative)}`);
+async function loadEntries(relative = ".", routeToken = navigationGuard.currentRoute()) {
+  const workspaceId = activeWorkspace.id;
+  const entries = await api(`/api/workspaces/${workspaceId}/entries?path=${encodeURIComponent(relative)}`);
+  if (!navigationGuard.isCurrent(routeToken) || activeWorkspace?.id !== workspaceId) return;
   clearNode(repositoryTree);
   if (relative !== ".") {
     const rootButton = document.createElement("button");
     rootButton.type = "button";
     rootButton.className = "tree-entry tree-back";
     rootButton.textContent = "← Repository root";
-    rootButton.addEventListener("click", () => void loadEntries("."));
+    rootButton.addEventListener("click", () => void loadEntries(".").catch((error) => showError(error.message)));
     repositoryTree.append(rootButton);
   }
   if (!entries.length) repositoryTree.append(emptyCopy("This directory is empty."));
@@ -177,13 +180,16 @@ function connectEvents(conversationId) {
   eventSource.onerror = () => { streamState.textContent = "RECONNECTING"; };
 }
 
-async function loadConversation(conversationId) {
-  activeConversation = await api(`/api/conversations/${conversationId}`);
+async function loadConversation(conversationId, routeToken) {
+  const conversation = await api(`/api/conversations/${conversationId}`);
+  if (!navigationGuard.isCurrent(routeToken)) return;
+  activeConversation = conversation;
   conversationTitle.textContent = activeConversation.title;
   messageInput.disabled = false;
   sendMessage.disabled = false;
-  clearNode(conversationMessages);
   const messages = await api(`/api/conversations/${conversationId}/messages`);
+  if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
+  clearNode(conversationMessages);
   if (!messages.length) conversationMessages.append(emptyCopy("Send the first task for this workspace."));
   messages.forEach(appendMessage);
   connectEvents(conversationId);
@@ -203,17 +209,24 @@ function clearConversation() {
 }
 
 async function restoreRoute() {
+  const routeToken = navigationGuard.beginRoute();
   showError();
   const route = parseRoute();
   if (!route.workspaceId) return;
   try {
-    renderWorkspace(await api(`/api/workspaces/${route.workspaceId}`));
-    await loadEntries();
-    if (route.conversationId) await loadConversation(route.conversationId);
+    const workspace = await api(`/api/workspaces/${route.workspaceId}`);
+    if (!navigationGuard.isCurrent(routeToken)) return;
+    renderWorkspace(workspace);
+    await loadEntries(".", routeToken);
+    if (!navigationGuard.isCurrent(routeToken)) return;
+    if (route.conversationId) await loadConversation(route.conversationId, routeToken);
     else clearConversation();
-    renderConversationList(await api(`/api/workspaces/${route.workspaceId}/conversations`));
+    if (!navigationGuard.isCurrent(routeToken)) return;
+    const conversations = await api(`/api/workspaces/${route.workspaceId}/conversations`);
+    if (!navigationGuard.isCurrent(routeToken)) return;
+    renderConversationList(conversations);
   } catch (error) {
-    showError(error.message);
+    if (navigationGuard.isCurrent(routeToken)) showError(error.message);
   }
 }
 
@@ -256,16 +269,28 @@ conversationForm.addEventListener("submit", async (event) => {
 messageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!messageInput.value.trim() || !activeConversation) return;
+  const conversationId = activeConversation.id;
+  const draft = messageInput.value;
+  const pending = navigationGuard.captureMessage(
+    navigationGuard.currentRoute(),
+    conversationId,
+    draft,
+  );
   try {
-    const message = await api(`/api/conversations/${activeConversation.id}/messages`, {
+    const message = await api(`/api/conversations/${conversationId}/messages`, {
       method: "POST",
-      body: JSON.stringify({content: messageInput.value}),
+      body: JSON.stringify({content: draft}),
     });
+    if (!navigationGuard.canApplyMessage(pending, activeConversation?.id)) return;
     if (conversationMessages.querySelector(".empty-copy")) clearNode(conversationMessages);
     appendMessage(message);
-    messageInput.value = "";
+    if (navigationGuard.canClearDraft(pending, activeConversation?.id, messageInput.value)) {
+      messageInput.value = "";
+    }
   } catch (error) {
-    showError(error.message);
+    if (navigationGuard.canApplyMessage(pending, activeConversation?.id)) {
+      showError(error.message);
+    }
   }
 });
 

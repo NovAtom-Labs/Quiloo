@@ -1,6 +1,7 @@
 """Persistent activity feed and Server-Sent Event serialization."""
 
 import json
+from collections.abc import Iterator
 from uuid import UUID
 
 from pydantic import JsonValue
@@ -25,6 +26,19 @@ class EventFeed:
         self, conversation_id: UUID, after_id: int, limit: int = 200
     ) -> tuple[IDEEvent, ...]:
         return self.store.list_events_after(conversation_id, after_id, limit)
+
+    def iter_after(
+        self, conversation_id: UUID, after_id: int, page_size: int = 200
+    ) -> Iterator[IDEEvent]:
+        cursor = after_id
+        while True:
+            page = self.list_after(conversation_id, cursor, page_size)
+            if not page:
+                return
+            yield from page
+            cursor = page[-1].id
+            if len(page) < page_size:
+                return
 
 
 def format_sse(event: IDEEvent) -> str:

@@ -121,9 +121,9 @@ def build_ide_router(services: IDEServices) -> APIRouter:
         services.conversations.get(conversation_id)
 
         if not follow:
-            rows = services.events.list_after(conversation_id, cursor)
+            rows = services.events.iter_after(conversation_id, cursor)
             return StreamingResponse(
-                iter(format_sse(event) for event in rows),
+                (format_sse(event) for event in rows),
                 media_type="text/event-stream",
                 headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )

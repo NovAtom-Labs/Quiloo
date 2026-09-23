@@ -82,6 +82,37 @@ def test_sse_reconnect_honors_last_event_id_without_duplicates(
     assert "event: message_created" in resumed.text
 
 
+def test_finite_sse_response_returns_complete_event_history(tmp_path: Path) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    events = EventFeed(store)
+    services = IDEServices(
+        workspaces=WorkspaceManager(store),
+        conversations=ConversationService(store, events),
+        events=events,
+    )
+    web = TestClient(create_app(ide=services))
+    root = tmp_path / "repo"
+    root.mkdir()
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+    conversation = web.post(
+        f"/api/workspaces/{workspace['id']}/conversations",
+        json={"title": "Long activity history"},
+    ).json()
+    for sequence in range(205):
+        events.append(
+            conversation_id=conversation["id"],
+            kind="status_changed",
+            payload={"sequence": sequence},
+        )
+
+    response = web.get(
+        f"/api/conversations/{conversation['id']}/events?follow=false"
+    )
+
+    assert response.status_code == 200
+    assert response.text.count("event: status_changed") == 205
+
+
 def test_invalid_workspace_paths_and_unknown_records_are_sanitized(
     tmp_path: Path,
 ) -> None:
@@ -99,3 +130,23 @@ def test_invalid_workspace_paths_and_unknown_records_are_sanitized(
     assert str(missing) not in invalid.text
     assert unknown.status_code == 404
     assert unknown.json()["code"] == "workspace_not_found"
+
+
+def test_missing_child_workspace_path_is_a_sanitized_client_error(
+    tmp_path: Path,
+) -> None:
+    web = ide_client(tmp_path)
+    root = tmp_path / "repo"
+    root.mkdir()
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+
+    response = web.get(
+        f"/api/workspaces/{workspace['id']}/entries?path=deleted-directory"
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "code": "invalid_workspace_path",
+        "message": "The workspace path is unavailable or invalid.",
+    }
+    assert "deleted-directory" not in response.text

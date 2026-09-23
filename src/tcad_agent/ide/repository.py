@@ -28,33 +28,36 @@ class RepositoryInspector:
         if not target.is_dir():
             raise WorkspacePathError("workspace entry is not a directory")
         rows: list[WorkspaceEntry] = []
-        for child in target.iterdir():
-            child_relative = child.relative_to(canonical_root).as_posix()
-            if child.is_symlink():
-                rows.append(
-                    WorkspaceEntry(
-                        path=child_relative,
-                        name=child.name,
-                        kind="symlink",
+        try:
+            for child in target.iterdir():
+                child_relative = child.relative_to(canonical_root).as_posix()
+                if child.is_symlink():
+                    rows.append(
+                        WorkspaceEntry(
+                            path=child_relative,
+                            name=child.name,
+                            kind="symlink",
+                        )
                     )
-                )
-            elif child.is_dir():
-                rows.append(
-                    WorkspaceEntry(
-                        path=child_relative,
-                        name=child.name,
-                        kind="directory",
+                elif child.is_dir():
+                    rows.append(
+                        WorkspaceEntry(
+                            path=child_relative,
+                            name=child.name,
+                            kind="directory",
+                        )
                     )
-                )
-            elif child.is_file():
-                rows.append(
-                    WorkspaceEntry(
-                        path=child_relative,
-                        name=child.name,
-                        kind="file",
-                        size=child.stat().st_size,
+                elif child.is_file():
+                    rows.append(
+                        WorkspaceEntry(
+                            path=child_relative,
+                            name=child.name,
+                            kind="file",
+                            size=child.stat().st_size,
+                        )
                     )
-                )
+        except OSError as exc:
+            raise WorkspacePathError("workspace entry is unavailable") from exc
         order = {"directory": 0, "file": 1, "symlink": 2}
         return tuple(
             sorted(rows, key=lambda row: (order[row.kind], row.name.casefold()))
