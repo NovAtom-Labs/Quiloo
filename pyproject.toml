@@ -44,7 +44,10 @@ tcad_agent = ["**/*.yaml", "**/*.j2"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-markers = ["integration: invokes an installed simulator or subprocess boundary"]
+markers = [
+  "integration: invokes an installed simulator or subprocess boundary",
+  "live_bedrock: invokes the configured Amazon Bedrock model",
+]
 
 [tool.ruff]
 line-length = 100
