@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "novatom-tcad-agent"
+version = "0.1.0"
+description = "Simulator-neutral TCAD research agent foundation"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "jinja2>=3.1,<4",
+  "numpy>=2.2,<3",
+  "pint>=0.26,<0.27",
+  "pydantic>=2.12,<3",
+  "pyyaml>=6.0,<7",
+  "typer>=0.16,<1",
+]
+
+[project.optional-dependencies]
+knowledge = ["fastembed>=0.7,<1"]
+agent = [
+  "openhands-sdk==1.49.4",
+  "openhands-tools==1.49.4",
+]
+dev = [
+  "mypy>=1.18,<2",
+  "pip-tools==7.5.2",
+  "pytest>=8.4,<10",
+  "pytest-cov>=7,<8",
+  "ruff>=0.13,<1",
+  "types-pyyaml>=6.0,<7",
+]
+
+[project.scripts]
+tcad-agent = "apps.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+tcad_agent = ["**/*.yaml", "**/*.j2"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: invokes an installed simulator or subprocess boundary"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "RUF"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+packages = ["tcad_agent"]
