@@ -211,6 +211,29 @@ def test_approval_resumes_and_denial_rejects_pending_action(services) -> None:
     assert resumed.id == run.id
 
 
+def test_stop_cancels_pending_approval(services) -> None:
+    runtime = ScriptedRuntimeFactory(
+        [], status=ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+    )
+    supervisor = AgentSupervisor(services, runtime)
+    run = supervisor.start(services.conversation.id, "Request a risky action")
+    supervisor.join(run.id, timeout=2)
+    approval = services.store.create_approval(
+        run.id,
+        "action-1",
+        "terminal",
+        "HIGH",
+        "terminal: git push",
+        {"command": "git push"},
+    )
+
+    cancelled = supervisor.stop(run.id)
+
+    assert cancelled.state is RunState.CANCELLED
+    assert services.store.get_approval(approval.id).decision is ApprovalDecision.DENY
+    assert services.store.list_pending_approvals(services.conversation.id) == ()
+
+
 def test_restart_recovery_pauses_interrupted_running_run(services) -> None:
     run = services.store.create_run(
         services.conversation.id, services.conversation.id

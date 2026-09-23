@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260924-4">
+    <link rel="stylesheet" href="/static/ide.css?v=20260924-5">
   </head>
   <body>
     <div class="ide-shell">
@@ -68,13 +68,22 @@
 
       <aside id="agent-panel" class="agent-panel" aria-label="Agent conversation">
         <div class="agent-heading">
-          <div><span>SESSION</span><strong id="conversation-title">No conversation</strong></div>
+          <div><span>SESSION · <b id="run-state">IDLE</b></span><strong id="conversation-title">No conversation</strong></div>
           <button id="create-conversation" type="button" disabled>New conversation</button>
+        </div>
+        <div id="run-controls" class="run-controls" aria-label="Agent run controls">
+          <button id="pause-run" type="button" hidden>Pause</button>
+          <button id="resume-run" type="button" hidden>Resume</button>
+          <button id="stop-run" type="button" hidden>Stop</button>
         </div>
         <p id="ide-error" class="ide-error hidden" role="alert" aria-live="assertive"></p>
         <div id="conversation-messages" class="conversation-messages" aria-live="polite">
           <p class="empty-copy">Open a workspace and start a conversation.</p>
         </div>
+        <section id="approval-section" class="approval-section hidden" aria-label="Pending approvals">
+          <div class="activity-heading"><span>APPROVAL REQUIRED</span><span>USER DECISION</span></div>
+          <div id="pending-approvals" class="pending-approvals"></div>
+        </section>
         <section class="activity-section">
           <div class="activity-heading"><span>ACTIVITY</span><span id="stream-state">OFFLINE</span></div>
           <div id="agent-activity" class="agent-activity" aria-live="polite"></div>
@@ -99,7 +108,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/ide-state.js?v=20260924-2" defer></script>
-    <script src="/static/ide.js?v=20260924-3" defer></script>
+    <script src="/static/ide-state.js?v=20260924-3" defer></script>
+    <script src="/static/ide.js?v=20260924-4" defer></script>
   </body>
 </html>

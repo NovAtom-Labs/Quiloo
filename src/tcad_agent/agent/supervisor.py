@@ -164,6 +164,16 @@ class AgentSupervisor:
     def stop(self, run_id: UUID) -> AgentRunRecord:
         runtime = self._runtime_for(run_id)
         runtime.interrupt()
+        run = self.services.store.get_run(run_id)
+        for approval in self.services.store.list_pending_approvals(
+            run.conversation_id
+        ):
+            if approval.run_id == run_id:
+                self.services.store.resolve_approval(
+                    approval.id,
+                    approval.revision,
+                    ApprovalDecision.DENY,
+                )
         cancelled = self._transition(run_id, RunState.CANCELLED)
         self.services.events.append(
             cancelled.conversation_id,

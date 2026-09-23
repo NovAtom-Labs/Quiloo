@@ -16,6 +16,13 @@ const conversationTitle = document.querySelector("#conversation-title");
 const conversationMessages = document.querySelector("#conversation-messages");
 const agentActivity = document.querySelector("#agent-activity");
 const streamState = document.querySelector("#stream-state");
+const runState = document.querySelector("#run-state");
+const runControls = document.querySelector("#run-controls");
+const pauseRun = document.querySelector("#pause-run");
+const resumeRun = document.querySelector("#resume-run");
+const stopRun = document.querySelector("#stop-run");
+const approvalSection = document.querySelector("#approval-section");
+const pendingApprovals = document.querySelector("#pending-approvals");
 const messageForm = document.querySelector("#message-form");
 const messageInput = document.querySelector("#message-input");
 const sendMessage = document.querySelector("#send-message");
@@ -24,8 +31,12 @@ const workspaceWelcome = document.querySelector("#workspace-welcome");
 
 let activeWorkspace = null;
 let activeConversation = null;
+let activeRun = null;
 let eventSource = null;
+let sendingPrompt = false;
 const navigationGuard = window.QuilooIDEState.createNavigationGuard();
+const submissions = window.QuilooIDEState.createSubmissionTracker();
+const eventLedger = window.QuilooIDEState.createEventLedger();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -33,7 +44,12 @@ async function api(path, options = {}) {
     ...options,
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.message || data.detail || "Request failed");
+  if (!response.ok) {
+    const detail = data.detail && typeof data.detail === "object"
+      ? data.detail.message
+      : data.detail;
+    throw new Error(data.message || detail || "Request failed");
+  }
   return data;
 }
 
@@ -153,30 +169,184 @@ function appendMessage(message) {
   conversationMessages.scrollTop = conversationMessages.scrollHeight;
 }
 
+function renderRunIndicator() {
+  document.querySelector("#agent-running")?.remove();
+  const controls = window.QuilooIDEState.controlsForState(activeRun?.state);
+  if (controls.send || !activeRun) return;
+  const indicator = document.createElement("article");
+  indicator.id = "agent-running";
+  indicator.className = "message is-agent-status";
+  const label = document.createElement("span");
+  const copy = document.createElement("p");
+  label.textContent = "AGENT";
+  copy.textContent = activeRun.state === "waiting_for_approval"
+    ? "Waiting for your approval"
+    : activeRun.state === "paused"
+      ? "Run paused"
+      : "Working in the repository";
+  indicator.append(label, copy);
+  conversationMessages.append(indicator);
+}
+
+async function refreshMessages(conversationId = activeConversation?.id) {
+  if (!conversationId) return;
+  const messages = await api(`/api/conversations/${conversationId}/messages`);
+  if (activeConversation?.id !== conversationId) return;
+  clearNode(conversationMessages);
+  if (!messages.length) conversationMessages.append(emptyCopy("Send the first task for this workspace."));
+  messages.forEach(appendMessage);
+  renderRunIndicator();
+}
+
+function setRun(run) {
+  activeRun = run;
+  const state = run?.state || "idle";
+  const controls = window.QuilooIDEState.controlsForState(state);
+  runState.textContent = state.replaceAll("_", " ").toUpperCase();
+  pauseRun.hidden = !controls.pause;
+  resumeRun.hidden = !controls.resume;
+  stopRun.hidden = !controls.stop;
+  runControls.hidden = !controls.pause && !controls.resume && !controls.stop;
+  messageInput.disabled = !activeConversation || !controls.send || sendingPrompt;
+  sendMessage.disabled = messageInput.disabled;
+  sendMessage.textContent = sendingPrompt ? "Starting…" : "Send";
+  renderRunIndicator();
+}
+
+function activityDescription(event) {
+  const payload = event.payload || {};
+  if (event.kind === "tool_call_started") return payload.summary || payload.tool_name || "Tool call";
+  if (event.kind === "tool_call_completed") {
+    const owner = payload.subagent ? `${payload.subagent} · ` : "";
+    const output = String(payload.output || "Completed").replaceAll("\n", " ").slice(0, 260);
+    return `${owner}${output}`;
+  }
+  if (event.kind === "approval_requested") return `${payload.risk || "HIGH"} · ${payload.summary || "Approval required"}`;
+  if (payload.state) return String(payload.state).replaceAll("_", " ");
+  if (payload.detail) return String(payload.detail).slice(0, 260);
+  return event.kind.replaceAll("_", " ");
+}
+
 function appendActivity(event) {
   const row = document.createElement("div");
+  const body = document.createElement("div");
   const kind = document.createElement("strong");
+  const detail = document.createElement("span");
   const time = document.createElement("time");
-  row.className = "activity-row";
+  row.className = `activity-row is-${event.kind}`;
   kind.textContent = event.kind.replaceAll("_", " ");
+  detail.textContent = activityDescription(event);
   time.textContent = new Date(event.created_at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
-  row.append(kind, time);
+  body.append(kind, detail);
+  row.append(body, time);
   agentActivity.append(row);
   agentActivity.scrollTop = agentActivity.scrollHeight;
+}
+
+function approvalTarget(approval) {
+  const payload = approval.payload || {};
+  return payload.path || payload.command || payload.operation || "Review the requested action";
+}
+
+async function decideApproval(approval, decision) {
+  showError();
+  try {
+    const suffix = decision === "approve" ? "approve" : "deny";
+    const body = {expected_revision: approval.revision};
+    if (decision === "deny") body.reason = "Denied by the user";
+    const run = await api(`/api/approvals/${approval.id}/${suffix}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    setRun(run);
+    await loadApprovals();
+  } catch (error) {
+    showError(error.message);
+    await loadApprovals();
+  }
+}
+
+function renderApprovals(approvals) {
+  clearNode(pendingApprovals);
+  approvalSection.classList.toggle("hidden", approvals.length === 0);
+  approvals.forEach((approval) => {
+    const card = document.createElement("article");
+    const heading = document.createElement("div");
+    const tool = document.createElement("strong");
+    const risk = document.createElement("span");
+    const summary = document.createElement("p");
+    const target = document.createElement("code");
+    const actions = document.createElement("div");
+    const deny = document.createElement("button");
+    const approve = document.createElement("button");
+    card.className = "approval-card";
+    tool.textContent = approval.tool_name;
+    risk.textContent = approval.risk;
+    heading.append(tool, risk);
+    summary.textContent = approval.summary;
+    target.textContent = approvalTarget(approval);
+    deny.type = "button";
+    deny.className = "is-deny";
+    deny.textContent = "Deny";
+    approve.type = "button";
+    approve.className = "is-approve";
+    approve.textContent = "Approve once";
+    deny.addEventListener("click", () => void decideApproval(approval, "deny"));
+    approve.addEventListener("click", () => void decideApproval(approval, "approve"));
+    actions.append(deny, approve);
+    card.append(heading, summary, target, actions);
+    pendingApprovals.append(card);
+  });
+}
+
+async function loadApprovals(conversationId = activeConversation?.id) {
+  if (!conversationId) return;
+  const approvals = await api(`/api/conversations/${conversationId}/approvals`);
+  if (activeConversation?.id === conversationId) renderApprovals(approvals);
+}
+
+function updateRunFromEvent(event) {
+  const terminalStates = {
+    run_completed: "completed",
+    run_failed: "failed",
+    run_blocked: "blocked",
+    run_cancelled: "cancelled",
+    run_paused: "paused",
+    run_recovered_paused: "paused",
+  };
+  if (event.kind === "run_state_changed" && event.payload?.state) {
+    setRun({...activeRun, id: event.payload.run_id, state: event.payload.state});
+  } else if (event.kind === "approval_requested") {
+    setRun({...activeRun, id: event.payload?.run_id, state: "waiting_for_approval"});
+  } else if (terminalStates[event.kind]) {
+    setRun({...activeRun, id: event.payload?.run_id, state: terminalStates[event.kind]});
+  }
 }
 
 function connectEvents(conversationId) {
   if (eventSource) eventSource.close();
   clearNode(agentActivity);
+  eventLedger.reset();
   streamState.textContent = "CONNECTING";
   eventSource = new EventSource(`/api/conversations/${conversationId}/events`);
   const receive = (rawEvent) => {
+    if (activeConversation?.id !== conversationId) return;
     streamState.textContent = "LIVE";
-    appendActivity(JSON.parse(rawEvent.data));
+    const event = JSON.parse(rawEvent.data);
+    if (!eventLedger.accept(event.id)) return;
+    appendActivity(event);
+    updateRunFromEvent(event);
+    if (event.kind === "message_created") void refreshMessages(conversationId);
+    if (event.kind === "approval_requested" || event.kind === "approval_resolved") {
+      void loadApprovals(conversationId);
+    }
   };
-  ["conversation_created", "message_created", "status_changed"].forEach((kind) => {
-    eventSource.addEventListener(kind, receive);
-  });
+  [
+    "conversation_created", "message_created", "run_created", "run_state_changed",
+    "run_started", "tool_call_started", "tool_call_completed", "approval_requested",
+    "approval_resolved", "run_completed", "run_failed", "run_blocked", "run_paused",
+    "run_cancelled", "run_recovered_paused", "agent_error", "runtime_state_changed",
+  ].forEach((kind) => eventSource.addEventListener(kind, receive));
   eventSource.onopen = () => { streamState.textContent = "LIVE"; };
   eventSource.onerror = () => { streamState.textContent = "RECONNECTING"; };
 }
@@ -186,24 +356,26 @@ async function loadConversation(conversationId, routeToken) {
   if (!navigationGuard.isCurrent(routeToken)) return;
   activeConversation = conversation;
   conversationTitle.textContent = activeConversation.title;
-  messageInput.disabled = false;
-  sendMessage.disabled = false;
-  const messages = await api(`/api/conversations/${conversationId}/messages`);
+  await refreshMessages(conversationId);
   if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
-  clearNode(conversationMessages);
-  if (!messages.length) conversationMessages.append(emptyCopy("Send the first task for this workspace."));
-  messages.forEach(appendMessage);
+  const run = await api(`/api/conversations/${conversationId}/runs/active`);
+  if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
+  setRun(run);
+  await loadApprovals(conversationId);
+  if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
   connectEvents(conversationId);
 }
 
 function clearConversation() {
   activeConversation = null;
+  activeRun = null;
+  submissions.reset();
   conversationTitle.textContent = "No conversation";
-  messageInput.disabled = true;
-  sendMessage.disabled = true;
+  setRun(null);
   clearNode(conversationMessages);
   conversationMessages.append(emptyCopy("Start or select a conversation."));
   clearNode(agentActivity);
+  renderApprovals([]);
   streamState.textContent = "OFFLINE";
   if (eventSource) eventSource.close();
   eventSource = null;
@@ -290,32 +462,63 @@ conversationForm.addEventListener("submit", async (event) => {
 
 messageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (!messageInput.value.trim() || !activeConversation) return;
+  const draft = messageInput.value.trim();
+  if (!draft || !activeConversation || sendingPrompt) return;
+  if (!window.QuilooIDEState.controlsForState(activeRun?.state).send) return;
   const conversationId = activeConversation.id;
-  const draft = messageInput.value;
-  const pending = navigationGuard.captureMessage(
-    navigationGuard.currentRoute(),
-    conversationId,
-    draft,
-  );
+  const submission = submissions.begin(conversationId, draft);
+  sendingPrompt = true;
+  setRun(activeRun);
+  showError();
   try {
-    const message = await api(`/api/conversations/${conversationId}/messages`, {
+    let messageId = submission.messageId;
+    if (!messageId) {
+      const message = await api(`/api/conversations/${conversationId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({content: draft}),
+      });
+      submissions.recordMessage(submission, message.id);
+      messageId = message.id;
+      if (conversationMessages.querySelector(".empty-copy")) clearNode(conversationMessages);
+      appendMessage(message);
+    }
+    const run = await api(`/api/conversations/${conversationId}/runs`, {
       method: "POST",
-      body: JSON.stringify({content: draft}),
+      body: JSON.stringify({message_id: messageId}),
     });
-    if (!navigationGuard.canApplyMessage(pending, activeConversation?.id)) return;
-    if (conversationMessages.querySelector(".empty-copy")) clearNode(conversationMessages);
-    appendMessage(message);
-    if (navigationGuard.canClearDraft(pending, activeConversation?.id, messageInput.value)) {
-      messageInput.value = "";
-    }
+    submissions.recordRun(submission, run.id);
+    if (activeConversation?.id !== conversationId) return;
+    messageInput.value = "";
+    setRun(run);
   } catch (error) {
-    if (navigationGuard.canApplyMessage(pending, activeConversation?.id)) {
-      showError(error.message);
-    }
+    if (activeConversation?.id === conversationId) showError(error.message);
+  } finally {
+    sendingPrompt = false;
+    if (activeConversation?.id === conversationId) setRun(activeRun);
   }
 });
 
+messageInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey) {
+    event.preventDefault();
+    messageForm.requestSubmit();
+  }
+});
+
+async function controlRun(action) {
+  if (!activeRun) return;
+  showError();
+  try {
+    const run = await api(`/api/runs/${activeRun.id}/${action}`, {method: "POST"});
+    setRun(run);
+  } catch (error) {
+    showError(error.message);
+  }
+}
+
+pauseRun.addEventListener("click", () => void controlRun("pause"));
+resumeRun.addEventListener("click", () => void controlRun("resume"));
+stopRun.addEventListener("click", () => void controlRun("stop"));
 window.addEventListener("popstate", () => void restoreRoute());
 window.addEventListener("beforeunload", () => eventSource?.close());
 void restoreRoute();

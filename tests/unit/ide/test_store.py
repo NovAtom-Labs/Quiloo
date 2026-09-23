@@ -88,3 +88,24 @@ def test_approval_resolution_is_optimistic_and_persisted(tmp_path: Path) -> None
         store.resolve_approval(
             approval.id, approval.revision, ApprovalDecision.DENY
         )
+
+
+def test_terminal_run_does_not_expose_stale_pending_approval(tmp_path: Path) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    workspace = WorkspaceManager(store).open(tmp_path)
+    conversation = ConversationService(store, EventFeed(store)).create(
+        workspace.id, "Agent task"
+    )
+    run = store.create_run(conversation.id, conversation.id)
+    store.create_approval(
+        run.id,
+        "action-1",
+        "terminal",
+        "HIGH",
+        "install package",
+        {"command": "pip install package"},
+    )
+    waiting = store.get_run(run.id)
+    store.transition_run(run.id, waiting.revision, RunState.CANCELLED)
+
+    assert store.list_pending_approvals(conversation.id) == ()

@@ -5,8 +5,11 @@ from openhands.sdk.event import ActionEvent
 from openhands.sdk.llm.message import MessageToolCall
 from openhands.sdk.security import SecurityRisk
 from openhands.sdk.tool import Action
+from openhands.sdk.tool.builtins.finish import FinishAction
+from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands.tools.file_editor.definition import CommandLiteral, FileEditorAction
 from openhands.tools.task.definition import TaskAction
+from openhands.tools.task_tracker.definition import TaskItem, TaskTrackerAction
 from openhands.tools.terminal.definition import TerminalAction
 
 from tcad_agent.agent.policy import (
@@ -14,6 +17,7 @@ from tcad_agent.agent.policy import (
     action_summary,
     classify_action,
 )
+from tcad_agent.agent.tools import TcadDomainAction
 
 
 @pytest.fixture
@@ -49,7 +53,18 @@ def file_event(path: str, command: CommandLiteral = "view") -> ActionEvent:
     )
 
 
-@pytest.mark.parametrize("command", ["pytest -q", "git diff", "rg TODO src"])
+@pytest.mark.parametrize(
+    "command",
+    [
+        "pytest -q",
+        "git diff",
+        "rg TODO src",
+        "cp tests/test.py.template tests/test.py",
+        "mv draft.txt notes/draft.txt",
+        "mkdir -p build/results",
+        "touch build/results/.keep",
+    ],
+)
 def test_repository_commands_are_low_risk(workspace: Path, command: str) -> None:
     assert classify_action(workspace, terminal_event(command)) is SecurityRisk.LOW
 
@@ -97,6 +112,43 @@ def test_delegated_task_is_medium_risk(workspace: Path) -> None:
     )
 
     assert classify_action(workspace, event) is SecurityRisk.MEDIUM
+
+
+def test_task_tracker_is_low_risk_workspace_metadata(workspace: Path) -> None:
+    event = action_event(
+        "task_tracker",
+        TaskTrackerAction(
+            command="plan",
+            task_list=[TaskItem(title="Inspect the repository")],
+        ),
+    )
+
+    assert classify_action(workspace, event) is SecurityRisk.LOW
+    assert action_summary(event) == "task_tracker: update 1 task"
+
+
+@pytest.mark.parametrize(
+    "tool_name,action,summary",
+    [
+        ("think", ThinkAction(thought="compare fixes"), "think: internal planning"),
+        ("finish", FinishAction(message="done"), "finish: complete response"),
+        (
+            "tcad_domain",
+            TcadDomainAction(operation="validate_spec"),
+            "tcad_domain: validate_spec",
+        ),
+    ],
+)
+def test_builtin_and_tcad_actions_are_low_risk(
+    workspace: Path,
+    tool_name: str,
+    action: Action,
+    summary: str,
+) -> None:
+    event = action_event(tool_name, action)
+
+    assert classify_action(workspace, event) is SecurityRisk.LOW
+    assert action_summary(event) == summary
 
 
 def test_unknown_action_fails_closed(workspace: Path) -> None:

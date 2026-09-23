@@ -509,9 +509,10 @@ class SqliteIDEStore:
                 JOIN agent_runs ON agent_runs.id = approval_requests.run_id
                 WHERE agent_runs.conversation_id = ?
                   AND approval_requests.decision IS NULL
+                  AND agent_runs.state = ?
                 ORDER BY approval_requests.created_at ASC, approval_requests.id ASC
                 """,
-                (str(conversation_id),),
+                (str(conversation_id), RunState.WAITING_FOR_APPROVAL.value),
             ).fetchall()
         return tuple(self._approval(row) for row in rows)
 

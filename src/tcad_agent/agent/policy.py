@@ -8,14 +8,20 @@ from pathlib import Path
 
 from openhands.sdk.event import ActionEvent
 from openhands.sdk.security import SecurityAnalyzerBase, SecurityRisk
+from openhands.sdk.tool.builtins.finish import FinishAction
+from openhands.sdk.tool.builtins.think import ThinkAction
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task.definition import TaskAction
+from openhands.tools.task_tracker.definition import TaskTrackerAction
 from openhands.tools.terminal.definition import TerminalAction
+
+from tcad_agent.agent.tools import TcadDomainAction
 
 _SAFE_COMMANDS = {
     "basename",
     "cargo",
     "cmake",
+    "cp",
     "devsim",
     "diff",
     "dirname",
@@ -24,7 +30,9 @@ _SAFE_COMMANDS = {
     "head",
     "ls",
     "make",
+    "mkdir",
     "mypy",
+    "mv",
     "pytest",
     "pwd",
     "python",
@@ -34,6 +42,7 @@ _SAFE_COMMANDS = {
     "sed",
     "tail",
     "test",
+    "touch",
     "wc",
 }
 _SAFE_GIT_COMMANDS = {"branch", "diff", "log", "rev-parse", "show", "status"}
@@ -50,7 +59,6 @@ _DANGEROUS_COMMANDS = {
     "git",  # Git is allowed only through the safe-subcommand branch.
     "kill",
     "killall",
-    "mv",
     "nc",
     "npm",
     "npx",
@@ -138,6 +146,10 @@ def classify_action(workspace: Path, event: ActionEvent) -> SecurityRisk:
         return SecurityRisk.LOW
     if isinstance(action, TerminalAction):
         return _terminal_risk(workspace, action)
+    if isinstance(action, TaskTrackerAction):
+        return SecurityRisk.LOW
+    if isinstance(action, (ThinkAction, FinishAction, TcadDomainAction)):
+        return SecurityRisk.LOW
     if isinstance(action, TaskAction):
         return SecurityRisk.MEDIUM
     return SecurityRisk.HIGH
@@ -155,6 +167,18 @@ def action_summary(event: ActionEvent) -> str:
         if len(command) > 220:
             command = f"{command[:217]}..."
         return f"terminal: {command}"
+    if isinstance(action, TaskTrackerAction):
+        if action.command == "view":
+            return "task_tracker: view tasks"
+        count = len(action.task_list or ())
+        noun = "task" if count == 1 else "tasks"
+        return f"task_tracker: update {count} {noun}"
+    if isinstance(action, ThinkAction):
+        return "think: internal planning"
+    if isinstance(action, FinishAction):
+        return "finish: complete response"
+    if isinstance(action, TcadDomainAction):
+        return f"tcad_domain: {action.operation}"
     if isinstance(action, TaskAction):
         description = (action.description or "delegated task").strip()
         return f"task {action.subagent_type}: {description[:180]}"

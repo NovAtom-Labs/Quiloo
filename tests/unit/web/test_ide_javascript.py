@@ -1,3 +1,4 @@
+import json
 import shutil
 import subprocess
 from pathlib import Path
@@ -33,6 +34,20 @@ def test_navigation_guard_prevents_stale_browser_updates() -> None:
     ).read_text()
     completed = subprocess.run(
         [_javascript_runner() or "", "-e", f"{source}\n{assertions}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
+def test_production_ide_script_parses() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide.js").read_text()
+    completed = subprocess.run(
+        [_javascript_runner() or "", "-e", f"new Function({json.dumps(source)})"],
         check=False,
         capture_output=True,
         text=True,

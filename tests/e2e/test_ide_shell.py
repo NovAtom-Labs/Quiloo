@@ -50,6 +50,12 @@ def test_workspace_conversation_route_restores_persisted_activity(
     assert posted.status_code == 201
     assert restored_page.status_code == 200
     assert 'id="agent-panel"' in restored_page.text
+    assert 'id="run-controls"' in restored_page.text
+    assert 'id="pause-run"' in restored_page.text
+    assert 'id="resume-run"' in restored_page.text
+    assert 'id="stop-run"' in restored_page.text
+    assert 'id="pending-approvals"' in restored_page.text
+    assert "Foundation slice" not in restored_page.text
     assert [message["content"] for message in restored_messages] == [
         "Inspect the experiment definition"
     ]
