@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from tcad_agent.domain.models import ExperimentSpec
+from tcad_agent.domain.models import Contact, ExperimentSpec, Observable
 
 
 def minimal_spec() -> dict:
@@ -79,3 +79,62 @@ def test_normalization_is_independent_of_input_units() -> None:
 def test_default_temperature_is_validated_as_a_quantity() -> None:
     spec = ExperimentSpec.model_validate(minimal_spec())
     assert spec.physics.temperature.to("K") == 300.0
+
+
+def test_metal_contact_requires_energy_work_function() -> None:
+    contact = Contact.model_validate(
+        {
+            "id": "anode",
+            "location": "x_min",
+            "kind": "metal_work_function",
+            "work_function": "4.10 eV",
+        }
+    )
+    assert contact.work_function is not None
+    assert contact.work_function.to("eV") == pytest.approx(4.10)
+
+
+def test_metal_contact_rejects_missing_work_function() -> None:
+    with pytest.raises(ValidationError, match="metal work-function contact"):
+        Contact.model_validate(
+            {"id": "anode", "location": "x_min", "kind": "metal_work_function"}
+        )
+
+
+def test_ohmic_contact_rejects_work_function() -> None:
+    with pytest.raises(ValidationError, match="ohmic contact"):
+        Contact.model_validate(
+            {
+                "id": "anode",
+                "location": "x_min",
+                "kind": "ohmic",
+                "work_function": "4.10 eV",
+            }
+        )
+
+
+def test_contact_rejects_voltage_as_work_function() -> None:
+    with pytest.raises(ValidationError, match="energy"):
+        Contact.model_validate(
+            {
+                "id": "anode",
+                "location": "x_min",
+                "kind": "metal_work_function",
+                "work_function": "4.10 V",
+            }
+        )
+
+
+def test_schema_represents_requested_equilibrium_observables() -> None:
+    requested = {
+        "charge_density",
+        "conduction_band",
+        "valence_band",
+        "fermi_level",
+        "electron_current_density",
+        "hole_current_density",
+        "electron_mobility",
+        "hole_mobility",
+        "recombination_rate",
+    }
+    assert requested <= {observable.value for observable in Observable}

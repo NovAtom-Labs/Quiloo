@@ -2,7 +2,7 @@ import pytest
 
 from tcad_agent.adapters.devsim.compiler import DevsimAdapter
 from tcad_agent.domain.errors import CapabilityError
-from tcad_agent.domain.models import ExperimentSpec
+from tcad_agent.domain.models import ExperimentSpec, Observable
 
 
 def test_compiler_is_deterministic_and_name_agnostic(
@@ -23,4 +23,18 @@ def test_compiler_rejects_without_writing_files(
     workspace = tmp_path / "rejected"
     with pytest.raises(CapabilityError):
         DevsimAdapter.from_defaults().compile(unsupported_spec, workspace)
+    assert not workspace.exists()
+
+
+def test_compiler_rejects_unmapped_observable_without_writing_files(
+    valid_spec: ExperimentSpec, tmp_path
+) -> None:
+    workspace = tmp_path / "unsupported-observable"
+    spec = valid_spec.model_copy(
+        update={"observables": (*valid_spec.observables, Observable.CONDUCTION_BAND)}
+    )
+
+    with pytest.raises(CapabilityError, match="conduction_band"):
+        DevsimAdapter.from_defaults().compile(spec, workspace)
+
     assert not workspace.exists()

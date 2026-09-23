@@ -4,12 +4,27 @@ adapter_version: "0.1.0"
 execution_state: unconfigured
 dimensions: [1]
 equations: [poisson, electron_continuity, hole_continuity]
-models: [boltzmann, constant_mobility, srh]
+models: [boltzmann, fermi, constant_mobility, srh, auger, band_gap_narrowing]
 materials: [silicon]
 profiles: [constant]
-contacts: [ohmic]
+contacts: [ohmic, metal_work_function]
 studies: [equilibrium, dc]
-observables: [terminal_current, potential, electric_field, electron_density, hole_density]
+observables:
+  - terminal_current
+  - terminal_charge
+  - potential
+  - electric_field
+  - electron_density
+  - hole_density
+  - charge_density
+  - conduction_band
+  - valence_band
+  - fermi_level
+  - electron_current_density
+  - hole_current_density
+  - electron_mobility
+  - hole_mobility
+  - recombination_rate
 limits:
   max_bias_points: 10
   max_regions: 32

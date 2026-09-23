@@ -27,6 +27,7 @@ class ContactLocation(StrEnum):
 class ContactKind(StrEnum):
     OHMIC = "ohmic"
     IDEAL_GATE = "ideal_gate"
+    METAL_WORK_FUNCTION = "metal_work_function"
 
 
 class Equation(StrEnum):
@@ -42,6 +43,15 @@ class Observable(StrEnum):
     ELECTRIC_FIELD = "electric_field"
     ELECTRON_DENSITY = "electron_density"
     HOLE_DENSITY = "hole_density"
+    CHARGE_DENSITY = "charge_density"
+    CONDUCTION_BAND = "conduction_band"
+    VALENCE_BAND = "valence_band"
+    FERMI_LEVEL = "fermi_level"
+    ELECTRON_CURRENT_DENSITY = "electron_current_density"
+    HOLE_CURRENT_DENSITY = "hole_current_density"
+    ELECTRON_MOBILITY = "electron_mobility"
+    HOLE_MOBILITY = "hole_mobility"
+    RECOMBINATION_RATE = "recombination_rate"
 
 
 class Region1D(StrictModel):
@@ -90,10 +100,18 @@ class Contact(StrictModel):
 
     @field_validator("work_function")
     @classmethod
-    def require_voltage(cls, value: QuantityValue | None) -> QuantityValue | None:
+    def require_energy(cls, value: QuantityValue | None) -> QuantityValue | None:
         if value is not None:
-            value.require("V", "voltage")
+            value.require("eV", "energy")
         return value
+
+    @model_validator(mode="after")
+    def require_kind_specific_fields(self) -> Self:
+        if self.kind is ContactKind.METAL_WORK_FUNCTION and self.work_function is None:
+            raise ValueError("metal work-function contact requires work_function")
+        if self.kind is ContactKind.OHMIC and self.work_function is not None:
+            raise ValueError("ohmic contact cannot define work_function")
+        return self
 
 
 class PhysicsSelection(StrictModel):
