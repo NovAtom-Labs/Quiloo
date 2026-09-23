@@ -2,101 +2,84 @@
 
 ## Current state
 
-Sentaurus scientific capabilities are declared, but `execution_state` is `unconfigured`. The current system refuses Sentaurus compilation and execution. This is intentional and must remain true until the exact licensed version and remote worker pass conformance tests.
+The local repository now contains a deterministic Sentaurus Device compiler, Ed25519-signed remote protocol, reference licensed-host service, strict native-result normalizer, and cross-backend conformance rules. The compiler can generate and inspect `sdevice.cmd` without a license. Real execution remains intentionally unconfigured on this machine.
 
-No proprietary Sentaurus documentation or syntax is stored in this repository.
+The current compiler expects a reviewed `device.tdr` structure or mesh artifact at runtime. Producing or supplying that artifact for the exact Sentaurus release is the main licensed-machine integration item. No proprietary manual or licensed example belongs in this repository.
 
-## Target boundary
+DEVSIM remains independent and runnable throughout this work.
 
-The portable `ExperimentSpec`, capability service, approval gate, canonical result, validators, evidence bundle, report, skills, and researcher commands remain unchanged. Sentaurus-specific work is confined to:
+## Stable switching boundary
 
-1. a deterministic version-specific compiler on the licensed machine
-2. an allowlisted remote worker transport
-3. a native output parser and normalizer
-4. the Sentaurus capability manifest and restricted knowledge source entries
-5. one Sentaurus binding in `src/tcad_agent/adapters/registry.py`
+The natural-language request, clarification flow, `ExperimentSpec`, capability check, plan approval, validation, evidence bundle, and report do not depend on either simulator. Backend-specific code is limited to the adapter, runner, normalizer, and capability manifest.
 
-Connecting Sentaurus is not a string substitution for DEVSIM. It is an adapter implementation behind already stable contracts.
+Switching backends means selecting a different binding for the same validated portable specification. It does not mean renaming files or assuming both simulators implement identical physics.
 
-## Required information from the licensed machine
+## What is implemented
 
-Collect these before editing code:
+- Fixed-template `sdevice.cmd` generation with no raw native syntax from users or models.
+- Reviewed mappings for Fermi statistics, mobility, SRH, Auger, and Old Slotboom band-gap narrowing.
+- Ohmic and explicit metal work-function contact rendering.
+- Deterministic experiment, command, runtime, and compiler digests.
+- Source mapping from command lines back to specification paths.
+- Signed ZIP submission with exact version binding and five-minute validity.
+- Replay prevention, digest verification, path traversal checks, archive limits, a flat input allowlist, and output allowlisting.
+- One configured executable, argument arrays without a shell, wall-time limits, CPU limits, and memory limits.
+- Strict JSON tabular normalization with SI conversion and non-finite-value rejection.
+- Case-specific conformance outcomes: passed, warning, failed, or not applicable.
 
-- exact Sentaurus release and patch level
-- executable paths and license check command
-- permitted invocation method, working directories, CPU and memory limits
-- native input and output formats available under the license
-- network endpoint and certificate policy
-- approved location for proprietary manuals and examples
-- one expert-reviewed hand-built reference run for each conformance case
+## Licensed-machine checklist
 
-If any item is missing, keep the backend unconfigured.
+Do not change `execution_state` to `configured` until every item is recorded and reviewed:
 
-## One-day adapter procedure
+1. Exact Sentaurus release and patch level.
+2. Absolute `sdevice` executable path and executable hash.
+3. The operating-system service account and file permissions.
+4. A reviewed method for generating or supplying `device.tdr` from the portable region, contact, doping, and mesh data.
+5. An authorized native-to-JSON extraction procedure for the allowlisted result fields.
+6. Client Ed25519 public verification key installed on the runner.
+7. HTTPS service identity, certificate policy, and network allowlist.
+8. CPU, memory, wall-time, disk, upload, file-count, and concurrency quotas.
+9. Exact output allowlist and retention period.
+10. Restricted manual and example locations, license scope, allowed users, and version tags.
+11. One domain-expert-reviewed golden run for each enabled conformance case.
+12. A signed conformance report attached to the pilot release evidence.
 
-This procedure assumes the machine, license, network route, and expert reference cases are already available.
+## Runner configuration
 
-### 1. Pin the runtime
+The client signs submissions with its private key. The licensed runner stores only the matching trusted public key. Keys must be generated and distributed through the deployment secret process, never committed.
 
-Record the exact Sentaurus version, executable hashes, worker image or environment hash, adapter version, parser version, and licensed source versions. Put supported values in `src/tcad_agent/adapters/sentaurus/manifest.yaml`. Do not mark `execution_state: configured` yet.
+Client settings:
 
-### 2. Install restricted knowledge locally
-
-Create a restricted manifest entry with `access: restricted`, the exact version, review state, and a path rooted on the licensed machine. Build the index there. Keep documents and the generated index outside Git. Test that a version filter never returns another release.
-
-### 3. Implement the deterministic compiler
-
-Add `src/tcad_agent/adapters/sentaurus/compiler.py` implementing the existing `Adapter` protocol. Map only manifest-declared concepts. The compiler must refuse an unmapped model, material, profile, contact, study, or observable. It must never accept model-generated Tcl, Scheme, SDevice text, shell fragments, or arbitrary command-line flags.
-
-The local compile output is a portable envelope containing normalized `experiment.json`, compiler metadata, and hashes. Native Sentaurus syntax is generated by the version-pinned compiler inside the licensed boundary.
-
-### 4. Implement the remote worker
-
-Complete `RemoteSentaurusRunner.run`. Accept only HTTPS with mutual TLS or an equivalently approved authenticated channel. Pin the worker public key, exact simulator version, and endpoint. Use no remote shell.
-
-Submit `POST /v1/jobs` with this logical request:
-
-```json
-{
-  "schema_version": "1.0",
-  "job_id": "uuid",
-  "backend": "sentaurus",
-  "sentaurus_version": "exact-release",
-  "compiler_version": "version",
-  "timeout_seconds": 120,
-  "input_digest": "sha256",
-  "runtime_digest": "sha256",
-  "artifacts": [
-    {"path": "experiment.json", "sha256": "sha256", "content_base64": "..."}
-  ]
-}
+```text
+TCAD_SENTAURUS_ENDPOINT=https://licensed-runner.example
+TCAD_SENTAURUS_VERSION=<exact-release>
+TCAD_SENTAURUS_SIGNING_PRIVATE_KEY=<base64-raw-ed25519-private-key>
+TCAD_SENTAURUS_TRUSTED_PUBLIC_KEY=<base64-raw-runner-identity-key>
 ```
 
-Sign the canonical request bytes. Reject absolute paths, `..`, links, unknown fields, digest mismatches, version mismatches, budgets above policy, and every artifact not on the compiler allowlist.
+Licensed-host settings map to `SentaurusRunnerSettings`: job root, exact executable, exact version, trusted client public key, upload limit, execution timeout, file limit, and output allowlist. Keep the service disabled if any required value is absent.
 
-Return `202` with `job_id` and a status URL. `GET /v1/jobs/{job_id}` returns one of `accepted`, `running`, `completed`, `execution_failed`, `timed_out`, or `malformed_result`. A terminal response includes return code, elapsed seconds, and hashed base64 artifacts for stdout, stderr, the native result, and compiler provenance. The client verifies every hash and signature before writing `NativeRunResult`.
+The protocol exposes:
 
-The worker must run in a fresh per-job directory, with fixed executable paths, explicit argument arrays, resource limits, no outbound network, no user-controlled environment variables, and automatic cleanup after artifacts are retained under policy.
+- `POST /v1/jobs`
+- `GET /v1/jobs/{job_id}/status`
+- `GET /v1/jobs/{job_id}/result`
 
-### 5. Normalize without changing the core
+It never exposes a shell, model prompt, unrestricted file path, or user-controlled executable.
 
-The Sentaurus adapter parses the returned native result into the existing `CanonicalResult`. Preserve native units and record conversions. Use the same validation engine, bundle writer, and report generator as DEVSIM. Backend-specific fields belong in provenance, not in portable scientific fields.
+## One-day licensed-machine procedure
 
-### 6. Pass conformance and enable
-
-Run every case in `evaluations/conformance/cases.yaml` on both backends. Require execution, convergence, sweep completeness, finite values, current conservation, and provenance on each backend. Apply expert-approved cross-backend tolerances to selected metrics. Semantic agreement is required; identical meshes and numbers are not.
-
-Only after the cases pass:
-
-1. record the signed conformance report
-2. change the Sentaurus manifest to `execution_state: configured`
-3. configure endpoint, trusted public key, and version through secrets or deployment configuration
-4. run the full test suite and one approved smoke study
-
-## Definition of seamless switching
-
-For a researcher, switching means changing `--backend devsim` to `--backend sentaurus` on the same validated specification. It does not mean both simulators produce identical decks or values. A correct switch keeps the core contracts and workflow unchanged while selecting a different capability manifest, deterministic adapter, runner, and normalizer.
+1. Install the current commit in an isolated Python 3.13 environment.
+2. Record the exact release, executable hash, account, quotas, TLS identity, and retention policy.
+3. Install the trusted client public key.
+4. Review the generated `sdevice.cmd` snapshot against the authorized documentation for that release.
+5. Complete the reviewed structure or mesh generation step and native JSON extraction step.
+6. Run `examples/al-pn-al-equilibrium.yaml` manually once and compare it with the expert golden deck and plots.
+7. Start the reference service behind the approved HTTPS identity.
+8. Run `pytest -m sentaurus tests/integration/test_cross_backend_conformance.py -q` from the client.
+9. Review every failed or warning comparison. Do not loosen a tolerance without the TCAD domain lead approving the case file.
+10. Attach the signed run bundle and conformance report, then mark the manifest configured.
 
 ## Rollback
 
-If a version, license, signature, parser, validator, or conformance check fails, set `execution_state` back to `unconfigured`. Existing bundles remain immutable and readable. DEVSIM continues through its independent adapter and runtime.
+If the version, license, signature, parser, structure input, validation, or conformance check fails, keep or return `execution_state` to `unconfigured`. Existing evidence bundles stay readable. DEVSIM continues through its separate adapter and runtime.

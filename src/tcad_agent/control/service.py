@@ -33,6 +33,7 @@ from tcad_agent.model_gateway.base import AgentContextPacket, AgentProposal, Mod
 from tcad_agent.recovery.models import RecoveryBudget
 from tcad_agent.recovery.policy import RecoveryPolicy
 from tcad_agent.runners.models import CompiledJob, RunBudget
+from tcad_agent.runners.remote import BackendUnconfiguredError
 from tcad_agent.validation.engine import ValidationEngine
 
 
@@ -219,7 +220,22 @@ class ControlService:
         binding = self.backend_resolver(backend)
         spec = ExperimentSpec.model_validate(running.data["spec"])
         job = CompiledJob.model_validate(running.data["job"])
-        native = binding.runner.run(job, RunBudget(seconds=self.run_budget_seconds))
+        try:
+            native = binding.runner.run(job, RunBudget(seconds=self.run_budget_seconds))
+        except BackendUnconfiguredError:
+            ledger.append(RunEventKind.FAILED, {"code": "backend_unconfigured"})
+            failed = self.store.transition(
+                running.id,
+                running.revision,
+                RequestState.FAILED,
+                {
+                    "error_code": "backend_unconfigured",
+                    "error_message": (
+                        "Sentaurus execution requires the configured licensed runner."
+                    ),
+                },
+            )
+            return self._view(failed)
         result = binding.adapter.normalize(native)
         validating = self.store.transition(
             running.id,

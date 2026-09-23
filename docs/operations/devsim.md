@@ -14,6 +14,8 @@ If the simulator is not in the sibling `devsim` directory, set `TCAD_DEVSIM_PYTH
 
 ## Validate, compile, and run
 
+DEVSIM remains the complete local test backend while Sentaurus is being connected. Every ordinary code change must keep the DEVSIM end-to-end tests green.
+
 ```bash
 .venv/bin/tcad-agent validate examples/pn-junction.yaml
 
@@ -27,6 +29,17 @@ If the simulator is not in the sibling `devsim` directory, set `TCAD_DEVSIM_PYTH
   --timeout-seconds 120 \
   --output runs
 ```
+
+The Al / p-Si / n-Si / Al request has an explicit local approximation:
+
+```bash
+.venv/bin/tcad-agent run examples/al-pn-al-equilibrium-devsim.yaml \
+  --backend devsim \
+  --approve \
+  --output runs
+```
+
+This local case uses ohmic contacts, Boltzmann statistics, constant mobility, and SRH because those are the capabilities of the reviewed DEVSIM adapter. It does not pretend to implement aluminum work-function contacts, Fermi statistics, Auger recombination, or band-gap narrowing. The full Sentaurus case is `examples/al-pn-al-equilibrium.yaml`.
 
 Validation is safe and read-only. Compilation writes deterministic inputs but does not start the simulator. Run requires `--approve` and writes a new immutable bundle. Reusing a run ID is rejected by the bundle writer.
 
@@ -74,7 +87,7 @@ The index is immutable. Delete an obsolete generated index only when intentional
 
 ```bash
 .venv/bin/ruff check .
-.venv/bin/mypy src
+.venv/bin/mypy --strict src
 .venv/bin/pytest -q
 ```
 

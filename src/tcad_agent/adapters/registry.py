@@ -7,8 +7,10 @@ from typing import Protocol
 
 from tcad_agent.adapters.base import Adapter
 from tcad_agent.adapters.devsim.compiler import DevsimAdapter
+from tcad_agent.adapters.sentaurus.compiler import SentaurusAdapter
 from tcad_agent.runners.local import LocalRunner
 from tcad_agent.runners.models import CompiledJob, NativeRunResult, RunBudget
+from tcad_agent.runners.remote import RemoteRunnerConfig, RemoteSentaurusRunner
 
 
 class BackendAdapterUnavailable(RuntimeError):
@@ -29,13 +31,16 @@ def get_backend(backend: str) -> BackendBinding:
     """Return the installed backend binding or refuse at one explicit seam."""
     if backend == "devsim":
         devsim_python = Path(
-            os.getenv(
-                "TCAD_DEVSIM_PYTHON",
-                str(Path.cwd().parent / "devsim" / ".venv" / "bin" / "python"),
-            )
+            os.getenv("TCAD_DEVSIM_PYTHON")
+            or str(Path.cwd().parent / "devsim" / ".venv" / "bin" / "python")
         )
         return BackendBinding(
             adapter=DevsimAdapter.from_defaults(),
             runner=LocalRunner(devsim_python),
+        )
+    if backend == "sentaurus":
+        return BackendBinding(
+            adapter=SentaurusAdapter.from_defaults(),
+            runner=RemoteSentaurusRunner(RemoteRunnerConfig.from_environment()),
         )
     raise BackendAdapterUnavailable(f"{backend} adapter and runner are not installed")

@@ -1,6 +1,6 @@
 # NovAtom TCAD Agent
 
-NovAtom TCAD Agent is a simulator-neutral foundation for researcher-driven semiconductor device simulation. Researchers describe regions, doping profiles, contacts, physics, studies, and observables in a strict `ExperimentSpec`. Deterministic adapters translate that data into simulator inputs. DEVSIM works locally today. Sentaurus is represented by the same capability and execution contracts and remains disabled until the licensed machine is connected.
+NovAtom TCAD Agent is a simulator-neutral research workflow for semiconductor device simulation. A researcher can enter a natural-language request in a local web application, answer consequential clarification questions, review an exact plan, approve it, run DEVSIM locally, and inspect a validated evidence bundle. The same strict `ExperimentSpec` can be compiled by the Sentaurus adapter without changing the researcher workflow. Licensed Sentaurus execution remains disabled until its separate machine is configured and reviewed.
 
 Named devices are examples, not execution modes. The PN and PIN examples pass through the same schema, compiler, runner, normalizer, validators, bundle writer, and report generator. A researcher can compose another supported one-dimensional silicon stack without adding product code.
 
@@ -11,20 +11,27 @@ Working now:
 - strict units-aware experiment specifications
 - data-driven backend capability checks and explicit refusal
 - deterministic DEVSIM compilation and bounded execution
+- local browser interface with clarification, plan approval, run progress, reports, and downloads
+- persistent request lifecycle, duplicate-run protection, and a tamper-evident event ledger
+- bounded failure classification and allowlisted recovery decisions
+- deterministic Sentaurus Device command compilation with source mapping and hashes
+- signed remote-runner protocol with replay, path, size, version, and output controls
+- strict Sentaurus result normalization and case-scoped cross-backend conformance
 - canonical results, physical checks, immutable evidence bundles, and reports
 - manifest-gated local knowledge retrieval with citations
 - eight TCAD operating skills and a typed OpenHands tool boundary
-- researcher CLI with an explicit execution approval gate
+- researcher CLI and web app with an explicit execution approval gate
 
 Deliberate limits:
 
 - one-dimensional, silicon-first structures
 - constant donor and acceptor profiles
-- ohmic contacts, equilibrium, and bounded DC sweeps
+- DEVSIM: ohmic contacts, equilibrium, bounded DC sweeps, and the manifest-declared model subset
+- Sentaurus compiler: ohmic or metal work-function contacts and the reviewed model mappings
 - exploratory output, not fabrication-calibrated prediction
-- no Sentaurus execution until its licensed machine, exact version, adapter, and runner are configured
+- no real Sentaurus execution until the licensed machine supplies a reviewed structure or mesh artifact, exact release, restricted knowledge, endpoint identity, and golden conformance run
 
-See [Architecture](docs/architecture.md), [DEVSIM operations](docs/operations/devsim.md), and [Sentaurus integration](docs/operations/sentaurus-integration.md).
+See [Local web app](docs/operations/local-web-app.md), [DEVSIM operations](docs/operations/devsim.md), [Sentaurus integration](docs/operations/sentaurus-integration.md), and [Pilot acceptance](docs/testing/pilot-acceptance.md).
 
 ## Quick start
 
@@ -37,11 +44,15 @@ Python 3.13 is required. From this repository:
 .venv/bin/pytest -q
 ```
 
+For the normal researcher workflow, copy `.env.example` to `.env`, add a valid Bedrock credential, and double-click `launch_tcad_agent.command`. The app is available only on `http://127.0.0.1:8765`.
+
 Validate both ordinary data fixtures:
 
 ```bash
 .venv/bin/tcad-agent validate examples/pn-junction.yaml
 .venv/bin/tcad-agent validate examples/pin-diode.yaml
+.venv/bin/tcad-agent validate examples/al-pn-al-equilibrium-devsim.yaml
+.venv/bin/tcad-agent validate examples/al-pn-al-equilibrium.yaml
 ```
 
 Inspect a natural-language agent evaluation prompt:
@@ -80,6 +91,8 @@ The installed DEVSIM runtime is `2.9.1` at `/Users/satyagni/Documents/NovAtom La
 - `AWS_BEARER_TOKEN_BEDROCK`: Amazon Bedrock API key. Keep it only in the ignored local `.env` file or a secret manager.
 - `AWS_REGION_NAME`: Bedrock invocation region. The local pilot uses `ap-south-1` with the global Sonnet 5 inference profile.
 - `TCAD_DEVSIM_PYTHON`: optional DEVSIM Python executable override. The default is the sibling `devsim/.venv/bin/python` path.
+- `TCAD_WORKSPACE`: optional local request database and artifact root. Default: `.tcad-agent`.
+- `TCAD_SENTAURUS_ENDPOINT`, `TCAD_SENTAURUS_VERSION`, and signing key variables are deployment-only settings for the licensed runner. They are not required for DEVSIM.
 
 Create the local configuration from the safe template, add the credential, and
 export it before starting an agent process:
@@ -94,7 +107,7 @@ set +a
 Never commit `.env`. Rotate any credential that has been disclosed outside the
 local secret store.
 
-The agent profile exposes only the `tcad_domain` tool. It does not expose a terminal. Simulation execution requires an approved plan identifier in agent workflows or `--approve` in the CLI.
+The agent profile exposes only the `tcad_domain` tool. It does not expose a terminal. The model proposes structured intent only. Deterministic code performs capability checks, compilation, execution, validation, recovery decisions, and reporting. Simulation execution requires approval of the exact plan digest.
 
 The knowledge build combines the pinned public DEVSIM source with NovAtom's curated portable TCAD guides. Curated guides are explicitly marked as awaiting domain-lead review. Sentaurus guidance remains closed until version-compatible licensed sources are available on the licensed machine.
 
@@ -110,6 +123,10 @@ src/tcad_agent/validation/   numerical and physical checks
 src/tcad_agent/bundles/      immutable evidence packaging
 src/tcad_agent/knowledge/    authorized ingestion and retrieval
 src/tcad_agent/agent/        typed OpenHands tools and runtime profile
+src/tcad_agent/control/      request lifecycle, approval, and orchestration
+src/tcad_agent/web/          loopback-only researcher application
+src/tcad_agent/remote_protocol/ signed licensed-runner contracts
+src/tcad_agent/sentaurus_runner/ reference licensed-host service
 skills/                      progressive TCAD operating knowledge
 examples/                    ordinary experiment fixtures
 evaluations/                 retrieval and cross-backend acceptance cases

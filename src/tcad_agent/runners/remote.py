@@ -6,6 +6,7 @@ import base64
 import binascii
 import hashlib
 import io
+import os
 import zipfile
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
@@ -41,6 +42,21 @@ class RemoteRunnerConfig(StrictModel):
     trusted_public_key: str | None = None
     sentaurus_version: str | None = None
     timeout_seconds: float = 30
+
+    @classmethod
+    def from_environment(cls) -> RemoteRunnerConfig:
+        return cls.model_validate(
+            {
+                "endpoint": os.getenv("TCAD_SENTAURUS_ENDPOINT") or None,
+                "signing_private_key": (
+                    os.getenv("TCAD_SENTAURUS_SIGNING_PRIVATE_KEY") or None
+                ),
+                "trusted_public_key": (
+                    os.getenv("TCAD_SENTAURUS_TRUSTED_PUBLIC_KEY") or None
+                ),
+                "sentaurus_version": os.getenv("TCAD_SENTAURUS_VERSION") or None,
+            }
+        )
 
     @field_validator("endpoint")
     @classmethod

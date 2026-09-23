@@ -8,6 +8,15 @@ from tcad_agent.domain.models import ExperimentSpec
 ROOT = Path(__file__).parents[1]
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-live-bedrock",
+        action="store_true",
+        default=False,
+        help="run the opt-in Amazon Bedrock smoke test",
+    )
+
+
 @pytest.fixture
 def valid_spec() -> ExperimentSpec:
     payload = yaml.safe_load((ROOT / "examples" / "pn-junction.yaml").read_text())
