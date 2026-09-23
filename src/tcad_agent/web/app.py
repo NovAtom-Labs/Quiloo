@@ -201,6 +201,22 @@ def create_app(
 
     @app.get("/")
     def index(request: Request) -> Response:
+        return templates.TemplateResponse(request, "ide.html", {})
+
+    @app.get("/workspaces/{workspace_id}")
+    def workspace_page(request: Request, workspace_id: UUID) -> Response:
+        del workspace_id
+        return templates.TemplateResponse(request, "ide.html", {})
+
+    @app.get("/workspaces/{workspace_id}/conversations/{conversation_id}")
+    def conversation_page(
+        request: Request, workspace_id: UUID, conversation_id: UUID
+    ) -> Response:
+        del workspace_id, conversation_id
+        return templates.TemplateResponse(request, "ide.html", {})
+
+    @app.get("/simulate")
+    def simulation_page(request: Request) -> Response:
         return templates.TemplateResponse(request, "index.html", {})
 
     @app.get("/requests/{request_id}/{stage}")

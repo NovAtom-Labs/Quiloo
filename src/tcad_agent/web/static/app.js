@@ -113,7 +113,7 @@ function parseLocation() {
 }
 
 function workflowPath(stage) {
-  return current ? `/requests/${current.id}/${stage}` : "/";
+  return current ? `/requests/${current.id}/${stage}` : "/simulate";
 }
 
 function updatePageCopy(stage) {

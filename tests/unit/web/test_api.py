@@ -55,7 +55,30 @@ def test_root_and_health_are_local_researcher_entrypoints(tmp_path: Path) -> Non
     assert len(health["runtime_fingerprint"]) == 16
     page = web.get("/")
     assert page.status_code == 200
-    assert "NovAtom TCAD Agent" in page.text
+    assert "Quiloo workspace" in page.text
+
+
+def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
+    page = client(tmp_path).get("/")
+    parser = ButtonTextParser()
+    parser.feed(page.text)
+
+    assert parser.elements["workspace-browser"] == "aside"
+    assert parser.elements["repository-tree"] == "div"
+    assert parser.elements["workspace-main"] == "main"
+    assert parser.elements["workspace-tabs"] == "nav"
+    assert parser.elements["agent-panel"] == "aside"
+    assert parser.elements["conversation-messages"] == "div"
+    assert parser.elements["agent-activity"] == "div"
+    assert parser.elements["open-workspace"] == "button"
+    assert parser.elements["create-conversation"] == "button"
+
+
+def test_guided_simulation_remains_available(tmp_path: Path) -> None:
+    page = client(tmp_path).get("/simulate")
+    assert page.status_code == 200
+    assert 'id="workflow-progress"' in page.text
+    assert 'id="results-workspace"' in page.text
 
 
 def test_create_request_enters_clarification(tmp_path: Path) -> None:
@@ -73,7 +96,7 @@ def test_create_request_enters_clarification(tmp_path: Path) -> None:
 
 
 def test_clarification_form_has_explicit_continue_action(tmp_path: Path) -> None:
-    page = client(tmp_path).get("/")
+    page = client(tmp_path).get("/simulate")
     parser = ButtonTextParser()
     parser.feed(page.text)
     assert parser.buttons["answer"] == "Continue to plan"
@@ -82,7 +105,7 @@ def test_clarification_form_has_explicit_continue_action(tmp_path: Path) -> None
 def test_researcher_page_exposes_workflow_review_and_results_regions(
     tmp_path: Path,
 ) -> None:
-    page = client(tmp_path).get("/")
+    page = client(tmp_path).get("/simulate")
     parser = ButtonTextParser()
     parser.feed(page.text)
     assert parser.elements["workflow-progress"] == "ol"
