@@ -27,10 +27,18 @@ from tcad_agent.control.service import (
 )
 from tcad_agent.control.store import RequestNotFoundError, SqliteRequestStore
 from tcad_agent.events.models import RunEvent
+from tcad_agent.ide.conversations import ConversationInputError
+from tcad_agent.ide.paths import WorkspacePathError
+from tcad_agent.ide.store import ConversationNotFoundError, WorkspaceNotFoundError
 from tcad_agent.model_gateway.base import AgentContextPacket, AgentProposal, ModelGateway
 from tcad_agent.model_gateway.openhands import (
     ModelConfigurationError,
     OpenHandsBedrockGateway,
+)
+from tcad_agent.web.ide_routes import (
+    IDEServices,
+    build_default_ide_services,
+    build_ide_router,
 )
 from tcad_agent.web.runtime import runtime_fingerprint
 from tcad_agent.web.schemas import (
@@ -85,13 +93,61 @@ def create_app(
     control: ControlAPI | None = None,
     *,
     runtime_id: str | None = None,
+    ide: IDEServices | None = None,
 ) -> FastAPI:
     service = control or build_default_control()
+    ide_services = ide or build_default_ide_services()
     active_runtime_id = runtime_id or runtime_fingerprint()
     package_root = Path(__file__).parent
     templates = Jinja2Templates(directory=package_root / "templates")
     app = FastAPI(title="NovAtom TCAD Agent", docs_url=None, redoc_url=None)
     app.mount("/static", StaticFiles(directory=package_root / "static"), name="static")
+    app.include_router(build_ide_router(ide_services))
+
+    @app.exception_handler(WorkspacePathError)
+    async def invalid_workspace_path(
+        _request: Request, _exc: WorkspacePathError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "code": "invalid_workspace_path",
+                "message": "The workspace path is unavailable or invalid.",
+            },
+        )
+
+    @app.exception_handler(ConversationInputError)
+    async def invalid_conversation_input(
+        _request: Request, exc: ConversationInputError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=400,
+            content={"code": "invalid_conversation_input", "message": str(exc)},
+        )
+
+    @app.exception_handler(WorkspaceNotFoundError)
+    async def workspace_not_found(
+        _request: Request, _exc: WorkspaceNotFoundError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "code": "workspace_not_found",
+                "message": "The workspace was not found.",
+            },
+        )
+
+    @app.exception_handler(ConversationNotFoundError)
+    async def conversation_not_found(
+        _request: Request, _exc: ConversationNotFoundError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=404,
+            content={
+                "code": "conversation_not_found",
+                "message": "The conversation was not found.",
+            },
+        )
 
     @app.exception_handler(RequestNotFoundError)
     async def request_not_found(_request: Request, _exc: RequestNotFoundError) -> JSONResponse:

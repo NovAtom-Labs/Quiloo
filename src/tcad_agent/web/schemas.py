@@ -28,3 +28,15 @@ class ResearchResults(WebRequest):
     experiment: dict[str, JsonValue]
     result: dict[str, JsonValue]
     validation: dict[str, JsonValue]
+
+
+class OpenWorkspaceRequest(WebRequest):
+    path: str = Field(min_length=1, max_length=4096)
+
+
+class CreateConversationRequest(WebRequest):
+    title: str = Field(min_length=1, max_length=120)
+
+
+class CreateMessageRequest(WebRequest):
+    content: str = Field(min_length=1, max_length=100_000)
