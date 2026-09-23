@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
-    <link rel="stylesheet" href="/static/ide.css?v=20260924-1">
+    <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
+    <link rel="stylesheet" href="/static/ide.css?v=20260924-3">
   </head>
   <body>
     <div class="ide-shell">
@@ -18,14 +19,14 @@
             <circle cx="31" cy="33" r="3"></circle>
             <path d="M10.5 14.5 17 19M25 19l6.5-5M23.5 25l5.5 6M9.5 15.5l8 16M33 14l-11 17"></path>
           </svg>
-          <span><strong>Quiloo</strong><small>NOVATOM LABS</small></span>
+          <span><strong>Quiloo</strong><small>Research workspace</small></span>
         </a>
         <div id="workspace-status" class="workspace-status" aria-live="polite">
           No workspace open
         </div>
         <div class="header-actions">
-          <span class="runtime-state"><i></i> LOCAL RUNTIME</span>
-          <a class="guided-link" href="/simulate">Guided simulation</a>
+          <span class="runtime-state">Local runtime</span>
+          <a class="guided-link" href="/simulate">Simulation</a>
         </div>
       </header>
 
@@ -53,24 +54,24 @@
           <a href="/simulate">Simulation</a>
         </nav>
         <section id="workspace-welcome" class="workspace-welcome">
-          <span class="section-label">LOCAL AGENT WORKSPACE</span>
-          <h1>Research across code, simulation, and evidence.</h1>
-          <p>Select a repository to establish the agent workspace. Conversations and activity are persisted locally and survive browser or service restarts.</p>
-          <div class="capability-grid">
-            <article><span>01</span><strong>Repository context</strong><p>Canonical local paths, Git state, and safe directory inspection.</p></article>
-            <article><span>02</span><strong>Persistent sessions</strong><p>Stable conversation URLs with resumable messages and activity.</p></article>
-            <article><span>03</span><strong>TCAD workflow</strong><p>The validated DEVSIM and Sentaurus-neutral flow remains available.</p></article>
-          </div>
+          <span class="section-label">Workspace</span>
+          <h1>Repository research environment</h1>
+          <p>Inspect a local repository, maintain persistent research sessions, and move between source work and validated simulation.</p>
+          <dl class="workspace-facts">
+            <div><dt>Access scope</dt><dd>Selected repository</dd></div>
+            <div><dt>Session storage</dt><dd>Local and persistent</dd></div>
+            <div><dt>Simulation</dt><dd>DEVSIM ready</dd></div>
+          </dl>
           <div class="foundation-note">
-            <strong>Foundation slice</strong>
-            <span>Prompts are persisted now. Autonomous OpenHands editing and terminal execution are connected in the next slice.</span>
+            <strong>Current runtime</strong>
+            <span>Repository context and prompts are persistent. File editing and terminal execution connect in the next runtime slice.</span>
           </div>
         </section>
       </main>
 
       <aside id="agent-panel" class="agent-panel" aria-label="Agent conversation">
         <div class="agent-heading">
-          <div><span>AGENT</span><strong id="conversation-title">No conversation</strong></div>
+          <div><span>SESSION</span><strong id="conversation-title">No conversation</strong></div>
           <button id="create-conversation" type="button" disabled>New conversation</button>
         </div>
         <p id="ide-error" class="ide-error hidden" role="alert" aria-live="assertive"></p>
@@ -91,7 +92,7 @@
 
     <dialog id="conversation-dialog" aria-labelledby="conversation-dialog-title">
       <form id="conversation-form" method="dialog">
-        <span class="section-label">NEW SESSION</span>
+        <span class="section-label">New session</span>
         <h2 id="conversation-dialog-title">Start a repository conversation</h2>
         <label for="conversation-title-input">Conversation title</label>
         <input id="conversation-title-input" maxlength="120" required value="Repository task">

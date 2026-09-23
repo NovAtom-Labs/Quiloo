@@ -1,0 +1,63 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  --background: #0b0d10;
+  --surface: #101318;
+  --surface-raised: #15191f;
+  --surface-hover: #1a1f27;
+  --border: #272d35;
+  --border-strong: #3a434f;
+  --text: #e6e9ed;
+  --text-strong: #f4f6f8;
+  --muted: #929ca8;
+  --muted-dim: #68727e;
+  --blue: #7896c4;
+  --blue-strong: #91acd3;
+  --blue-soft: rgba(120, 150, 196, 0.11);
+  --green: #72a88d;
+  --amber: #bda36d;
+  --red: #c67c80;
+  --radius-small: 3px;
+  --radius: 5px;
+  --font-mono: "SFMono-Regular", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  background: var(--background);
+  color: var(--text);
+}
+
+* { box-sizing: border-box; }
+html, body { min-height: 100%; margin: 0; background: var(--background); }
+body { color: var(--text); }
+button, input, textarea, select { color: inherit; font: inherit; }
+button, select { cursor: pointer; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+input, textarea, select {
+  width: 100%;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-small);
+  background: #0d1014;
+}
+input::placeholder, textarea::placeholder { color: var(--muted-dim); }
+button:disabled { cursor: not-allowed; opacity: 0.42; }
+a { color: var(--blue-strong); }
+code, pre, .numeric { font-family: var(--font-mono); }
+::selection { color: var(--text-strong); background: rgba(120, 150, 196, 0.3); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 8px; background: #353d47; background-clip: padding-box; }
+
+.brand { color: inherit; text-decoration: none; }
+.brand-mark { flex: 0 0 auto; }
+.brand-mark circle { fill: #dfe4e9; }
+.brand-mark circle:nth-child(n+2) { fill: var(--blue); }
+.brand-mark path { fill: none; stroke: #adb7c2; stroke-width: 1.35; }
+.hidden { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}

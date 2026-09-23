@@ -2,10 +2,10 @@
 
 const STAGES = ["request", "clarify", "review", "results"];
 const PAGE_COPY = {
-  request: ["AUTONOMOUS DEVICE RESEARCH", "From research intent to <em>validated</em> device evidence.", "Describe the study. The agent resolves material assumptions, compiles an exact plan, and runs only after your approval."],
-  clarify: ["CONSEQUENTIAL INPUTS", "Resolve assumptions before the agent <em>commits</em>.", "Only information that changes the physical experiment is requested."],
-  review: ["IMMUTABLE EXECUTION PLAN", "Know exactly what the simulator will <em>execute</em>.", "Inspect the normalized structure, physics, outputs, backend, and limitations before approval."],
-  results: ["SIMULATION EVIDENCE", "Interrogate the result, not just a <em>download</em>.", "Explore fields, operating points, validation checks, and the exact device definition in one workspace."],
+  request: ["Simulation workflow", "Define the device study", "Specify geometry, materials, contacts, physics, operating conditions, and required outputs."],
+  clarify: ["Required inputs", "Resolve material and boundary conditions", "Provide only the missing values that materially change the experiment."],
+  review: ["Execution plan", "Review the normalized simulation plan", "Confirm the structure, models, outputs, backend, and limitations before execution."],
+  results: ["Simulation results", "Inspect validated device results", "Review spatial fields, operating points, validation checks, and the exact simulated structure."],
 };
 
 const promptInput = document.querySelector("#prompt");
@@ -119,9 +119,9 @@ function workflowPath(stage) {
 function updatePageCopy(stage) {
   const [eyebrow, title, copy] = PAGE_COPY[stage];
   document.querySelector("#page-eyebrow").textContent = eyebrow;
-  document.querySelector("#page-title").innerHTML = title;
+  document.querySelector("#page-title").textContent = title;
   document.querySelector("#page-copy").textContent = copy;
-  document.title = `${formatLabel(stage)} · NovAtom TCAD Agent`;
+  document.title = `${formatLabel(stage)} · Quiloo TCAD`;
 }
 
 function showPage(stage, historyMode = null) {

@@ -81,6 +81,27 @@ def test_guided_simulation_remains_available(tmp_path: Path) -> None:
     assert 'id="results-workspace"' in page.text
 
 
+def test_workspace_and_simulation_share_scientific_theme(tmp_path: Path) -> None:
+    web = client(tmp_path)
+
+    workspace_page = web.get("/")
+    simulation_page = web.get("/simulate")
+    theme = web.get("/static/theme.css?v=20260924-1")
+
+    assert 'href="/static/theme.css?v=20260924-1"' in workspace_page.text
+    assert 'href="/static/theme.css?v=20260924-1"' in simulation_page.text
+    assert theme.status_code == 200
+    assert theme.headers["content-type"].startswith("text/css")
+
+
+def test_workflow_runtime_uses_operational_copy(tmp_path: Path) -> None:
+    script = client(tmp_path).get("/static/app.js?v=20260924-4")
+
+    assert script.status_code == 200
+    assert "Simulation workflow" in script.text
+    assert "From research intent to <em>validated</em> device evidence." not in script.text
+
+
 def test_create_request_enters_clarification(tmp_path: Path) -> None:
     prompt = Path("examples/prompts/al-pn-al-equilibrium.md").read_text()
     response = client(tmp_path).post(
