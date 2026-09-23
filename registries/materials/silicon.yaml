@@ -1,0 +1,15 @@
+id: silicon
+version: "1.0"
+review_status: provisional
+source:
+  title: DEVSIM simple_physics silicon constants
+  url: https://github.com/devsim/devsim/blob/43b41ca845184c47e22b72d144db7e7db8509377/python_packages/simple_physics.py
+  license: Apache-2.0
+parameters:
+  relative_permittivity: 11.1
+  intrinsic_carrier_density_cm3: 1.0e10
+  electron_mobility_cm2_per_vs: 400
+  hole_mobility_cm2_per_vs: 200
+limitations:
+  - Initial reference values are uncalibrated and intended only for platform verification.
+

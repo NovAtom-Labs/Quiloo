@@ -39,6 +39,7 @@ class CapabilityManifest(StrictModel):
     dimensions: tuple[int, ...]
     equations: tuple[str, ...]
     models: tuple[str, ...] = ()
+    materials: tuple[str, ...] = ("silicon",)
     profiles: tuple[str, ...] = ("constant",)
     contacts: tuple[str, ...] = ("ohmic",)
     studies: tuple[str, ...] = ("equilibrium", "dc")
@@ -51,6 +52,7 @@ class CapabilityManifest(StrictModel):
             "dimensions",
             "equations",
             "models",
+            "materials",
             "profiles",
             "contacts",
             "studies",
@@ -67,4 +69,3 @@ class CapabilityManifest(StrictModel):
             raise ValueError(f"unknown backend: {backend}")
         resource = files("tcad_agent.adapters").joinpath(backend, "manifest.yaml")
         return cls.model_validate(yaml.safe_load(resource.read_text()))
-

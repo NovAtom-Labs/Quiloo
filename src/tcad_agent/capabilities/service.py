@@ -26,6 +26,12 @@ class CapabilityService:
         self._check_many(issues, "physics.models", spec.physics.models, manifest.models)
         self._check_many(
             issues,
+            "regions.material",
+            tuple(region.material for region in spec.regions),
+            manifest.materials,
+        )
+        self._check_many(
+            issues,
             "profiles",
             tuple(profile.kind for profile in spec.profiles),
             manifest.profiles,
@@ -76,4 +82,3 @@ class CapabilityService:
     ) -> None:
         for index, value in enumerate(requested):
             cls._check_one(issues, f"{path}[{index}]", value, supported)
-

@@ -1,0 +1,11 @@
+id: classical-drift-diffusion
+version: "1.0"
+review_status: provisional
+models:
+  statistics: boltzmann
+  mobility: constant_mobility
+  recombination: srh
+source:
+  title: DEVSIM simple_physics implementation
+  url: https://github.com/devsim/devsim/blob/43b41ca845184c47e22b72d144db7e7db8509377/python_packages/simple_physics.py
+  license: Apache-2.0

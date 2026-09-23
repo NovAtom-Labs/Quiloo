@@ -5,6 +5,7 @@ execution_state: unconfigured
 dimensions: [1]
 equations: [poisson, electron_continuity, hole_continuity]
 models: [boltzmann, constant_mobility, srh]
+materials: [silicon]
 profiles: [constant]
 contacts: [ohmic]
 studies: [equilibrium, dc]
