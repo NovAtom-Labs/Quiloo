@@ -17,6 +17,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from tcad_agent.agent.supervisor import AgentRunConflictError, AgentSupervisor
+from tcad_agent.ide.changes import WorkspaceChangeTracker
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed, format_sse
 from tcad_agent.ide.models import (
@@ -25,6 +26,7 @@ from tcad_agent.ide.models import (
     ConversationMessage,
     ConversationRecord,
     RunState,
+    WorkspaceChangeSet,
     WorkspaceEntry,
     WorkspaceFilePreview,
     WorkspaceRecord,
@@ -63,6 +65,7 @@ class IDEServices:
     workspaces: WorkspaceManager
     conversations: ConversationService
     events: EventFeed
+    changes: WorkspaceChangeTracker = field(default_factory=WorkspaceChangeTracker)
     store: SqliteIDEStore = field(init=False)
     runtime_root: Path = field(init=False)
 
@@ -334,6 +337,16 @@ def build_ide_router(
         }
         runs = services.store.list_runs(conversation_id)
         return next((run for run in reversed(runs) if run.state in active_states), None)
+
+    @router.get("/runs/{run_id}/changes")
+    def run_changes(run_id: UUID) -> WorkspaceChangeSet:
+        run = services.store.get_run(run_id)
+        conversation = services.conversations.get(run.conversation_id)
+        workspace = services.workspaces.get(conversation.workspace_id)
+        baseline = services.store.get_run_baseline(run_id)
+        return services.changes.compare(workspace.root, baseline).model_copy(
+            update={"run_id": run_id}
+        )
 
     @router.post("/runs/{run_id}/pause")
     def pause_agent_run(run_id: UUID) -> AgentRunRecord:

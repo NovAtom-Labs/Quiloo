@@ -170,6 +170,54 @@ def test_agent_run_and_approval_api_lifecycle(tmp_path: Path) -> None:
     assert stale.json()["code"] == "stale_revision"
 
 
+def test_run_changes_endpoint_compares_against_starting_workspace(
+    tmp_path: Path,
+) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    events = EventFeed(store)
+    services = IDEServices(
+        workspaces=WorkspaceManager(store),
+        conversations=ConversationService(store, events),
+        events=events,
+    )
+    supervisor = AgentSupervisor(services, ApprovalRuntimeFactory())
+    web = TestClient(create_app(ide=services, agent_supervisor=supervisor))
+    root = tmp_path / "repo"
+    root.mkdir()
+    existing = root / "existing.txt"
+    untouched = root / "untouched-dirty.txt"
+    existing.write_text("already dirty\n")
+    untouched.write_text("pre-existing\n")
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+    conversation = web.post(
+        f"/api/workspaces/{workspace['id']}/conversations",
+        json={"title": "Change attribution"},
+    ).json()
+    message = web.post(
+        f"/api/conversations/{conversation['id']}/messages",
+        json={"content": "Inspect the repository"},
+    ).json()
+
+    started = web.post(
+        f"/api/conversations/{conversation['id']}/runs",
+        json={"message_id": message["id"]},
+    )
+    assert started.status_code == 202
+    run = started.json()
+    supervisor.join(UUID(run["id"]), timeout=2)
+    existing.write_text("already dirty\nagent line\n")
+
+    response = web.get(f"/api/runs/{run['id']}/changes")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["run_id"] == run["id"]
+    assert [(row["path"], row["operation"]) for row in payload["files"]] == [
+        ("existing.txt", "modified")
+    ]
+    assert payload["files"][0]["additions"] == 1
+
+
 def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     root.mkdir()

@@ -17,6 +17,7 @@ from openhands.sdk.tool import Observation
 from openhands.tools.terminal.definition import TerminalAction
 
 from tcad_agent.agent.supervisor import AgentRunConflictError, AgentSupervisor
+from tcad_agent.ide.changes import WorkspaceChangeTracker
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
 from tcad_agent.ide.models import ApprovalDecision, RunState
@@ -142,9 +143,44 @@ def services(tmp_path: Path):
         events=events,
         workspaces=workspaces,
         conversations=conversations,
+        changes=WorkspaceChangeTracker(),
         conversation=conversation,
         runtime_root=tmp_path / ".runtime",
     )
+
+
+def test_start_captures_baseline_before_runtime_executes(services) -> None:
+    observed = {"baseline_present": False}
+
+    class BaselineObservingConversation(ScriptedConversation):
+        def run(self) -> None:
+            run = services.store.list_runs(services.conversation.id)[-1]
+            observed["baseline_present"] = (
+                services.store.get_run_baseline(run.id) is not None
+            )
+            super().run()
+
+    class BaselineObservingFactory(ScriptedRuntimeFactory):
+        def create(self, workspace: Path, conversation_id: UUID, callback):
+            conversation = BaselineObservingConversation(
+                conversation_id,
+                callback,
+                self.events,
+                self.status,
+                self.gate,
+            )
+            self.created.append(conversation)
+            return conversation
+
+    supervisor = AgentSupervisor(services, BaselineObservingFactory([]))
+
+    run = supervisor.start(services.conversation.id, "repair and validate")
+    supervisor.join(run.id, timeout=2)
+
+    assert observed["baseline_present"] is True
+    assert services.store.get_run_baseline(run.id).root == services.workspaces.get(
+        services.conversation.workspace_id
+    ).root
 
 
 def test_supervisor_runs_in_background_and_persists_final_answer(services) -> None:

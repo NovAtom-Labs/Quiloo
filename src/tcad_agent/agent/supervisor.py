@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol
 from uuid import UUID
@@ -12,6 +13,7 @@ from openhands.sdk.conversation import ConversationExecutionStatus
 from openhands.sdk.event import Event
 
 from tcad_agent.agent.events import AgentEventBridge, safe_event_text
+from tcad_agent.ide.changes import WorkspaceChangeTracker
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
 from tcad_agent.ide.models import (
@@ -19,6 +21,7 @@ from tcad_agent.ide.models import (
     ApprovalDecision,
     PermissionCategory,
     RunState,
+    WorkspaceBaseline,
 )
 from tcad_agent.ide.store import IDEStoreError, SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
@@ -72,6 +75,9 @@ class SupervisorServices(Protocol):
     @property
     def runtime_root(self) -> Path: ...
 
+    @property
+    def changes(self) -> WorkspaceChangeTracker: ...
+
 
 _ACTIVE_STATES = {
     RunState.QUEUED,
@@ -115,6 +121,24 @@ class AgentSupervisor:
             if persist_message:
                 self.services.conversations.add_user_message(conversation_id, prompt)
             run = self.services.store.create_run(conversation_id, conversation_id)
+            baseline_warning: str | None = None
+            try:
+                baseline = self.services.changes.capture(workspace.root)
+            except Exception as error:
+                baseline_warning = safe_event_text(error)
+                baseline = WorkspaceBaseline(
+                    root=workspace.root,
+                    captured_at=datetime.now(UTC),
+                    truncated=True,
+                    files={},
+                )
+            self.services.store.save_run_baseline(run.id, baseline)
+            if baseline_warning is not None:
+                self.services.events.append(
+                    conversation_id,
+                    "change_baseline_warning",
+                    {"run_id": str(run.id), "detail": baseline_warning},
+                )
             permission_grants = self._grants_for(run.id)
             bridge = AgentEventBridge(
                 conversation_id,
