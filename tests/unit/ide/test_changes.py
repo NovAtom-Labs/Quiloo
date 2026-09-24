@@ -1,7 +1,10 @@
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
+from uuid import UUID
 
-from tcad_agent.ide.changes import WorkspaceChangeTracker
+from tcad_agent.ide.changes import WorkspaceChangeTracker, attribute_changes
+from tcad_agent.ide.models import IDEEvent
 
 
 def _initialize_git_repo(root: Path) -> Path:
@@ -103,7 +106,11 @@ def test_change_tracker_never_captures_credential_like_paths(tmp_path: Path) -> 
     secret = "credential-content-must-not-persist"
     for relative in (
         ".env",
+        ".env.local",
+        ".env.production",
         ".netrc",
+        ".npmrc",
+        ".pypirc",
         ".gnupg/private.key",
         ".ssh/config",
         ".aws/credentials",
@@ -132,3 +139,51 @@ def test_truncated_comparison_does_not_invent_create_delete_or_rename(
 
     assert changes.baseline_truncated is True
     assert changes.files == ()
+
+
+def test_change_attribution_uses_explicit_successful_action_identity(
+    tmp_path: Path,
+) -> None:
+    target = tmp_path / "model.py"
+    target.write_text("before\n")
+    tracker = WorkspaceChangeTracker()
+    baseline = tracker.capture(tmp_path)
+    target.write_text("after\n")
+    change_set = tracker.compare(tmp_path, baseline)
+    conversation_id = UUID("00000000-0000-0000-0000-000000000001")
+    run_id = "00000000-0000-0000-0000-000000000002"
+    now = datetime.now(UTC)
+    events = (
+        IDEEvent(
+            id=1,
+            conversation_id=conversation_id,
+            kind="tool_call_started",
+            payload={
+                "run_id": run_id,
+                "action_id": "edit-1",
+                "tool_name": "file_editor",
+                "phase": "edit",
+                "arguments": {"command": "str_replace", "path": "model.py"},
+            },
+            created_at=now,
+        ),
+        IDEEvent(
+            id=2,
+            conversation_id=conversation_id,
+            kind="tool_call_completed",
+            payload={
+                "run_id": run_id,
+                "action_id": "edit-1",
+                "tool_name": "file_editor",
+                "is_error": False,
+                "output": "done",
+            },
+            created_at=now,
+        ),
+    )
+
+    attributed = attribute_changes(change_set, events)
+
+    assert attributed.files[0].attributed_action_ids == ("edit-1",)
+    assert attributed.files[0].attributed_tools == ("file_editor",)
+    assert attributed.files[0].validation_action_ids == ()

@@ -16,6 +16,8 @@ function toolStarted(id, actionId, toolName, summary, subagent = null, runId = "
     tool_name: toolName,
     summary,
     subagent,
+    phase: toolName === "terminal" ? "validate" : "inspect",
+    evidence_kind: toolName === "terminal" ? "validation" : null,
   });
 }
 
@@ -42,6 +44,8 @@ let snapshot = view.snapshot();
 assertEqual(snapshot.steps.length, 1, "start and completion form one step");
 assertEqual(snapshot.steps[0].status, "completed", "completion closes step");
 assertEqual(snapshot.steps[0].output, "2 passed", "tool evidence is retained");
+assertEqual(snapshot.steps[0].phase, "validate", "structured phase metadata is retained");
+assertEqual(snapshot.steps[0].evidenceKind, "validation", "structured evidence type is retained");
 assertEqual(snapshot.lastEventId, 12, "duplicate replay is ignored");
 assertEqual(snapshot.technicalEvents.length, 0, "conversation lifecycle noise is excluded from run state");
 

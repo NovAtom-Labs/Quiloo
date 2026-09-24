@@ -17,7 +17,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 
 from tcad_agent.agent.supervisor import AgentRunConflictError, AgentSupervisor
-from tcad_agent.ide.changes import WorkspaceChangeTracker
+from tcad_agent.ide.changes import WorkspaceChangeTracker, attribute_changes
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed, format_sse
 from tcad_agent.ide.models import (
@@ -344,9 +344,15 @@ def build_ide_router(
         conversation = services.conversations.get(run.conversation_id)
         workspace = services.workspaces.get(conversation.workspace_id)
         baseline = services.store.get_run_baseline(run_id)
-        return services.changes.compare(workspace.root, baseline).model_copy(
-            update={"run_id": run_id}
+        change_set = services.changes.compare(workspace.root, baseline).model_copy(
+            update={"run_id": run_id},
         )
+        run_events = tuple(
+            event
+            for event in services.events.iter_after(run.conversation_id, 0)
+            if event.payload.get("run_id") == str(run_id)
+        )
+        return attribute_changes(change_set, run_events, root=workspace.root)
 
     @router.post("/runs/{run_id}/pause")
     def pause_agent_run(run_id: UUID) -> AgentRunRecord:

@@ -80,6 +80,11 @@ class WorkspaceChange(StrictModel):
     diff: str | None = None
     diff_truncated: bool = False
     uncertain: bool = False
+    attributed_action_ids: tuple[str, ...] = ()
+    attributed_tools: tuple[str, ...] = ()
+    attributed_subagents: tuple[str, ...] = ()
+    validation_action_ids: tuple[str, ...] = ()
+    artifact: bool = False
 
 
 class WorkspaceChangeSet(StrictModel):

@@ -70,6 +70,28 @@
     };
   }
 
+  function createRunResourceCache() {
+    const resources = new Map();
+    let selectedRunId = null;
+    return {
+      select(runId) {
+        selectedRunId = runId ? String(runId) : null;
+        return this.current();
+      },
+      put(runId, value) {
+        if (runId) resources.set(String(runId), value);
+        return this.current();
+      },
+      current() {
+        return selectedRunId ? resources.get(selectedRunId) || null : null;
+      },
+      clear() {
+        resources.clear();
+        selectedRunId = null;
+      },
+    };
+  }
+
   function controlsForState(state) {
     const running = state === "queued" || state === "running";
     const waiting = state === "waiting_for_approval" || state === "waiting_for_user";
@@ -113,6 +135,7 @@
   globalThis.QuilooIDEState = {
     controlsForState,
     createRefreshCoordinator,
+    createRunResourceCache,
     createEventLedger,
     createNavigationGuard,
     createSubmissionTracker,

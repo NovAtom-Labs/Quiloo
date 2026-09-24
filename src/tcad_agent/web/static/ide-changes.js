@@ -29,6 +29,11 @@
       diff: change.diff || null,
       diffTruncated: Boolean(change.diff_truncated),
       canOpenFile: change.operation !== "deleted",
+      attributedActionIds: change.attributed_action_ids || [],
+      attributedTools: change.attributed_tools || [],
+      attributedSubagents: change.attributed_subagents || [],
+      validationActionIds: change.validation_action_ids || [],
+      artifact: Boolean(change.artifact),
     }));
   }
 

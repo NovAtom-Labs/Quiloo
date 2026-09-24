@@ -68,6 +68,17 @@ assertEqual(
   "terminal runs should not trigger active-run polling",
 );
 
+const runResources = globalThis.QuilooIDEState.createRunResourceCache();
+runResources.select("run-1");
+runResources.put("run-1", {files: [{path: "first.py"}]});
+assertEqual(runResources.current().files[0].path, "first.py", "selected run receives its own changes");
+runResources.select("run-2");
+assertEqual(runResources.current(), null, "new run never inherits the previous run changes");
+runResources.put("run-1", {files: [{path: "stale.py"}]});
+assertEqual(runResources.current(), null, "late response for another run cannot become current");
+runResources.put("run-2", {files: [{path: "second.py"}]});
+assertEqual(runResources.current().files[0].path, "second.py", "current run accepts its matching response");
+
 let refreshCalls = 0;
 let releaseRefresh;
 const refreshCoordinator = globalThis.QuilooIDEState.createRefreshCoordinator(

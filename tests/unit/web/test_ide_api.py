@@ -205,6 +205,28 @@ def test_run_changes_endpoint_compares_against_starting_workspace(
     assert started.status_code == 202
     run = started.json()
     supervisor.join(UUID(run["id"]), timeout=2)
+    events.append(
+        UUID(conversation["id"]),
+        "tool_call_started",
+        {
+            "run_id": run["id"],
+            "action_id": "edit-existing",
+            "tool_name": "file_editor",
+            "phase": "edit",
+            "arguments": {"command": "str_replace", "path": "existing.txt"},
+        },
+    )
+    events.append(
+        UUID(conversation["id"]),
+        "tool_call_completed",
+        {
+            "run_id": run["id"],
+            "action_id": "edit-existing",
+            "tool_name": "file_editor",
+            "is_error": False,
+            "output": "updated",
+        },
+    )
     existing.write_text("already dirty\nagent line\n")
 
     response = web.get(f"/api/runs/{run['id']}/changes")
@@ -216,6 +238,8 @@ def test_run_changes_endpoint_compares_against_starting_workspace(
         ("existing.txt", "modified")
     ]
     assert payload["files"][0]["additions"] == 1
+    assert payload["files"][0]["attributed_action_ids"] == ["edit-existing"]
+    assert payload["files"][0]["attributed_tools"] == ["file_editor"]
 
 
 def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:

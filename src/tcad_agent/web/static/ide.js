@@ -72,6 +72,7 @@ let activeChangeSet = null;
 const navigationGuard = window.QuilooIDEState.createNavigationGuard();
 const submissions = window.QuilooIDEState.createSubmissionTracker();
 const runPresentation = window.QuilooIDEEvents.createRunPresentation();
+const runChanges = window.QuilooIDEState.createRunResourceCache();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -147,7 +148,7 @@ function setViewerNotice(message = "") {
 
 function fileCanBeEdited(preview) {
   const editableKinds = new Set(["text", "markdown", "json", "csv", "tsv"]);
-  const protectedPath = /(^|\/)(\.env|\.git|\.ssh|\.aws|\.gnupg|\.netrc|credentials|id_rsa|id_ed25519|secrets)(\/|$)/i;
+  const protectedPath = /(^|\/)(\.env(?:\.[^/]+)?|\.git|\.git-credentials|\.ssh|\.aws|\.gnupg|\.netrc|\.npmrc|\.pypirc|\.dockerconfigjson|auth\.json|credentials|id_rsa|id_ed25519|secrets)(\/|$)/i;
   const protectedSuffix = /\.(key|pem)$/i;
   return editableKinds.has(preview.kind)
     && !preview.truncated
@@ -556,11 +557,17 @@ function renderRunIndicator() {
   const label = document.createElement("span");
   const copy = document.createElement("p");
   label.textContent = "AGENT";
+  const presentation = runPresentation.snapshot(activeRun?.id || selectedRunId);
+  const current = window.QuilooAgentView.activityRows(presentation)
+    .filter((row) => row.status === "running")
+    .at(-1);
   copy.textContent = activeRun.state === "waiting_for_approval"
     ? "Waiting for your approval"
     : activeRun.state === "paused"
       ? "Run paused"
-      : "Working in the repository";
+      : current
+        ? `${current.phase}: ${current.label}`
+        : "Run active. Waiting for the next recorded action.";
   indicator.append(label, copy);
   conversationMessages.append(indicator);
 }
@@ -610,7 +617,7 @@ async function requestConversationRefresh(conversationId = activeConversation?.i
 
 function setRun(run) {
   activeRun = run;
-  if (run?.id) selectedRunId = run.id;
+  if (run?.id) selectRun(run.id, {refresh: true});
   const state = run?.state || "idle";
   const controls = window.QuilooIDEState.controlsForState(state);
   runState.textContent = state.replaceAll("_", " ").toUpperCase();
@@ -659,6 +666,7 @@ function renderRunSummary(snapshot) {
     ["Commands", summary.commands?.join("\n")],
     ["Validation", summary.validationEvidence?.map((item) => `${item.label}${item.output ? `: ${item.output}` : ""}`).join("\n")],
     ["Artifacts", summary.artifacts?.join("\n")],
+    ["Provenance", summary.provenance?.join("\n")],
     ["Warnings", summary.warnings?.join("\n")],
     ["Next", summary.nextActions?.join("\n")],
   ].filter(([, value]) => value);
@@ -772,7 +780,9 @@ function renderAgentPresentation() {
 }
 
 function renderChanges(changeSet) {
-  activeChangeSet = changeSet;
+  const runId = changeSet?.run_id || selectedRunId;
+  runChanges.put(runId, changeSet);
+  activeChangeSet = runChanges.current();
   const rows = window.QuilooChanges.toRows(changeSet);
   const incomplete = window.QuilooChanges.isIncomplete(changeSet);
   clearNode(agentChanges);
@@ -802,7 +812,10 @@ function renderChanges(changeSet) {
     path.textContent = row.label;
     delta.textContent = row.delta;
     top.append(operation, path, delta);
-    detail.textContent = row.detail || (row.uncertain ? "Exact line changes are unavailable" : "Open run diff");
+    const attribution = row.attributedActionIds.length
+      ? `Action ${row.attributedActionIds.join(", ")}${row.attributedSubagents.length ? ` · ${row.attributedSubagents.join(", ")}` : ""}`
+      : null;
+    detail.textContent = row.detail || attribution || (row.uncertain ? "Exact line changes are unavailable" : "Attribution unavailable · Open run diff");
     button.append(top, detail);
     button.addEventListener("click", () => {
       if (row.diff || !row.canOpenFile) showDiff(row);
@@ -816,6 +829,7 @@ function renderChanges(changeSet) {
 async function refreshChanges(runId = selectedRunId) {
   if (!runId) {
     activeChangeSet = null;
+    runChanges.select(null);
     changesCount.textContent = "0";
     changesState.textContent = "NO RUN";
     clearNode(agentChanges);
@@ -835,6 +849,28 @@ async function refreshChanges(runId = selectedRunId) {
     clearNode(agentChanges);
     agentChanges.append(emptyCopy("Changes are unavailable for this historical run."));
   }
+}
+
+function selectRun(runId, {refresh = false} = {}) {
+  const normalized = runId ? String(runId) : null;
+  if (selectedRunId === normalized) return false;
+  selectedRunId = normalized;
+  activeChangeSet = runChanges.select(normalized);
+  if (activeChangeSet) {
+    renderChanges(activeChangeSet);
+  } else {
+    changesCount.textContent = "0";
+    changesState.textContent = normalized ? "CHECKING" : "NO RUN";
+    clearNode(agentChanges);
+    agentChanges.append(emptyCopy(
+      normalized
+        ? "Changes for this run are being checked."
+        : "Run changes will appear after the agent starts working.",
+    ));
+    renderRunSummary(runPresentation.snapshot(normalized));
+  }
+  if (refresh && normalized) void refreshChanges(normalized);
+  return true;
 }
 
 function approvalTarget(approval) {
@@ -956,8 +992,10 @@ function updateRunFromEvent(event) {
 function connectEvents(conversationId) {
   if (eventSource) eventSource.close();
   runPresentation.reset();
-  selectedRunId = activeRun?.id || null;
+  runChanges.clear();
+  selectedRunId = null;
   activeChangeSet = null;
+  selectRun(activeRun?.id || null);
   renderAgentPresentation();
   void refreshChanges(selectedRunId);
   streamState.textContent = "CONNECTING";
@@ -968,7 +1006,7 @@ function connectEvents(conversationId) {
     const event = JSON.parse(rawEvent.data);
     if (!runPresentation.accept(event)) return;
     const snapshot = runPresentation.snapshot();
-    if (snapshot.runId) selectedRunId = snapshot.runId;
+    if (snapshot.runId) selectRun(snapshot.runId, {refresh: true});
     renderAgentPresentation();
     updateRunFromEvent(event);
     if (event.kind === "message_created") void refreshMessages(conversationId);

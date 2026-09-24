@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import shlex
 from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
@@ -55,6 +56,78 @@ _CREDENTIAL_PATTERNS = (
     re.compile(r"\bAKIA[A-Z0-9]{16}\b"),
     re.compile(r"(?i)\b(bearer|token|api[_-]?key|secret)\s*[:=]\s*[^\s,;]+"),
 )
+
+
+def structured_action_metadata(event: ActionEvent) -> dict[str, JsonValue]:
+    """Return evidence fields derived from typed actions, never summary text."""
+
+    action = event.action
+    if isinstance(action, FileEditorAction):
+        return {
+            "phase": "inspect" if action.command == "view" else "edit",
+            "affected_paths": [str(action.path)],
+        }
+    if isinstance(action, TaskAction):
+        return {"phase": "delegate", "subagent": action.subagent_type}
+    if isinstance(action, TcadDomainAction):
+        phases = {
+            "validate_spec": "validate",
+            "compile_experiment": "edit",
+            "run_experiment": "execute",
+            "validate_result": "validate",
+            "search_knowledge": "inspect",
+            "build_report": "report",
+        }
+        metadata: dict[str, JsonValue] = {
+            "phase": phases.get(action.operation, "unknown")
+        }
+        if action.operation in {"validate_spec", "validate_result"}:
+            metadata["evidence_kind"] = "validation"
+        return metadata
+    if isinstance(action, TerminalAction):
+        try:
+            tokens = shlex.split(action.command)
+        except ValueError:
+            tokens = []
+        if len(tokens) >= 4 and tokens[0] == "cd" and tokens[2] == "&&":
+            tokens = tokens[3:]
+        if tokens and tokens[-1] == "2>&1":
+            tokens.pop()
+        executable = Path(tokens[0]).name if tokens else ""
+        inspection_commands = {
+            "cat",
+            "diff",
+            "find",
+            "grep",
+            "head",
+            "ls",
+            "pwd",
+            "rg",
+            "sed",
+            "tail",
+            "wc",
+        }
+        validation_commands = {"mypy", "pytest", "ruff"}
+        if executable == "git" and len(tokens) > 1 and tokens[1] in {
+            "diff",
+            "log",
+            "show",
+            "status",
+        }:
+            return {"phase": "inspect"}
+        if executable in inspection_commands:
+            return {"phase": "inspect"}
+        if executable in validation_commands:
+            return {"phase": "validate", "evidence_kind": "validation"}
+        if (
+            executable in {"python", "python3"}
+            and len(tokens) > 1
+            and Path(tokens[1]).name == "check.py"
+        ):
+            return {"phase": "validate", "evidence_kind": "validation"}
+        return {"phase": "execute"}
+    phases = {"task_tracker": "plan", "think": "plan", "finish": "report"}
+    return {"phase": phases.get(event.tool_name, "unknown")}
 
 
 def safe_event_text(value: object, secrets: tuple[str, ...] = ()) -> str:
@@ -150,6 +223,7 @@ class AgentEventBridge:
         category = permission_category(policy_workspace, event)
         payload: dict[str, JsonValue] = {
             **self._base(event),
+            **structured_action_metadata(event),
             "action_id": event.id,
             "risk": risk.value,
             "permission_category": category.value,

@@ -18,15 +18,17 @@
   }
 
   function phaseForStep(step) {
-    const text = `${step.toolName || ""} ${step.summary || step.label || ""} ${technicalCommand(step) || ""}`.toLowerCase();
-    if (/pytest|mypy|ruff|validate|validation|check|test\b/.test(text)) return "Validate";
-    if (/simulate|devsim|sentaurus|execute|run\b/.test(text)) return "Execute";
-    if (/file_editor/.test(text) && /create|str_replace|insert|edit|write/.test(text)) return "Edit";
-    if (/task_tracker|plan|todo/.test(text)) return "Plan";
-    if (/\btask\b|delegate|subagent/.test(text)) return "Delegate";
-    if (/finish|report|summar/.test(text)) return "Report";
-    if (/file_editor|view|read|inspect|search|find|grep|rg\b/.test(text)) return "Inspect";
-    return "Execute";
+    const labels = {
+      plan: "Plan",
+      inspect: "Inspect",
+      edit: "Edit",
+      delegate: "Delegate",
+      execute: "Execute",
+      validate: "Validate",
+      report: "Report",
+    };
+    if (Object.values(labels).includes(step.phase)) return step.phase;
+    return labels[step.phase] || "Unclassified";
   }
 
   function activityRows(snapshot) {
@@ -43,6 +45,10 @@
       path: step.arguments?.path || null,
       taskStatus: step.taskStatus || null,
       phase: phaseForStep(step),
+      evidenceKind: step.evidenceKind || null,
+      affectedPaths: step.affectedPaths || [],
+      artifactPaths: step.artifactPaths || [],
+      provenance: step.provenance || null,
     }));
   }
 
@@ -70,7 +76,7 @@
     };
     const changedPaths = (changeSet?.files || []).map((change) => change.path);
     const validationEvidence = successful
-      .filter((step) => step.phase === "Validate")
+      .filter((step) => step.evidenceKind === "validation")
       .map((step) => ({label: step.label, output: step.output || null}));
     const warnings = [];
     if (changeSet?.baseline_truncated) {
@@ -98,7 +104,8 @@
       phases: unique(steps.map((step) => step.phase)),
       commands: unique(steps.map((step) => step.command)),
       validationEvidence,
-      artifacts: changedPaths.filter((path) => /(^|\/)(artifacts?|results?|reports?)(\/|$)/i.test(path)),
+      artifacts: (changeSet?.files || []).filter((change) => change.artifact).map((change) => change.path),
+      provenance: unique(successful.map((step) => step.provenance).filter((item) => typeof item === "string")),
       warnings,
       nextActions,
     };

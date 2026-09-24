@@ -65,6 +65,11 @@
           arguments: payload.arguments || null,
           subagent: payload.subagent || null,
           taskStatus: null,
+          phase: payload.phase || "unknown",
+          evidenceKind: payload.evidence_kind || null,
+          affectedPaths: payload.affected_paths || [],
+          artifactPaths: payload.artifact_paths || [],
+          provenance: payload.provenance || null,
         };
         state.stepsByKey.set(key, step);
         state.steps.push(step);
@@ -94,6 +99,11 @@
           arguments: null,
           subagent: null,
           taskStatus: null,
+          phase: payload.phase || "unknown",
+          evidenceKind: payload.evidence_kind || null,
+          affectedPaths: payload.affected_paths || [],
+          artifactPaths: payload.artifact_paths || [],
+          provenance: payload.provenance || null,
         };
         state.stepsByKey.set(key, step);
         state.steps.push(step);

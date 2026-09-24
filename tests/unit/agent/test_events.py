@@ -9,7 +9,7 @@ from openhands.sdk.security import SecurityRisk
 from openhands.sdk.tool import Observation
 from openhands.tools.terminal.definition import TerminalAction
 
-from tcad_agent.agent.events import AgentEventBridge
+from tcad_agent.agent.events import AgentEventBridge, structured_action_metadata
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
 from tcad_agent.ide.store import SqliteIDEStore
@@ -83,6 +83,9 @@ def test_event_bridge_persists_normalized_tool_and_assistant_events(
         "tool_call_completed",
         "message_created",
     ]
+    started = activity[-3].payload
+    assert started["phase"] == "validate"
+    assert started["evidence_kind"] == "validation"
     assert conversations.messages(conversation.id)[-1].content == "Completed safely"
 
 
@@ -168,3 +171,18 @@ def test_bridge_accepts_uuid_identifiers(tmp_path: Path) -> None:
     )
 
     assert bridge.conversation_id == conversation.id
+
+
+def test_structured_phase_metadata_uses_typed_command_semantics() -> None:
+    validation = structured_action_metadata(
+        _terminal_action(
+            'cd "/workspace" && python scripts/check.py 2>&1',
+            risk=SecurityRisk.LOW,
+        )
+    )
+    inspection = structured_action_metadata(
+        _terminal_action("cat checks/input.txt", risk=SecurityRisk.LOW)
+    )
+
+    assert validation == {"phase": "validate", "evidence_kind": "validation"}
+    assert inspection == {"phase": "inspect"}

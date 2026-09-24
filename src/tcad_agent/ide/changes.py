@@ -12,6 +12,7 @@ from typing import ClassVar
 
 from tcad_agent.ide.models import (
     BaselineFile,
+    IDEEvent,
     WorkspaceBaseline,
     WorkspaceChange,
     WorkspaceChangeSet,
@@ -254,3 +255,86 @@ class WorkspaceChangeTracker:
             return completed.stdout.strip() if completed.returncode == 0 else None
 
         return run("rev-parse", "HEAD"), run("branch", "--show-current")
+
+
+def attribute_changes(
+    change_set: WorkspaceChangeSet,
+    events: tuple[IDEEvent, ...],
+    *,
+    root: Path | None = None,
+) -> WorkspaceChangeSet:
+    """Attach only explicit, successful action identities to changed paths."""
+
+    starts: dict[str, IDEEvent] = {}
+    successful: set[str] = set()
+    for event in events:
+        action_id = event.payload.get("action_id")
+        if not isinstance(action_id, str):
+            continue
+        if event.kind == "tool_call_started":
+            starts[action_id] = event
+        elif event.kind == "tool_call_completed" and not event.payload.get("is_error"):
+            successful.add(action_id)
+
+    def relative_path(value: object) -> str | None:
+        if not isinstance(value, str) or not value:
+            return None
+        candidate = Path(value)
+        if candidate.is_absolute():
+            if root is None:
+                return None
+            try:
+                candidate = candidate.resolve(strict=False).relative_to(root.resolve())
+            except ValueError:
+                return None
+        return candidate.as_posix().removeprefix("./")
+
+    mutations: dict[str, list[tuple[str, str, str | None]]] = {}
+    validation_targets: dict[str, list[str]] = {}
+    artifact_paths: set[str] = set()
+    for action_id, event in starts.items():
+        if action_id not in successful:
+            continue
+        payload = event.payload
+        arguments = payload.get("arguments")
+        arguments = arguments if isinstance(arguments, dict) else {}
+        tool_name = payload.get("tool_name")
+        tool_name = tool_name if isinstance(tool_name, str) else "tool"
+        subagent = payload.get("subagent")
+        subagent = subagent if isinstance(subagent, str) else None
+        command = arguments.get("command")
+        path = relative_path(arguments.get("path"))
+        if tool_name == "file_editor" and command != "view" and path:
+            mutations.setdefault(path, []).append((action_id, tool_name, subagent))
+        targets = payload.get("validation_targets")
+        if payload.get("evidence_kind") == "validation" and isinstance(targets, list):
+            for target in targets:
+                if normalized := relative_path(target):
+                    validation_targets.setdefault(normalized, []).append(action_id)
+        artifacts = payload.get("artifact_paths")
+        if isinstance(artifacts, list):
+            artifact_paths.update(
+                normalized
+                for item in artifacts
+                if (normalized := relative_path(item)) is not None
+            )
+
+    attributed: list[WorkspaceChange] = []
+    for change in change_set.files:
+        actions = mutations.get(change.path, [])
+        attributed.append(
+            change.model_copy(
+                update={
+                    "attributed_action_ids": tuple(item[0] for item in actions),
+                    "attributed_tools": tuple(dict.fromkeys(item[1] for item in actions)),
+                    "attributed_subagents": tuple(
+                        dict.fromkeys(item[2] for item in actions if item[2])
+                    ),
+                    "validation_action_ids": tuple(
+                        validation_targets.get(change.path, [])
+                    ),
+                    "artifact": change.path in artifact_paths,
+                }
+            )
+        )
+    return change_set.model_copy(update={"files": tuple(attributed)})

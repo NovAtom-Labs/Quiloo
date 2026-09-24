@@ -17,6 +17,8 @@ const rows = agent.activityRows({
     arguments: {command: "pytest tests/test_science.py -q"},
     subagent: "science-checker",
     isError: false,
+    phase: "validate",
+    evidenceKind: "validation",
   }],
   technicalEvents: [{kind: "conversation_created"}],
 });
@@ -38,6 +40,21 @@ assertEqual(completed.changedPaths.join(","), "src/physics.py,report.md", "compl
 assertEqual(completed.validationEvidence.length, 1, "successful validation action becomes evidence");
 assertEqual(completed.commands[0], "pytest tests/test_science.py -q", "completion retains executed commands");
 assertEqual(completed.nextActions.length, 1, "completed runs provide a grounded next action");
+
+const honest = agent.activityRows({steps: [{
+  id: "action-2",
+  toolName: "file_editor",
+  summary: "Read checks/input.txt",
+  status: "completed",
+  arguments: {command: "view", path: "checks/input.txt"},
+  phase: "inspect",
+}]});
+assertEqual(honest[0].phase, "Inspect", "phase comes from structured backend metadata, not path keywords");
+const noInferredArtifact = agent.outcomeSummary(
+  {runState: "completed", steps: honest},
+  {files: [{path: "reports/notes.txt", artifact: false}]},
+);
+assertEqual(noInferredArtifact.artifacts.length, 0, "artifact status is never inferred from a folder name");
 
 const failed = agent.outcomeSummary(
   {
