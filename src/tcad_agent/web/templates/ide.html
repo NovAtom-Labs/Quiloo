@@ -6,26 +6,21 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260924-7">
+    <link rel="stylesheet" href="/static/ide.css?v=20260925-1">
   </head>
   <body>
     <div class="ide-shell">
       <header class="ide-header">
         <a class="brand" href="/" aria-label="Quiloo workspace home">
-          <svg class="brand-mark" viewBox="0 0 42 42" aria-hidden="true">
-            <circle cx="21" cy="21" r="4.5"></circle>
-            <circle cx="8" cy="13" r="3"></circle>
-            <circle cx="34" cy="12" r="3"></circle>
-            <circle cx="31" cy="33" r="3"></circle>
-            <path d="M10.5 14.5 17 19M25 19l6.5-5M23.5 25l5.5 6M9.5 15.5l8 16M33 14l-11 17"></path>
-          </svg>
-          <span><strong>Quiloo</strong><small>Research workspace</small></span>
+          <img class="brand-wordmark" src="/static/novatom-logo-horizontal-white.svg" alt="NovAtom Labs">
+          <span class="product-name"><strong>Quiloo</strong><small>Research workspace</small></span>
         </a>
         <div id="workspace-status" class="workspace-status" aria-live="polite">
           No workspace open
         </div>
         <div class="header-actions">
           <span class="runtime-state">Local runtime</span>
+          <button id="toggle-explorer-panel" class="toggle-explorer-panel" type="button" aria-controls="workspace-browser" aria-expanded="false">Repository</button>
           <button id="toggle-agent-panel" class="toggle-agent-panel" type="button" aria-controls="agent-panel" aria-expanded="false">Agent</button>
         </div>
       </header>
@@ -33,7 +28,7 @@
       <aside id="workspace-browser" class="workspace-browser" aria-label="Repository">
         <div class="panel-title">
           <span>REPOSITORY</span>
-          <span id="git-state">NOT OPEN</span>
+          <span class="panel-title-actions"><span id="git-state">NOT OPEN</span><button id="close-workspace-browser" type="button" aria-label="Close repository drawer">Close</button></span>
         </div>
         <form id="workspace-form" class="workspace-form">
           <label for="workspace-path">Repository folder</label>
@@ -48,6 +43,8 @@
           <p class="empty-copy">Open a local repository to inspect its files.</p>
         </div>
       </aside>
+
+      <div id="explorer-resizer" class="pane-resizer explorer-resizer" role="separator" aria-label="Resize repository explorer" aria-orientation="vertical" aria-valuemin="196" aria-valuemax="360" aria-valuenow="218" tabindex="0"></div>
 
       <main id="workspace-main" class="workspace-main">
         <nav id="workspace-tabs" class="workspace-tabs" aria-label="Workspace views">
@@ -96,7 +93,14 @@
         </section>
       </main>
 
+      <div id="agent-resizer" class="pane-resizer agent-resizer" role="separator" aria-label="Resize agent pane" aria-orientation="vertical" aria-valuemin="320" aria-valuemax="520" aria-valuenow="356" tabindex="0"></div>
+
       <aside id="agent-panel" class="agent-panel" aria-label="Agent conversation">
+        <nav id="agent-tabs" class="agent-tabs" aria-label="Agent views">
+          <button class="is-active" type="button" data-agent-view="chat" aria-selected="true">Chat</button>
+          <button type="button" data-agent-view="activity" aria-selected="false">Activity</button>
+          <button type="button" data-agent-view="changes" aria-selected="false">Changes <span id="changes-count">0</span></button>
+        </nav>
         <div class="agent-heading">
           <div><span>SESSION · <b id="run-state">IDLE</b></span><strong id="conversation-title">No conversation</strong></div>
           <div class="agent-heading-actions">
@@ -144,6 +148,9 @@
     </dialog>
     <script src="/static/ide-state.js?v=20260924-4" defer></script>
     <script src="/static/file-viewer.js?v=20260924-1" defer></script>
-    <script src="/static/ide.js?v=20260924-6" defer></script>
+    <script src="/static/ide-markdown.js?v=20260925-1" defer></script>
+    <script src="/static/ide-events.js?v=20260925-1" defer></script>
+    <script src="/static/ide-layout.js?v=20260925-1" defer></script>
+    <script src="/static/ide.js?v=20260925-1" defer></script>
   </body>
 </html>
