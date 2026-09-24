@@ -190,6 +190,9 @@ def test_structured_phase_metadata_uses_typed_command_semantics() -> None:
             f"{shlex.quote(sys.executable)} -m pytest -q", risk=SecurityRisk.LOW
         )
     )
+    formatting = structured_action_metadata(
+        _terminal_action("ruff format src", risk=SecurityRisk.LOW)
+    )
 
     assert validation == {
         "phase": "validate",
@@ -198,6 +201,7 @@ def test_structured_phase_metadata_uses_typed_command_semantics() -> None:
     }
     assert inspection == {"phase": "inspect"}
     assert module_validation == validation
+    assert formatting == {"phase": "execute"}
 
 
 def test_successful_action_observation_records_action_scoped_changed_paths(
@@ -231,3 +235,45 @@ def test_successful_action_observation_records_action_scoped_changed_paths(
     completed = events.list_after(conversation.id, 0)[-1]
     assert completed.kind == "tool_call_completed"
     assert completed.payload["affected_paths"] == ["generated.txt"]
+
+
+def test_overlapping_mutating_actions_do_not_claim_each_others_files(
+    tmp_path: Path,
+) -> None:
+    store, events, conversations, conversation, run = _services(tmp_path)
+    workspace = tmp_path / "repository"
+    workspace.mkdir()
+    bridge = AgentEventBridge(
+        conversation.id,
+        run.id,
+        store,
+        events,
+        conversations,
+        workspace=workspace,
+    )
+    first = _terminal_action("python first.py", risk=SecurityRisk.LOW)
+    second = _terminal_action("python second.py", risk=SecurityRisk.LOW).model_copy(
+        update={"tool_call_id": "call-2"}
+    )
+
+    bridge(first)
+    bridge(second)
+    (workspace / "shared.txt").write_text("changed\n")
+    for action in (first, second):
+        bridge(
+            ObservationEvent(
+                tool_name="terminal",
+                tool_call_id=action.tool_call_id,
+                action_id=action.id,
+                observation=_TestObservation.from_text("done"),
+            )
+        )
+
+    completed = [
+        event
+        for event in events.list_after(conversation.id, 0)
+        if event.kind == "tool_call_completed"
+    ]
+    assert len(completed) == 2
+    assert all(event.payload["attribution_uncertain"] is True for event in completed)
+    assert all("affected_paths" not in event.payload for event in completed)

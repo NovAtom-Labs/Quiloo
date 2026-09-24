@@ -720,6 +720,7 @@ function renderActivity(snapshot) {
     const metadata = document.createElement("span");
     const technical = document.createElement("div");
     details.className = `execution-step is-${row.status}`;
+    details.setAttribute("data-action-id", row.id);
     status.className = "execution-status";
     status.textContent = row.status === "running" ? "●" : row.status === "failed" ? "×" : "✓";
     label.textContent = row.label;
@@ -800,6 +801,7 @@ function renderChanges(changeSet) {
     return;
   }
   rows.forEach((row) => {
+    const item = document.createElement("article");
     const button = document.createElement("button");
     const top = document.createElement("span");
     const operation = document.createElement("b");
@@ -807,6 +809,7 @@ function renderChanges(changeSet) {
     const delta = document.createElement("code");
     const detail = document.createElement("small");
     button.type = "button";
+    item.className = "change-item";
     button.className = `change-row is-${row.operation}`;
     operation.textContent = row.operationLabel;
     path.textContent = row.label;
@@ -821,7 +824,26 @@ function renderChanges(changeSet) {
       if (row.diff || !row.canOpenFile) showDiff(row);
       else void openFile({path: row.label});
     });
-    agentChanges.append(button);
+    item.append(button);
+    if (row.validationActionIds.length) {
+      const validation = document.createElement("button");
+      const actionId = row.validationActionIds.at(-1);
+      validation.type = "button";
+      validation.className = "change-validation-link";
+      validation.textContent = row.validationActionIds.length === 1
+        ? "View validation evidence"
+        : `View ${row.validationActionIds.length} validation checks`;
+      validation.addEventListener("click", () => {
+        activateAgentView("activity");
+        const target = Array.from(agentActivity.querySelectorAll("[data-action-id]"))
+          .find((candidate) => candidate.dataset.actionId === actionId);
+        if (!target) return;
+        target.open = true;
+        target.scrollIntoView({block: "center"});
+      });
+      item.append(validation);
+    }
+    agentChanges.append(item);
   });
   renderRunSummary(runPresentation.snapshot(selectedRunId));
 }

@@ -292,8 +292,7 @@ def attribute_changes(
         return candidate.as_posix().removeprefix("./")
 
     mutations: dict[str, list[tuple[str, str, str | None]]] = {}
-    validation_targets: dict[str, list[str]] = {}
-    workspace_validations: list[str] = []
+    validations: dict[str, list[tuple[str, str]]] = {}
     artifact_paths: set[str] = set()
     for action_id, event in starts.items():
         if action_id not in successful:
@@ -318,18 +317,15 @@ def attribute_changes(
                     mutations.setdefault(normalized, []).append(
                         (action_id, tool_name, subagent)
                     )
-        targets = outcome.get("validation_targets") or payload.get(
-            "validation_targets"
-        )
-        if payload.get("evidence_kind") == "validation" and isinstance(targets, list):
-            for target in targets:
-                if normalized := relative_path(target):
-                    validation_targets.setdefault(normalized, []).append(action_id)
-        if (
-            payload.get("evidence_kind") == "validation"
-            and payload.get("validation_scope") == "workspace"
+        validated_files = outcome.get("validated_files")
+        if payload.get("evidence_kind") == "validation" and isinstance(
+            validated_files, dict
         ):
-            workspace_validations.append(action_id)
+            for target, digest in validated_files.items():
+                if (normalized := relative_path(target)) and isinstance(digest, str):
+                    validations.setdefault(normalized, []).append(
+                        (action_id, digest)
+                    )
         artifacts = outcome.get("artifact_paths") or payload.get("artifact_paths")
         if isinstance(artifacts, list):
             artifact_paths.update(
@@ -351,10 +347,10 @@ def attribute_changes(
                     ),
                     "validation_action_ids": tuple(
                         dict.fromkeys(
-                            [
-                                *validation_targets.get(change.path, []),
-                                *workspace_validations,
-                            ]
+                            action_id
+                            for action_id, digest in validations.get(change.path, [])
+                            if change.after_sha256 is not None
+                            and digest == change.after_sha256
                         )
                     ),
                     "artifact": change.path in artifact_paths,

@@ -108,7 +108,7 @@ def structured_action_metadata(event: ActionEvent) -> dict[str, JsonValue]:
             "tail",
             "wc",
         }
-        validation_commands = {"mypy", "pytest", "ruff"}
+        validation_commands = {"mypy", "pytest"}
         if executable == "git" and len(tokens) > 1 and tokens[1] in {
             "diff",
             "log",
@@ -119,6 +119,12 @@ def structured_action_metadata(event: ActionEvent) -> dict[str, JsonValue]:
         if executable in inspection_commands:
             return {"phase": "inspect"}
         if executable in validation_commands:
+            return {
+                "phase": "validate",
+                "evidence_kind": "validation",
+                "validation_scope": "workspace",
+            }
+        if executable == "ruff" and tokens[1:2] == ["check"]:
             return {
                 "phase": "validate",
                 "evidence_kind": "validation",
@@ -193,6 +199,8 @@ class AgentEventBridge:
         )
         self._approval_actions: set[str] = set()
         self._action_baselines: dict[str, WorkspaceBaseline] = {}
+        self._action_metadata: dict[str, dict[str, JsonValue]] = {}
+        self._ambiguous_actions: set[str] = set()
         self._change_tracker = WorkspaceChangeTracker()
 
     def __call__(self, event: Event) -> None:
@@ -240,6 +248,7 @@ class AgentEventBridge:
         )
         category = permission_category(policy_workspace, event)
         metadata = structured_action_metadata(event)
+        self._action_metadata[event.id] = metadata
         payload: dict[str, JsonValue] = {
             **self._base(event),
             **metadata,
@@ -259,6 +268,9 @@ class AgentEventBridge:
             "delegate",
         }:
             try:
+                if self._action_baselines:
+                    self._ambiguous_actions.update(self._action_baselines)
+                    self._ambiguous_actions.add(event.id)
                 self._action_baselines[event.id] = self._change_tracker.capture(
                     self.workspace
                 )
@@ -295,6 +307,7 @@ class AgentEventBridge:
             )
 
     def _observation(self, event: ObservationEvent) -> None:
+        metadata = self._action_metadata.pop(event.action_id, {})
         payload: dict[str, JsonValue] = {
             **self._base(event),
             "action_id": event.action_id,
@@ -312,7 +325,10 @@ class AgentEventBridge:
                 }
             )
         baseline = self._action_baselines.pop(event.action_id, None)
-        if baseline is not None and self.workspace is not None:
+        if event.action_id in self._ambiguous_actions:
+            payload["attribution_uncertain"] = True
+            self._ambiguous_actions.discard(event.action_id)
+        elif baseline is not None and self.workspace is not None:
             try:
                 action_changes = self._change_tracker.compare(self.workspace, baseline)
             except (OSError, ValueError):
@@ -321,6 +337,26 @@ class AgentEventBridge:
                 payload["affected_paths"] = [
                     change.path for change in action_changes.files
                 ]
+        if (
+            not event.observation.is_error
+            and metadata.get("evidence_kind") == "validation"
+            and self.workspace is not None
+        ):
+            try:
+                run_baseline = self.store.get_run_baseline(self.run_id)
+                validated_changes = self._change_tracker.compare(
+                    self.workspace, run_baseline
+                )
+            except (OSError, RuntimeError, ValueError):
+                payload["validation_incomplete"] = True
+            else:
+                if validated_changes.baseline_truncated:
+                    payload["validation_incomplete"] = True
+                payload["validated_files"] = {
+                    change.path: change.after_sha256
+                    for change in validated_changes.files
+                    if change.after_sha256 is not None and not change.uncertain
+                }
         self.events.append(
             self.conversation_id,
             "tool_call_completed",

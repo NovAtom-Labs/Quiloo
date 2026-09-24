@@ -173,6 +173,8 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         "technicalArguments",
         "Reversibility:",
         "Run active. Waiting for the next recorded action.",
+        "change-validation-link",
+        "data-action-id",
     ):
         assert required in source or required in permission_source
 

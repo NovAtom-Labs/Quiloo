@@ -7,7 +7,7 @@ function assertEqual(actual, expected, message) {
 const changes = globalThis.QuilooChanges;
 const rows = changes.toRows({
   files: [
-    {path: "src/physics.py", operation: "modified", additions: 8, deletions: 3, uncertain: false, diff: "@@"},
+    {path: "src/physics.py", operation: "modified", additions: 8, deletions: 3, uncertain: false, diff: "@@", validation_action_ids: ["validate-1"]},
     {path: "results/new.csv", operation: "created", additions: 12, deletions: 0, uncertain: false, diff: "@@"},
     {path: "old.log", operation: "deleted", additions: 0, deletions: 4, uncertain: false, diff: "@@"},
     {path: "docs/final.md", previous_path: "docs/draft.md", operation: "renamed", additions: null, deletions: null, uncertain: false, diff: null},
@@ -17,6 +17,7 @@ const rows = changes.toRows({
 assertEqual(rows[0].label, "src/physics.py", "path is the primary label");
 assertEqual(rows[0].delta, "+8 −3", "text line delta is compact");
 assertEqual(rows[0].uncertain, false, "exact comparison stays exact");
+assertEqual(rows[0].validationActionIds[0], "validate-1", "validation evidence remains navigable");
 assertEqual(rows[1].operationLabel, "Created", "created file is named clearly");
 assertEqual(rows[2].operationLabel, "Deleted", "deleted file is named clearly");
 assertEqual(rows[3].detail, "Renamed from docs/draft.md", "rename keeps the previous path");

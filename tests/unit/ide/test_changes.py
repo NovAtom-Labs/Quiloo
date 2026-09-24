@@ -205,6 +205,9 @@ def test_change_attribution_uses_explicit_successful_action_identity(
                 "tool_name": "terminal",
                 "is_error": False,
                 "output": "1 passed",
+                "validated_files": {
+                    "model.py": change_set.files[0].after_sha256,
+                },
             },
             created_at=now,
         ),
@@ -215,3 +218,17 @@ def test_change_attribution_uses_explicit_successful_action_identity(
     assert attributed.files[0].attributed_action_ids == ("edit-1",)
     assert attributed.files[0].attributed_tools == ("file_editor",)
     assert attributed.files[0].validation_action_ids == ("validate-1",)
+
+    stale_validation_events = list(events)
+    stale_validation_events[-1] = IDEEvent(
+        id=4,
+        conversation_id=conversation_id,
+        kind="tool_call_completed",
+        payload={
+            **events[-1].payload,
+            "validated_files": {"model.py": "f" * 64},
+        },
+        created_at=now,
+    )
+    stale = attribute_changes(change_set, tuple(stale_validation_events))
+    assert stale.files[0].validation_action_ids == ()
