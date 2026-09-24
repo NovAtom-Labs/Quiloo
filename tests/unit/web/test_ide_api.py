@@ -197,6 +197,168 @@ def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:
     assert sent.json()["role"] == "user"
 
 
+def test_workspace_file_preview_classifies_and_formats_supported_text(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "notes.md").write_text("# Junction\n\nBuilt-in potential.\n")
+    (root / "result.json").write_text('{"voltage":0.71,"converged":true}')
+    (root / "sweep.csv").write_text("bias,current\n0,0\n1,2e-6\n")
+    web = ide_client(tmp_path)
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+
+    markdown = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "notes.md"},
+    )
+    structured = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "result.json"},
+    )
+    table = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "sweep.csv"},
+    )
+
+    assert markdown.status_code == 200
+    assert markdown.json() == {
+        "path": "notes.md",
+        "name": "notes.md",
+        "kind": "markdown",
+        "mime_type": "text/markdown",
+        "size": 32,
+        "truncated": False,
+        "content": "# Junction\n\nBuilt-in potential.\n",
+    }
+    assert structured.json()["kind"] == "json"
+    assert structured.json()["content"] == (
+        '{\n  "voltage": 0.71,\n  "converged": true\n}'
+    )
+    assert table.json()["kind"] == "csv"
+    assert table.json()["content"] == "bias,current\n0,0\n1,2e-6\n"
+
+
+def test_workspace_file_preview_recognizes_extensionless_utf8_text(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "Makefile").write_text("validate:\n\tpython scripts/check.py\n")
+    web = ide_client(tmp_path)
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+
+    response = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "Makefile"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["kind"] == "text"
+    assert response.json()["mime_type"] == "text/plain"
+    assert response.json()["content"] == "validate:\n\tpython scripts/check.py\n"
+
+
+def test_workspace_file_preview_truncates_large_text_without_loading_it_all(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "large.log").write_text("x" * (1024 * 1024 + 100))
+    web = ide_client(tmp_path)
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+
+    response = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "large.log"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["kind"] == "text"
+    assert response.json()["truncated"] is True
+    assert len(response.json()["content"].encode()) <= 1024 * 1024
+
+
+def test_workspace_binary_preview_exposes_metadata_and_safe_raw_delivery(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    png = b"\x89PNG\r\n\x1a\n" + b"payload"
+    (root / "field.png").write_bytes(png)
+    (root / "report.pdf").write_bytes(b"%PDF-1.7\npreview")
+    (root / "mesh.bin").write_bytes(b"\x00\x01\x02")
+    web = ide_client(tmp_path)
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+
+    image = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "field.png"},
+    )
+    pdf = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "report.pdf"},
+    )
+    binary = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "mesh.bin"},
+    )
+    displayed = web.get(
+        f"/api/workspaces/{workspace['id']}/files/raw",
+        params={"path": "field.png"},
+    )
+    blocked_inline = web.get(
+        f"/api/workspaces/{workspace['id']}/files/raw",
+        params={"path": "mesh.bin"},
+    )
+    downloaded = web.get(
+        f"/api/workspaces/{workspace['id']}/files/raw",
+        params={"path": "mesh.bin", "download": "true"},
+    )
+
+    assert image.json()["kind"] == "image"
+    assert image.json()["content"] is None
+    assert pdf.json()["kind"] == "pdf"
+    assert binary.json()["kind"] == "binary"
+    assert displayed.status_code == 200
+    assert displayed.content == png
+    assert displayed.headers["content-type"] == "image/png"
+    assert displayed.headers["content-disposition"].startswith("inline;")
+    assert displayed.headers["x-content-type-options"] == "nosniff"
+    assert displayed.headers["content-security-policy"] == "sandbox"
+    assert blocked_inline.status_code == 415
+    assert downloaded.status_code == 200
+    assert downloaded.headers["content-disposition"].startswith("attachment;")
+
+
+def test_workspace_file_preview_rejects_directories_and_workspace_escape(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / "folder").mkdir()
+    (tmp_path / "outside.txt").write_text("secret")
+    web = ide_client(tmp_path)
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+
+    directory = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "folder"},
+    )
+    escaped = web.get(
+        f"/api/workspaces/{workspace['id']}/files/preview",
+        params={"path": "../outside.txt"},
+    )
+
+    assert directory.status_code == 400
+    assert escaped.status_code == 400
+    assert escaped.json() == {
+        "code": "invalid_workspace_path",
+        "message": "The workspace path is unavailable or invalid.",
+    }
+    assert "secret" not in escaped.text
+
+
 def test_local_directory_picker_returns_selected_directory(
     tmp_path: Path, monkeypatch
 ) -> None:

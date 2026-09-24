@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260924-5">
+    <link rel="stylesheet" href="/static/ide.css?v=20260924-6">
   </head>
   <body>
     <div class="ide-shell">
@@ -64,6 +64,31 @@
             <div><dt>Simulation</dt><dd>DEVSIM ready</dd></div>
           </dl>
         </section>
+        <section id="file-viewer" class="file-viewer hidden" aria-label="File viewer">
+          <header class="file-viewer-header">
+            <div class="file-identity">
+              <span id="file-viewer-kind" class="section-label">File</span>
+              <h1 id="file-viewer-title">File viewer</h1>
+              <p id="file-viewer-path"></p>
+            </div>
+            <div class="file-viewer-actions">
+              <div id="file-viewer-modes" class="file-viewer-modes" hidden>
+                <button id="file-viewer-preview" class="is-active" type="button">Preview</button>
+                <button id="file-viewer-source" type="button">Source</button>
+              </div>
+              <button id="file-viewer-refresh" type="button">Refresh</button>
+              <a id="file-viewer-download" href="#" download>Download</a>
+              <button id="file-viewer-close" type="button" aria-label="Close file">Close</button>
+            </div>
+          </header>
+          <div class="file-viewer-meta">
+            <span id="file-viewer-type">Unknown type</span>
+            <span id="file-viewer-size">0 B</span>
+            <span id="file-viewer-state">Read only</span>
+          </div>
+          <p id="file-viewer-notice" class="file-viewer-notice hidden"></p>
+          <div id="file-viewer-body" class="file-viewer-body"></div>
+        </section>
       </main>
 
       <aside id="agent-panel" class="agent-panel" aria-label="Agent conversation">
@@ -109,6 +134,7 @@
       </form>
     </dialog>
     <script src="/static/ide-state.js?v=20260924-3" defer></script>
-    <script src="/static/ide.js?v=20260924-4" defer></script>
+    <script src="/static/file-viewer.js?v=20260924-1" defer></script>
+    <script src="/static/ide.js?v=20260924-5" defer></script>
   </body>
 </html>

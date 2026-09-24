@@ -3,7 +3,7 @@
 from pathlib import Path
 from uuid import UUID
 
-from tcad_agent.ide.models import WorkspaceEntry, WorkspaceRecord
+from tcad_agent.ide.models import WorkspaceEntry, WorkspaceFilePreview, WorkspaceRecord
 from tcad_agent.ide.repository import RepositoryInspector
 from tcad_agent.ide.store import SqliteIDEStore
 
@@ -31,3 +31,13 @@ class WorkspaceManager:
     ) -> tuple[WorkspaceEntry, ...]:
         workspace = self.get(workspace_id)
         return self.inspector.entries(workspace.root, relative)
+
+    def preview_file(
+        self, workspace_id: UUID, relative: str
+    ) -> WorkspaceFilePreview:
+        workspace = self.get(workspace_id)
+        return self.inspector.preview_file(workspace.root, relative)
+
+    def file_path(self, workspace_id: UUID, relative: str) -> Path:
+        workspace = self.get(workspace_id)
+        return self.inspector.file_path(workspace.root, relative)

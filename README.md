@@ -57,11 +57,12 @@ conversation, and return to the same conversation URL after a browser or service
 ### Repository agent workflow
 
 1. Open a repository with the native folder picker or enter its absolute path.
-2. Create a conversation and describe the intended repository task.
-3. Quiloo reads and edits files, searches the repository, runs tests or validation commands, uses typed TCAD operations, and may delegate bounded work to a specialist subagent.
-4. Live activity shows tool names, canonical paths, commands, outcomes, validation evidence, and delegated task results. Internal chain-of-thought is never shown or stored.
-5. Repository-local reads, edits, tests, builds, and validation run without interruption. Access outside the selected repository, package installation, network activity, destructive commands, Git mutation, and remote mutation stop at an approval card.
-6. The researcher can approve once, deny, pause, resume, stop, refresh, or return later. Conversations, messages, run state, approvals, and normalized events are persisted locally.
+2. Select a file to inspect source, Markdown, JSON, CSV/TSV data, raster images, PDFs, or binary metadata in the central workspace.
+3. Create a conversation and describe the intended repository task.
+4. Quiloo reads and edits files, searches the repository, runs tests or validation commands, uses typed TCAD operations, and may delegate bounded work to a specialist subagent.
+5. Live activity shows tool names, canonical paths, commands, outcomes, validation evidence, and delegated task results. Internal chain-of-thought is never shown or stored.
+6. Repository-local reads, edits, tests, builds, and validation run without interruption. Access outside the selected repository, package installation, network activity, destructive commands, Git mutation, and remote mutation stop at an approval card.
+7. The researcher can approve once, deny, pause, resume, stop, refresh, or return later. Conversations, messages, run state, approvals, and normalized events are persisted locally.
 
 The selected repository is the default authority boundary. A parent agent and every delegated subagent use the same canonical workspace and policy. A subagent cannot widen access, and a high-risk child action is denied until the parent workflow obtains an allowed decision.
 
@@ -98,7 +99,7 @@ Each stage has a persistent URL. Refreshing or revisiting a clarification, revie
 
 | Area | Current capability |
 | --- | --- |
-| Repository IDE | Three-panel local workspace with canonical repository paths, Git state, directory inspection, persistent conversations, activity streaming, and stable URLs |
+| Repository IDE | Three-panel local workspace with canonical repository paths, Git state, directory inspection, safe in-workspace file previews, persistent conversations, activity streaming, and stable URLs |
 | Guided research interface | Four sequential local pages for request, clarification, plan approval, and interactive results at `/simulate` |
 | Portable specification | Strict one-dimensional `ExperimentSpec` with dimensional quantities and rejection of unknown fields |
 | Structures | Composable ordered silicon regions, without named-device execution branches |
@@ -157,6 +158,12 @@ Completed simulations open inside the application rather than forcing researcher
 - searchable numerical samples for the selected field
 - every deterministic validation check and its status
 - collapsible evidence downloads for audit and external analysis
+
+### Repository file viewer
+
+Selecting a repository file opens a read-only viewer in the central workspace. Text and code use a line-numbered source view. Markdown is rendered through a restricted DOM renderer with a source toggle, JSON has a collapsible tree, and CSV or TSV data opens as a bounded scrollable table. PNG, JPEG, WebP, and GIF files support zoom and dimension inspection, while PDFs use the browser viewer. Unknown binary formats show metadata and a download action.
+
+Preview paths are resolved against the canonical repository root. Traversal and escaping symlinks are rejected, executable HTML is never rendered, unknown binaries cannot be served inline, responses disable MIME sniffing, and text previews are capped at 1 MiB. Large tables and unusually long source files are bounded again in the browser to keep the local application responsive.
 
 ## Deliberate pilot limits
 

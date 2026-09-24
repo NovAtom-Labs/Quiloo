@@ -28,12 +28,29 @@ const messageInput = document.querySelector("#message-input");
 const sendMessage = document.querySelector("#send-message");
 const errorNotice = document.querySelector("#ide-error");
 const workspaceWelcome = document.querySelector("#workspace-welcome");
+const fileViewer = document.querySelector("#file-viewer");
+const fileViewerKind = document.querySelector("#file-viewer-kind");
+const fileViewerTitle = document.querySelector("#file-viewer-title");
+const fileViewerPath = document.querySelector("#file-viewer-path");
+const fileViewerType = document.querySelector("#file-viewer-type");
+const fileViewerSize = document.querySelector("#file-viewer-size");
+const fileViewerState = document.querySelector("#file-viewer-state");
+const fileViewerNotice = document.querySelector("#file-viewer-notice");
+const fileViewerBody = document.querySelector("#file-viewer-body");
+const fileViewerModes = document.querySelector("#file-viewer-modes");
+const fileViewerPreview = document.querySelector("#file-viewer-preview");
+const fileViewerSource = document.querySelector("#file-viewer-source");
+const fileViewerRefresh = document.querySelector("#file-viewer-refresh");
+const fileViewerDownload = document.querySelector("#file-viewer-download");
+const fileViewerClose = document.querySelector("#file-viewer-close");
 
 let activeWorkspace = null;
 let activeConversation = null;
 let activeRun = null;
 let eventSource = null;
 let sendingPrompt = false;
+let activeFile = null;
+let fileRequestGeneration = 0;
 const navigationGuard = window.QuilooIDEState.createNavigationGuard();
 const submissions = window.QuilooIDEState.createSubmissionTracker();
 const eventLedger = window.QuilooIDEState.createEventLedger();
@@ -84,6 +101,7 @@ function emptyCopy(text) {
 }
 
 function renderWorkspace(workspace) {
+  const changedWorkspace = activeWorkspace?.id !== workspace.id;
   activeWorkspace = workspace;
   workspacePath.value = workspace.root;
   workspaceStatus.textContent = workspace.root;
@@ -91,17 +109,251 @@ function renderWorkspace(workspace) {
     ? `${workspace.git.branch || "DETACHED"}${workspace.git.dirty ? " · MODIFIED" : " · CLEAN"}`
     : "NO GIT";
   createConversation.disabled = false;
+  if (changedWorkspace) closeFileViewer();
 }
 
-function selectEntry(entry) {
-  const label = workspaceWelcome.querySelector(".section-label");
-  const heading = workspaceWelcome.querySelector("h1");
-  const copy = workspaceWelcome.querySelector(":scope > p");
-  label.textContent = entry.kind.toUpperCase();
-  heading.textContent = entry.name;
-  copy.textContent = entry.kind === "file"
-    ? "Repository file selected."
-    : "Select a child entry or return to the repository root.";
+function closeFileViewer() {
+  fileRequestGeneration += 1;
+  activeFile = null;
+  fileViewer.classList.add("hidden");
+  workspaceWelcome.classList.remove("hidden");
+  document.querySelectorAll(".tree-entry.is-selected").forEach((entry) => entry.classList.remove("is-selected"));
+}
+
+function setViewerNotice(message = "") {
+  fileViewerNotice.textContent = message;
+  fileViewerNotice.classList.toggle("hidden", !message);
+}
+
+function renderSource(content) {
+  const source = document.createElement("ol");
+  const lines = window.QuilooFileViewer.sourceLines(content || "");
+  const displayLines = lines.slice(0, 20000);
+  source.className = "file-source";
+  displayLines.forEach((line) => {
+    const row = document.createElement("li");
+    const code = document.createElement("code");
+    code.textContent = line || " ";
+    row.append(code);
+    source.append(row);
+  });
+  if (lines.length > displayLines.length) {
+    setViewerNotice(`Preview limited to ${displayLines.length.toLocaleString()} lines.`);
+  }
+  fileViewerBody.append(source);
+}
+
+function renderMarkdown(content) {
+  const article = document.createElement("article");
+  article.className = "markdown-preview";
+  window.QuilooFileViewer.markdownBlocks(content || "").forEach((block) => {
+    let element;
+    if (block.type === "heading") {
+      element = document.createElement(`h${block.level}`);
+      element.textContent = block.text;
+    } else if (block.type === "code") {
+      element = document.createElement("pre");
+      const code = document.createElement("code");
+      code.textContent = block.text;
+      if (block.language) code.dataset.language = block.language;
+      element.append(code);
+    } else if (block.type === "list") {
+      element = document.createElement("ul");
+      block.items.forEach((item) => {
+        const row = document.createElement("li");
+        row.textContent = item;
+        element.append(row);
+      });
+    } else if (block.type === "quote") {
+      element = document.createElement("blockquote");
+      element.textContent = block.text;
+    } else {
+      element = document.createElement("p");
+      element.textContent = block.text;
+    }
+    article.append(element);
+  });
+  fileViewerBody.append(article);
+}
+
+function renderJsonValue(value, label, depth = 0, budget = {remaining: 2500}) {
+  budget.remaining -= 1;
+  if (budget.remaining < 0) {
+    const limited = document.createElement("span");
+    limited.className = "json-value is-muted";
+    limited.textContent = "Preview limit reached";
+    return limited;
+  }
+  if (value !== null && typeof value === "object") {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    const entries = Object.entries(value);
+    details.open = depth < 2;
+    summary.textContent = `${label}${Array.isArray(value) ? ` [${entries.length}]` : ` {${entries.length}}`}`;
+    details.append(summary);
+    const children = document.createElement("div");
+    children.className = "json-children";
+    entries.forEach(([key, child]) => children.append(renderJsonValue(child, key, depth + 1, budget)));
+    details.append(children);
+    return details;
+  }
+  const row = document.createElement("div");
+  const key = document.createElement("span");
+  const scalar = document.createElement("code");
+  row.className = "json-scalar";
+  key.textContent = `${label}:`;
+  scalar.textContent = typeof value === "string" ? `"${value}"` : String(value);
+  row.append(key, scalar);
+  return row;
+}
+
+function renderJson(content) {
+  try {
+    const tree = document.createElement("div");
+    tree.className = "json-tree";
+    tree.append(renderJsonValue(JSON.parse(content), "root"));
+    fileViewerBody.append(tree);
+  } catch (_error) {
+    setViewerNotice("This JSON is not valid, so the source view is shown.");
+    renderSource(content);
+  }
+}
+
+function renderTable(content, delimiter) {
+  const parsed = window.QuilooFileViewer.parseDelimited(content || "", delimiter);
+  const limited = window.QuilooFileViewer.limitTable(parsed, 500, 100);
+  const wrap = document.createElement("div");
+  const table = document.createElement("table");
+  const head = table.createTHead();
+  const body = table.createTBody();
+  wrap.className = "data-table-wrap";
+  table.className = "data-table";
+  limited.rows.forEach((row, rowIndex) => {
+    const tableRow = document.createElement("tr");
+    row.forEach((cell) => {
+      const element = document.createElement(rowIndex === 0 ? "th" : "td");
+      element.textContent = cell;
+      tableRow.append(element);
+    });
+    (rowIndex === 0 ? head : body).append(tableRow);
+  });
+  if (limited.truncated) setViewerNotice("Table preview limited to 500 rows and 100 columns.");
+  wrap.append(table);
+  fileViewerBody.append(wrap);
+}
+
+function renderImage(preview) {
+  const stage = document.createElement("div");
+  const controls = document.createElement("div");
+  const image = document.createElement("img");
+  let zoom = 1;
+  stage.className = "image-stage";
+  controls.className = "image-controls";
+  image.alt = preview.name;
+  image.src = window.QuilooFileViewer.fileUrl(activeWorkspace.id, preview.path, false);
+  const setZoom = (next) => {
+    zoom = Math.min(4, Math.max(0.25, next));
+    image.style.transform = `scale(${zoom})`;
+    controls.querySelector("span").textContent = `${Math.round(zoom * 100)}%`;
+  };
+  [["−", () => setZoom(zoom - 0.25)], ["Reset", () => setZoom(1)], ["+", () => setZoom(zoom + 0.25)]].forEach(([label, action]) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = label;
+    button.addEventListener("click", action);
+    controls.append(button);
+  });
+  const scale = document.createElement("span");
+  scale.textContent = "100%";
+  controls.append(scale);
+  image.addEventListener("load", () => {
+    fileViewerState.textContent = `${image.naturalWidth} × ${image.naturalHeight} px · Read only`;
+  });
+  stage.append(controls, image);
+  fileViewerBody.append(stage);
+}
+
+function renderPdf(preview) {
+  const frame = document.createElement("iframe");
+  frame.className = "pdf-viewer";
+  frame.title = preview.name;
+  frame.src = window.QuilooFileViewer.fileUrl(activeWorkspace.id, preview.path, false);
+  fileViewerBody.append(frame);
+}
+
+function renderBinary(preview) {
+  const card = document.createElement("div");
+  const title = document.createElement("strong");
+  const copy = document.createElement("p");
+  card.className = "binary-preview";
+  title.textContent = "Preview unavailable";
+  copy.textContent = "This binary format is not rendered in the workspace. Download it to open it with a compatible application.";
+  card.append(title, copy);
+  fileViewerBody.append(card);
+}
+
+function renderFileContent(mode = "preview") {
+  if (!activeFile) return;
+  clearNode(fileViewerBody);
+  setViewerNotice(activeFile.truncated ? "This is a truncated preview of a large file." : "");
+  fileViewerPreview.classList.toggle("is-active", mode === "preview");
+  fileViewerSource.classList.toggle("is-active", mode === "source");
+  if (mode === "source") {
+    renderSource(activeFile.content);
+  } else if (activeFile.kind === "markdown") {
+    renderMarkdown(activeFile.content);
+  } else if (activeFile.kind === "json") {
+    renderJson(activeFile.content);
+  } else if (activeFile.kind === "csv" || activeFile.kind === "tsv") {
+    renderTable(activeFile.content, activeFile.kind === "csv" ? "," : "\t");
+  } else if (activeFile.kind === "image") {
+    renderImage(activeFile);
+  } else if (activeFile.kind === "pdf") {
+    renderPdf(activeFile);
+  } else if (activeFile.kind === "binary") {
+    renderBinary(activeFile);
+  } else {
+    renderSource(activeFile.content);
+  }
+}
+
+function showFile(preview) {
+  activeFile = preview;
+  workspaceWelcome.classList.add("hidden");
+  fileViewer.classList.remove("hidden");
+  fileViewerKind.textContent = preview.kind.toUpperCase();
+  fileViewerTitle.textContent = preview.name;
+  fileViewerPath.textContent = preview.path;
+  fileViewerType.textContent = preview.mime_type;
+  fileViewerSize.textContent = window.QuilooFileViewer.formatBytes(preview.size);
+  fileViewerState.textContent = "Read only";
+  fileViewerDownload.href = window.QuilooFileViewer.fileUrl(activeWorkspace.id, preview.path, true);
+  fileViewerDownload.download = preview.name;
+  const modes = window.QuilooFileViewer.viewModes(preview.kind);
+  fileViewerModes.hidden = modes.length < 2;
+  fileViewerPreview.hidden = !modes.includes("preview");
+  fileViewerSource.hidden = !modes.includes("source");
+  renderFileContent(modes[0]);
+}
+
+async function openFile(entry) {
+  const requestGeneration = ++fileRequestGeneration;
+  const workspaceId = activeWorkspace.id;
+  showError();
+  fileViewerRefresh.disabled = true;
+  try {
+    const preview = await api(
+      `/api/workspaces/${workspaceId}/files/preview?path=${encodeURIComponent(entry.path)}`,
+    );
+    if (requestGeneration !== fileRequestGeneration || activeWorkspace?.id !== workspaceId) return;
+    showFile(preview);
+    document.querySelectorAll(".tree-entry.is-selected").forEach((button) => button.classList.remove("is-selected"));
+    document.querySelector(`.tree-entry[data-path="${CSS.escape(entry.path)}"]`)?.classList.add("is-selected");
+  } catch (error) {
+    if (requestGeneration === fileRequestGeneration) showError(error.message);
+  } finally {
+    if (requestGeneration === fileRequestGeneration) fileViewerRefresh.disabled = false;
+  }
 }
 
 async function loadEntries(relative = ".", routeToken = navigationGuard.currentRoute()) {
@@ -124,6 +376,7 @@ async function loadEntries(relative = ".", routeToken = navigationGuard.currentR
     const name = document.createElement("span");
     button.type = "button";
     button.className = "tree-entry";
+    button.dataset.path = entry.path;
     button.setAttribute("role", "treeitem");
     marker.className = `entry-marker is-${entry.kind}`;
     marker.textContent = entry.kind === "directory" ? "D" : entry.kind === "file" ? "F" : "L";
@@ -132,7 +385,7 @@ async function loadEntries(relative = ".", routeToken = navigationGuard.currentR
     if (entry.kind === "directory") {
       button.addEventListener("click", () => void loadEntries(entry.path).catch((error) => showError(error.message)));
     } else {
-      button.addEventListener("click", () => selectEntry(entry));
+      button.addEventListener("click", () => void openFile(entry));
     }
     repositoryTree.append(button);
   });
@@ -519,6 +772,12 @@ async function controlRun(action) {
 pauseRun.addEventListener("click", () => void controlRun("pause"));
 resumeRun.addEventListener("click", () => void controlRun("resume"));
 stopRun.addEventListener("click", () => void controlRun("stop"));
+fileViewerPreview.addEventListener("click", () => renderFileContent("preview"));
+fileViewerSource.addEventListener("click", () => renderFileContent("source"));
+fileViewerRefresh.addEventListener("click", () => {
+  if (activeFile) void openFile({path: activeFile.path});
+});
+fileViewerClose.addEventListener("click", closeFileViewer);
 window.addEventListener("popstate", () => void restoreRoute());
 window.addEventListener("beforeunload", () => eventSource?.close());
 void restoreRoute();

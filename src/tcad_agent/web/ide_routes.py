@@ -14,7 +14,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 
 from tcad_agent.agent.supervisor import AgentRunConflictError, AgentSupervisor
 from tcad_agent.ide.conversations import ConversationService
@@ -26,6 +26,7 @@ from tcad_agent.ide.models import (
     ConversationRecord,
     RunState,
     WorkspaceEntry,
+    WorkspaceFilePreview,
     WorkspaceRecord,
 )
 from tcad_agent.ide.store import IDEStoreError, MessageNotFoundError, SqliteIDEStore
@@ -211,6 +212,36 @@ def build_ide_router(
         workspace_id: UUID, path: str = "."
     ) -> tuple[WorkspaceEntry, ...]:
         return services.workspaces.entries(workspace_id, path)
+
+    @router.get("/workspaces/{workspace_id}/files/preview")
+    def workspace_file_preview(
+        workspace_id: UUID, path: str
+    ) -> WorkspaceFilePreview:
+        return services.workspaces.preview_file(workspace_id, path)
+
+    @router.get("/workspaces/{workspace_id}/files/raw")
+    def workspace_file_raw(
+        workspace_id: UUID, path: str, download: bool = False
+    ) -> FileResponse:
+        preview = services.workspaces.preview_file(workspace_id, path)
+        if not download and preview.kind not in {"image", "pdf"}:
+            raise HTTPException(
+                status_code=415,
+                detail="This file type can only be downloaded.",
+            )
+        target = services.workspaces.file_path(workspace_id, path)
+        disposition = "attachment" if download else "inline"
+        return FileResponse(
+            target,
+            media_type=preview.mime_type,
+            content_disposition_type=disposition,
+            filename=target.name,
+            headers={
+                "Cache-Control": "no-store",
+                "Content-Security-Policy": "sandbox",
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     @router.post("/workspaces/{workspace_id}/conversations", status_code=201)
     def create_conversation(

@@ -10,6 +10,10 @@ from pydantic import Field, JsonValue
 
 from tcad_agent.domain.models import StrictModel
 
+type WorkspaceFileKind = Literal[
+    "text", "markdown", "json", "csv", "tsv", "image", "pdf", "binary"
+]
+
 
 class GitSnapshot(StrictModel):
     available: bool
@@ -29,6 +33,16 @@ class WorkspaceEntry(StrictModel):
     name: str
     kind: Literal["file", "directory", "symlink"]
     size: int | None = Field(default=None, ge=0)
+
+
+class WorkspaceFilePreview(StrictModel):
+    path: str
+    name: str
+    kind: WorkspaceFileKind
+    mime_type: str
+    size: int = Field(ge=0)
+    truncated: bool = False
+    content: str | None = None
 
 
 class WorkspaceRecord(StrictModel):
