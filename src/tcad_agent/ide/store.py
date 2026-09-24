@@ -23,6 +23,7 @@ from tcad_agent.ide.models import (
     PermissionCategory,
     RepositorySnapshot,
     RunState,
+    WorkspaceBaseline,
     WorkspaceRecord,
     is_run_grantable,
 )
@@ -124,6 +125,12 @@ class SqliteIDEStore:
                     created_at TEXT NOT NULL,
                     PRIMARY KEY (run_id, permission_category)
                 );
+
+                CREATE TABLE IF NOT EXISTS run_change_baselines (
+                    run_id TEXT PRIMARY KEY REFERENCES agent_runs(id),
+                    baseline_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
                 """
             )
             approval_columns = {
@@ -201,6 +208,37 @@ class SqliteIDEStore:
                 """
             ).fetchall()
         return tuple(self._workspace(row) for row in rows)
+
+    def save_run_baseline(
+        self, run_id: UUID, baseline: WorkspaceBaseline
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO run_change_baselines (
+                    run_id, baseline_json, created_at
+                ) VALUES (?, ?, ?)
+                """,
+                (
+                    str(run_id),
+                    baseline.model_dump_json(),
+                    baseline.captured_at.isoformat(),
+                ),
+            )
+
+    def get_run_baseline(self, run_id: UUID) -> WorkspaceBaseline:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT baseline_json
+                FROM run_change_baselines
+                WHERE run_id = ?
+                """,
+                (str(run_id),),
+            ).fetchone()
+        if row is None:
+            raise IDEStoreError(f"run baseline does not exist: {run_id}")
+        return WorkspaceBaseline.model_validate_json(row["baseline_json"])
 
     def create_conversation(
         self, workspace_id: UUID, title: str

@@ -52,6 +52,44 @@ class WorkspaceTextFile(StrictModel):
     size: int = Field(ge=0)
 
 
+class BaselineFile(StrictModel):
+    path: str
+    size: int = Field(ge=0)
+    mtime_ns: int = Field(ge=0)
+    sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    content: str | None = None
+
+
+class WorkspaceBaseline(StrictModel):
+    root: Path
+    captured_at: datetime
+    git_head: str | None = None
+    git_branch: str | None = None
+    truncated: bool = False
+    files: dict[str, BaselineFile]
+
+
+class WorkspaceChange(StrictModel):
+    path: str
+    operation: Literal["created", "modified", "deleted", "renamed"]
+    previous_path: str | None = None
+    before_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    after_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    additions: int | None = Field(default=None, ge=0)
+    deletions: int | None = Field(default=None, ge=0)
+    diff: str | None = None
+    diff_truncated: bool = False
+    uncertain: bool = False
+
+
+class WorkspaceChangeSet(StrictModel):
+    run_id: UUID | None = None
+    baseline_captured_at: datetime
+    generated_at: datetime
+    baseline_truncated: bool
+    files: tuple[WorkspaceChange, ...]
+
+
 class WorkspaceRecord(StrictModel):
     id: UUID
     root: Path

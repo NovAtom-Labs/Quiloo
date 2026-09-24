@@ -1,10 +1,16 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
 
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
-from tcad_agent.ide.models import ApprovalDecision, RunState
+from tcad_agent.ide.models import (
+    ApprovalDecision,
+    BaselineFile,
+    RunState,
+    WorkspaceBaseline,
+)
 from tcad_agent.ide.store import IDEStoreError, SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
 
@@ -168,3 +174,34 @@ def test_terminal_run_does_not_expose_stale_pending_approval(tmp_path: Path) -> 
     store.transition_run(run.id, waiting.revision, RunState.CANCELLED)
 
     assert store.list_pending_approvals(conversation.id) == ()
+
+
+def test_run_baseline_is_persisted_and_first_capture_wins(tmp_path: Path) -> None:
+    database = tmp_path / "ide.sqlite3"
+    store = SqliteIDEStore(database)
+    workspace = WorkspaceManager(store).open(tmp_path)
+    conversation = ConversationService(store, EventFeed(store)).create(
+        workspace.id, "Agent task"
+    )
+    run = store.create_run(conversation.id, conversation.id)
+    captured_at = datetime.now(UTC)
+    first = WorkspaceBaseline(
+        root=tmp_path.resolve(),
+        captured_at=captured_at,
+        files={
+            "model.py": BaselineFile(
+                path="model.py",
+                size=4,
+                mtime_ns=1,
+                sha256="0" * 64,
+                content="test",
+            )
+        },
+    )
+    later = first.model_copy(update={"files": {}})
+
+    store.save_run_baseline(run.id, first)
+    store.save_run_baseline(run.id, later)
+    restored = SqliteIDEStore(database).get_run_baseline(run.id)
+
+    assert restored == first
