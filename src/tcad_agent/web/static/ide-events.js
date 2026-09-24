@@ -17,8 +17,11 @@
     const reasoning = [];
     const reasoningById = new Map();
     const pendingApprovals = new Map();
+    const approvalHistory = [];
+    const approvalsById = new Map();
     const technicalEvents = [];
     let lastEventId = 0;
+    let runId = null;
     let runState = "idle";
     let currentOperation = "Idle";
 
@@ -152,6 +155,7 @@
       seen.add(eventKey(event));
       const numericId = Number(event.id);
       if (Number.isFinite(numericId)) lastEventId = Math.max(lastEventId, numericId);
+      if (event.payload?.run_id) runId = String(event.payload.run_id);
       if (!["thinking_started", "thinking_delta", "thinking_aborted"].includes(event.kind)) {
         closeLiveReasoning();
       }
@@ -162,10 +166,27 @@
       else if (event.kind === "thinking_aborted") abortReasoning(event);
       else if (event.kind === "approval_requested") {
         const payload = event.payload || {};
-        pendingApprovals.set(String(payload.approval_id || event.id), payload);
+        const approvalId = String(payload.approval_id || event.id);
+        const entry = {
+          id: approvalId,
+          summary: payload.summary || "Permission required",
+          risk: payload.risk || "HIGH",
+          decision: null,
+          requestedAt: event.created_at || null,
+          resolvedAt: null,
+        };
+        pendingApprovals.set(approvalId, payload);
+        approvalsById.set(approvalId, entry);
+        approvalHistory.push(entry);
       } else if (event.kind === "approval_resolved") {
         const payload = event.payload || {};
-        pendingApprovals.delete(String(payload.approval_id || ""));
+        const approvalId = String(payload.approval_id || "");
+        pendingApprovals.delete(approvalId);
+        const entry = approvalsById.get(approvalId);
+        if (entry) {
+          entry.decision = payload.decision || "resolved";
+          entry.resolvedAt = event.created_at || null;
+        }
       } else if (![
         "run_created", "run_started", "run_state_changed", "run_completed", "run_failed",
         "run_blocked", "run_cancelled", "run_paused", "run_recovered_paused",
@@ -181,11 +202,13 @@
     function snapshot() {
       return JSON.parse(JSON.stringify({
         lastEventId,
+        runId,
         runState,
         currentOperation,
         steps,
         reasoning,
         pendingApprovals: Array.from(pendingApprovals.values()),
+        approvalHistory,
         technicalEvents,
       }));
     }
@@ -197,8 +220,11 @@
       reasoning.splice(0);
       reasoningById.clear();
       pendingApprovals.clear();
+      approvalHistory.splice(0);
+      approvalsById.clear();
       technicalEvents.splice(0);
       lastEventId = 0;
+      runId = null;
       runState = "idle";
       currentOperation = "Idle";
     }

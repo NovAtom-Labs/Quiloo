@@ -18,7 +18,14 @@ const conversationTitleInput = document.querySelector("#conversation-title-input
 const cancelConversation = document.querySelector("#cancel-conversation");
 const conversationTitle = document.querySelector("#conversation-title");
 const conversationMessages = document.querySelector("#conversation-messages");
+const agentTabs = Array.from(document.querySelectorAll("[data-agent-view]"));
+const agentViews = Array.from(document.querySelectorAll("[data-agent-panel]"));
 const agentActivity = document.querySelector("#agent-activity");
+const agentRunSummary = document.querySelector("#agent-run-summary");
+const agentReasoning = document.querySelector("#agent-reasoning");
+const agentChanges = document.querySelector("#agent-changes");
+const changesState = document.querySelector("#changes-state");
+const changesCount = document.querySelector("#changes-count");
 const streamState = document.querySelector("#stream-state");
 const runState = document.querySelector("#run-state");
 const runControls = document.querySelector("#run-controls");
@@ -60,10 +67,11 @@ let sendingPrompt = false;
 let activeFile = null;
 let editingFile = null;
 let fileRequestGeneration = 0;
-const thinkingRows = new Map();
+let selectedRunId = null;
+let activeChangeSet = null;
 const navigationGuard = window.QuilooIDEState.createNavigationGuard();
 const submissions = window.QuilooIDEState.createSubmissionTracker();
-const eventLedger = window.QuilooIDEState.createEventLedger();
+const runPresentation = window.QuilooIDEEvents.createRunPresentation();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -415,6 +423,9 @@ function showFile(preview) {
   fileViewerType.textContent = preview.mime_type;
   fileViewerSize.textContent = window.QuilooFileViewer.formatBytes(preview.size);
   fileViewerState.textContent = "Read only";
+  fileViewerRefresh.hidden = false;
+  fileViewerEdit.hidden = false;
+  fileViewerDownload.hidden = false;
   fileViewerDownload.href = window.QuilooFileViewer.fileUrl(activeWorkspace.id, preview.path, true);
   fileViewerDownload.download = preview.name;
   const modes = window.QuilooFileViewer.viewModes(preview.kind);
@@ -423,6 +434,33 @@ function showFile(preview) {
   fileViewerSource.hidden = !modes.includes("source");
   setFileEditing(false);
   renderFileContent(modes[0]);
+}
+
+function showDiff(change) {
+  activeFile = null;
+  editingFile = null;
+  workspaceWelcome.classList.add("hidden");
+  fileViewer.classList.remove("hidden");
+  fileViewerKind.textContent = change.operationLabel.toUpperCase();
+  fileViewerTitle.textContent = change.label.split("/").at(-1) || change.label;
+  fileViewerPath.textContent = change.detail || change.label;
+  fileViewerType.textContent = "Unified diff";
+  fileViewerSize.textContent = change.delta;
+  fileViewerState.textContent = change.diffTruncated ? "Diff truncated" : "Run change";
+  fileViewerModes.hidden = true;
+  fileViewerRefresh.hidden = true;
+  fileViewerEdit.hidden = true;
+  fileViewerDownload.hidden = true;
+  fileViewerSave.hidden = true;
+  fileViewerCancel.hidden = true;
+  fileEditor.classList.add("hidden");
+  fileViewerBody.classList.remove("hidden");
+  clearNode(fileViewerBody);
+  setViewerNotice(change.uncertain
+    ? "This binary or large-file change cannot be compared line by line."
+    : change.diffTruncated ? "This diff was limited to keep the workspace responsive." : "");
+  if (change.diff) renderSource(change.diff);
+  else fileViewerBody.append(emptyCopy("A line-by-line diff is not available for this change."));
 }
 
 async function openFile(entry) {
@@ -498,17 +536,40 @@ function renderConversationList(conversations) {
 }
 
 function appendMessage(message) {
-  if (conversationMessages.querySelector(`[data-message-id="${message.id}"]`)) return;
+  if (conversationMessages.querySelector(`[data-message-id="${message.id}"]`)) return null;
   const article = document.createElement("article");
+  const header = document.createElement("header");
   const role = document.createElement("span");
-  const content = document.createElement("p");
+  const time = document.createElement("time");
+  const content = document.createElement("div");
   article.className = `message is-${message.role}`;
   article.dataset.messageId = message.id;
   role.textContent = message.role.toUpperCase();
-  content.textContent = message.content;
-  article.append(role, content);
+  if (message.created_at) {
+    time.dateTime = message.created_at;
+    time.textContent = new Date(message.created_at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
+  }
+  content.className = "message-body";
+  window.QuilooMarkdown.render(content, message.content);
+  header.append(role, time);
+  article.append(header, content);
   conversationMessages.append(article);
-  conversationMessages.scrollTop = conversationMessages.scrollHeight;
+  return article;
+}
+
+function renderMessages(messages, {focusFinal = false} = {}) {
+  clearNode(conversationMessages);
+  if (!messages.length) {
+    conversationMessages.append(emptyCopy("Send the first task for this workspace."));
+    return;
+  }
+  let finalAssistant = null;
+  messages.forEach((message) => {
+    const node = appendMessage(message);
+    if (message.role === "assistant") finalAssistant = node;
+  });
+  if (focusFinal && finalAssistant) finalAssistant.scrollIntoView({block: "start"});
+  else conversationMessages.scrollTop = conversationMessages.scrollHeight;
 }
 
 function renderRunIndicator() {
@@ -534,9 +595,9 @@ async function refreshMessages(conversationId = activeConversation?.id) {
   if (!conversationId) return;
   const messages = await api(`/api/conversations/${conversationId}/messages`);
   if (activeConversation?.id !== conversationId) return;
-  clearNode(conversationMessages);
-  if (!messages.length) conversationMessages.append(emptyCopy("Send the first task for this workspace."));
-  messages.forEach(appendMessage);
+  const previousLast = conversationMessages.querySelector(".message:last-of-type")?.dataset.messageId;
+  const last = messages.at(-1);
+  renderMessages(messages, {focusFinal: last?.role === "assistant" && last.id !== previousLast});
   renderRunIndicator();
 }
 
@@ -548,9 +609,7 @@ async function synchronizeConversation(conversationId) {
     api(`/api/conversations/${conversationId}/approvals`),
   ]);
   if (activeConversation?.id !== conversationId) return;
-  clearNode(conversationMessages);
-  if (!messages.length) conversationMessages.append(emptyCopy("Send the first task for this workspace."));
-  messages.forEach(appendMessage);
+  renderMessages(messages);
   setRun(run);
   renderApprovals(approvals);
 }
@@ -577,6 +636,7 @@ async function requestConversationRefresh(conversationId = activeConversation?.i
 
 function setRun(run) {
   activeRun = run;
+  if (run?.id) selectedRunId = run.id;
   const state = run?.state || "idle";
   const controls = window.QuilooIDEState.controlsForState(state);
   runState.textContent = state.replaceAll("_", " ").toUpperCase();
@@ -591,72 +651,180 @@ function setRun(run) {
   renderRunIndicator();
 }
 
-function activityDescription(event) {
-  const payload = event.payload || {};
-  if (event.kind === "tool_call_started") return payload.summary || payload.tool_name || "Tool call";
-  if (event.kind === "tool_call_completed") {
-    const owner = payload.subagent ? `${payload.subagent} · ` : "";
-    const output = String(payload.output || "Completed").replaceAll("\n", " ").slice(0, 260);
-    return `${owner}${output}`;
-  }
-  if (event.kind === "approval_requested") return `${payload.risk || "HIGH"} · ${payload.summary || "Approval required"}`;
-  if (event.kind === "permission_grant_created") return `Allowed ${permissionCategoryLabel(payload.permission_category)} for this run`;
-  if (event.kind === "permission_grant_used") return `Used this run's ${permissionCategoryLabel(payload.permission_category)} permission`;
-  if (payload.state) return String(payload.state).replaceAll("_", " ");
-  if (payload.detail) return String(payload.detail).slice(0, 260);
-  return event.kind.replaceAll("_", " ");
+function activateAgentView(name) {
+  agentTabs.forEach((button) => {
+    const active = button.dataset.agentView === name;
+    button.classList.toggle("is-active", active);
+    button.setAttribute("aria-selected", String(active));
+  });
+  agentViews.forEach((view) => {
+    const active = view.dataset.agentPanel === name;
+    view.hidden = !active;
+    view.classList.toggle("is-active", active);
+  });
 }
 
-function appendActivity(event) {
-  const row = document.createElement("div");
-  const body = document.createElement("div");
-  const kind = document.createElement("strong");
+function renderRunSummary(snapshot) {
+  const summary = window.QuilooAgentView.outcomeSummary(snapshot, activeChangeSet);
+  clearNode(agentRunSummary);
+  agentRunSummary.hidden = !summary.visible;
+  if (!summary.visible) return;
+  const title = document.createElement("strong");
   const detail = document.createElement("span");
-  const time = document.createElement("time");
-  row.className = `activity-row is-${event.kind}`;
-  kind.textContent = event.kind.replaceAll("_", " ");
-  detail.textContent = activityDescription(event);
-  time.textContent = new Date(event.created_at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
-  body.append(kind, detail);
-  row.append(body, time);
-  agentActivity.append(row);
-  agentActivity.scrollTop = agentActivity.scrollHeight;
+  agentRunSummary.className = `agent-run-summary is-${summary.tone}`;
+  title.textContent = summary.title;
+  detail.textContent = summary.failedStep
+    ? `${summary.failedStep}${summary.failureOutput ? `: ${String(summary.failureOutput).slice(0, 180)}` : ""}`
+    : `${summary.completedSteps} actions completed · ${summary.changedFiles} files changed`;
+  agentRunSummary.append(title, detail);
 }
 
-function beginThinkingRow(itemId) {
-  const row = document.createElement("div");
-  const label = document.createElement("strong");
-  const body = document.createElement("pre");
-  row.className = "thinking-row is-live";
-  label.textContent = "Thinking";
-  row.append(label, body);
-  agentActivity.append(row);
-  agentActivity.scrollTop = agentActivity.scrollHeight;
-  const entry = {row, body, label};
-  thinkingRows.set(itemId, entry);
-  return entry;
+function renderReasoning(snapshot) {
+  clearNode(agentReasoning);
+  const entries = (snapshot.reasoning || []).filter((entry) => entry.content.trim());
+  agentReasoning.hidden = entries.length === 0;
+  entries.forEach((entry) => {
+    const details = document.createElement("details");
+    const heading = document.createElement("summary");
+    const content = document.createElement("pre");
+    details.className = `reasoning-entry is-${entry.status}`;
+    heading.textContent = entry.status === "live" ? "Operational reasoning in progress" : "Operational reasoning";
+    content.textContent = entry.content;
+    details.append(heading, content);
+    agentReasoning.append(details);
+  });
 }
 
-function appendThinkingDelta(event) {
-  const payload = event.payload || {};
-  const itemId = payload.item_id;
-  if (!itemId) return;
-  const entry = thinkingRows.get(itemId) || beginThinkingRow(itemId);
-  entry.body.append(document.createTextNode(String(payload.content || "")));
-  agentActivity.scrollTop = agentActivity.scrollHeight;
+function renderActivity(snapshot) {
+  clearNode(agentActivity);
+  const rows = window.QuilooAgentView.activityRows(snapshot);
+  if (!rows.length && !snapshot.approvalHistory?.length && !snapshot.technicalEvents?.length) {
+    agentActivity.append(emptyCopy("Tool activity will appear here when a run starts."));
+  }
+  rows.forEach((row) => {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    const status = document.createElement("span");
+    const label = document.createElement("strong");
+    const metadata = document.createElement("span");
+    const technical = document.createElement("div");
+    details.className = `execution-step is-${row.status}`;
+    status.className = "execution-status";
+    status.textContent = row.status === "running" ? "●" : row.status === "failed" ? "×" : "✓";
+    label.textContent = row.label;
+    metadata.textContent = [row.owner, row.duration].filter(Boolean).join(" · ");
+    summary.append(status, label, metadata);
+    technical.className = "execution-technical";
+    if (row.command) {
+      const command = document.createElement("code");
+      command.textContent = row.command;
+      technical.append(command);
+    }
+    if (row.output) {
+      const output = document.createElement("pre");
+      output.textContent = String(row.output).slice(0, 12_000);
+      technical.append(output);
+    }
+    if (row.path) {
+      const open = document.createElement("button");
+      open.type = "button";
+      open.textContent = `Open ${row.path}`;
+      open.addEventListener("click", () => void openFile({path: row.path}));
+      technical.append(open);
+    }
+    if (!technical.childNodes.length) technical.append(emptyCopy("No additional technical output."));
+    details.append(summary, technical);
+    agentActivity.append(details);
+  });
+  (snapshot.approvalHistory || []).forEach((approval) => {
+    const row = document.createElement("div");
+    const label = document.createElement("strong");
+    const state = document.createElement("span");
+    row.className = "approval-marker";
+    label.textContent = approval.summary;
+    state.textContent = approval.decision ? `Decision: ${approval.decision}` : "Waiting for approval";
+    row.append(label, state);
+    agentActivity.append(row);
+  });
+  if (snapshot.technicalEvents?.length) {
+    const details = document.createElement("details");
+    const summary = document.createElement("summary");
+    const events = document.createElement("pre");
+    details.className = "technical-events";
+    summary.textContent = `Technical events (${snapshot.technicalEvents.length})`;
+    events.textContent = snapshot.technicalEvents
+      .map((event) => `${event.kind}: ${JSON.stringify(event.payload || {})}`)
+      .join("\n");
+    details.append(summary, events);
+    agentActivity.append(details);
+  }
 }
 
-function finishThinkingRow(itemId, {aborted = false} = {}) {
-  const entry = thinkingRows.get(itemId);
-  if (!entry) return;
-  entry.row.classList.remove("is-live");
-  entry.row.classList.add(aborted ? "is-aborted" : "is-done");
-  entry.label.textContent = aborted ? "Thinking (interrupted)" : "Thinking";
-  thinkingRows.delete(itemId);
+function renderAgentPresentation() {
+  const snapshot = runPresentation.snapshot();
+  if (snapshot.runId) selectedRunId = snapshot.runId;
+  renderRunSummary(snapshot);
+  renderReasoning(snapshot);
+  renderActivity(snapshot);
 }
 
-function finishOpenThinkingRows() {
-  for (const itemId of Array.from(thinkingRows.keys())) finishThinkingRow(itemId);
+function renderChanges(changeSet) {
+  activeChangeSet = changeSet;
+  const rows = window.QuilooChanges.toRows(changeSet);
+  clearNode(agentChanges);
+  changesCount.textContent = String(rows.length);
+  changesState.textContent = rows.length ? `${rows.length} CHANGED` : "NO CHANGES";
+  if (!rows.length) {
+    agentChanges.append(emptyCopy("No workspace changes are attributed to this run."));
+    renderRunSummary(runPresentation.snapshot());
+    return;
+  }
+  rows.forEach((row) => {
+    const button = document.createElement("button");
+    const top = document.createElement("span");
+    const operation = document.createElement("b");
+    const path = document.createElement("strong");
+    const delta = document.createElement("code");
+    const detail = document.createElement("small");
+    button.type = "button";
+    button.className = `change-row is-${row.operation}`;
+    operation.textContent = row.operationLabel;
+    path.textContent = row.label;
+    delta.textContent = row.delta;
+    top.append(operation, path, delta);
+    detail.textContent = row.detail || (row.uncertain ? "Exact line changes are unavailable" : "Open run diff");
+    button.append(top, detail);
+    button.addEventListener("click", () => {
+      if (row.diff || !row.canOpenFile) showDiff(row);
+      else void openFile({path: row.label});
+    });
+    agentChanges.append(button);
+  });
+  renderRunSummary(runPresentation.snapshot());
+}
+
+async function refreshChanges(runId = selectedRunId) {
+  if (!runId) {
+    activeChangeSet = null;
+    changesCount.textContent = "0";
+    changesState.textContent = "NO RUN";
+    clearNode(agentChanges);
+    agentChanges.append(emptyCopy("Run changes will appear after the agent starts working."));
+    return;
+  }
+  changesState.textContent = "CHECKING";
+  try {
+    const changeSet = await api(`/api/runs/${runId}/changes`);
+    if (selectedRunId !== runId) return;
+    renderChanges(changeSet);
+  } catch (_error) {
+    if (selectedRunId !== runId) return;
+    activeChangeSet = null;
+    changesCount.textContent = "0";
+    changesState.textContent = "UNAVAILABLE";
+    clearNode(agentChanges);
+    agentChanges.append(emptyCopy("Changes are unavailable for this historical run."));
+  }
 }
 
 function approvalTarget(approval) {
@@ -696,6 +864,7 @@ function renderApprovals(approvals) {
   clearNode(pendingApprovals);
   approvalSection.classList.toggle("hidden", approvals.length === 0);
   approvals.forEach((approval) => {
+    const view = window.QuilooAgentView.permissionView(approval);
     const card = document.createElement("article");
     const heading = document.createElement("div");
     const tool = document.createElement("strong");
@@ -716,13 +885,13 @@ function renderApprovals(approvals) {
     tool.textContent = "Permission required";
     risk.textContent = "Needs approval";
     heading.append(tool, risk);
-    summary.textContent = approval.summary;
+    summary.textContent = view.explanation;
     technical.className = "approval-technical";
     technicalLabel.textContent = "Technical details";
-    toolDetail.textContent = `Tool: ${approval.tool_name}`;
-    categoryDetail.textContent = `Permission type: ${permissionCategoryLabel(approval.permission_category)}`;
-    riskDetail.textContent = `Risk level: ${approval.risk}`;
-    target.textContent = approvalTarget(approval);
+    toolDetail.textContent = `Tool: ${view.toolName}`;
+    categoryDetail.textContent = `Permission type: ${permissionCategoryLabel(view.permissionCategory)}`;
+    riskDetail.textContent = `Risk level: ${view.risk}`;
+    target.textContent = view.target;
     technicalBody.append(toolDetail, categoryDetail, riskDetail, target);
     technical.append(technicalLabel, technicalBody);
     deny.type = "button";
@@ -737,7 +906,7 @@ function renderApprovals(approvals) {
     approveCategory.title = "Allow this permission type for the rest of this run only";
     deny.addEventListener("click", () => void decideApproval(approval, "deny"));
     approve.addEventListener("click", () => void decideApproval(approval, "approve"));
-    if (canApproveCategory(approval.permission_category)) {
+    if (view.canApproveCategory) {
       approveCategory.addEventListener("click", () => void decideApproval(approval, "approve-category"));
       actions.append(deny, approve, approveCategory);
     } else {
@@ -774,30 +943,29 @@ function updateRunFromEvent(event) {
 
 function connectEvents(conversationId) {
   if (eventSource) eventSource.close();
-  clearNode(agentActivity);
-  thinkingRows.clear();
-  eventLedger.reset();
+  runPresentation.reset();
+  selectedRunId = activeRun?.id || null;
+  activeChangeSet = null;
+  renderAgentPresentation();
+  void refreshChanges(selectedRunId);
   streamState.textContent = "CONNECTING";
   eventSource = new EventSource(`/api/conversations/${conversationId}/events`);
   const receive = (rawEvent) => {
     if (activeConversation?.id !== conversationId) return;
     streamState.textContent = "LIVE";
     const event = JSON.parse(rawEvent.data);
-    if (!eventLedger.accept(event.id)) return;
-    if (event.kind === "thinking_started") { beginThinkingRow(event.payload?.item_id); return; }
-    if (event.kind === "thinking_delta") { appendThinkingDelta(event); return; }
-    if (event.kind === "thinking_aborted") {
-      finishThinkingRow(event.payload?.item_id, {aborted: true});
-      return;
-    }
-    finishOpenThinkingRows();
-    appendActivity(event);
+    if (!runPresentation.accept(event)) return;
+    const snapshot = runPresentation.snapshot();
+    if (snapshot.runId) selectedRunId = snapshot.runId;
+    renderAgentPresentation();
     updateRunFromEvent(event);
     if (event.kind === "message_created") void refreshMessages(conversationId);
     if (event.kind === "approval_requested" || event.kind === "approval_resolved") {
       void loadApprovals(conversationId);
     }
+    if (event.kind === "tool_call_completed") void refreshChanges(selectedRunId);
     if (["run_completed", "run_failed", "run_blocked", "run_cancelled"].includes(event.kind)) {
+      void refreshChanges(selectedRunId);
       void refreshCoordinator.request(conversationId).catch((error) => showError(error.message));
     }
   };
@@ -807,7 +975,7 @@ function connectEvents(conversationId) {
     "approval_resolved", "permission_grant_created", "permission_grant_used",
     "run_completed", "run_failed", "run_blocked", "run_paused",
     "run_cancelled", "run_recovered_paused", "agent_error", "runtime_state_changed",
-    "thinking_started", "thinking_delta", "thinking_aborted",
+    "thinking_started", "thinking_delta", "thinking_aborted", "change_baseline_warning",
   ].forEach((kind) => eventSource.addEventListener(kind, receive));
   eventSource.onopen = () => {
     streamState.textContent = "LIVE";
@@ -835,12 +1003,18 @@ async function loadConversation(conversationId, routeToken) {
 function clearConversation() {
   activeConversation = null;
   activeRun = null;
+  selectedRunId = null;
+  activeChangeSet = null;
   submissions.reset();
+  runPresentation.reset();
   conversationTitle.textContent = "No conversation";
   setRun(null);
   clearNode(conversationMessages);
   conversationMessages.append(emptyCopy("Start or select a conversation."));
   clearNode(agentActivity);
+  clearNode(agentReasoning);
+  clearNode(agentRunSummary);
+  void refreshChanges(null);
   renderApprovals([]);
   streamState.textContent = "OFFLINE";
   refreshConversation.disabled = true;
@@ -953,6 +1127,7 @@ messageForm.addEventListener("submit", async (event) => {
       messageId = message.id;
       if (conversationMessages.querySelector(".empty-copy")) clearNode(conversationMessages);
       appendMessage(message);
+      conversationMessages.scrollTop = conversationMessages.scrollHeight;
     }
     const run = await api(`/api/conversations/${conversationId}/runs`, {
       method: "POST",
@@ -992,6 +1167,9 @@ pauseRun.addEventListener("click", () => void controlRun("pause"));
 resumeRun.addEventListener("click", () => void controlRun("resume"));
 stopRun.addEventListener("click", () => void controlRun("stop"));
 refreshConversation.addEventListener("click", () => void requestConversationRefresh());
+agentTabs.forEach((button) => {
+  button.addEventListener("click", () => activateAgentView(button.dataset.agentView));
+});
 toggleAgentPanel.addEventListener("click", () => {
   setAgentPanelOpen(!agentPanel.classList.contains("is-open"));
 });

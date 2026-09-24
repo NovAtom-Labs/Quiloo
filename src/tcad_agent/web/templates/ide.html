@@ -101,36 +101,46 @@
           <button type="button" data-agent-view="activity" aria-selected="false">Activity</button>
           <button type="button" data-agent-view="changes" aria-selected="false">Changes <span id="changes-count">0</span></button>
         </nav>
-        <div class="agent-heading">
-          <div><span>SESSION · <b id="run-state">IDLE</b></span><strong id="conversation-title">No conversation</strong></div>
-          <div class="agent-heading-actions">
-            <button id="refresh-conversation" type="button" disabled>Refresh</button>
-            <button id="create-conversation" type="button" disabled>New conversation</button>
-            <button id="close-agent-panel" type="button" aria-label="Close agent panel">Close</button>
+        <section id="agent-view-chat" class="agent-view agent-chat is-active" data-agent-panel="chat">
+          <div class="agent-heading">
+            <div><span>SESSION · <b id="run-state">IDLE</b></span><strong id="conversation-title">No conversation</strong></div>
+            <div class="agent-heading-actions">
+              <button id="refresh-conversation" type="button" disabled>Refresh</button>
+              <button id="create-conversation" type="button" disabled>New conversation</button>
+              <button id="close-agent-panel" type="button" aria-label="Close agent panel">Close</button>
+            </div>
           </div>
-        </div>
-        <div id="run-controls" class="run-controls" aria-label="Agent run controls">
-          <button id="pause-run" type="button" hidden>Pause</button>
-          <button id="resume-run" type="button" hidden>Resume</button>
-          <button id="stop-run" type="button" hidden>Stop</button>
-        </div>
-        <p id="ide-error" class="ide-error hidden" role="alert" aria-live="assertive"></p>
-        <div id="conversation-messages" class="conversation-messages" aria-live="polite">
-          <p class="empty-copy">Open a workspace and start a conversation.</p>
-        </div>
-        <section id="approval-section" class="approval-section hidden" aria-label="Pending approvals">
-          <div class="activity-heading"><span>APPROVAL REQUIRED</span><span>USER DECISION</span></div>
-          <div id="pending-approvals" class="pending-approvals"></div>
+          <div id="run-controls" class="run-controls" aria-label="Agent run controls">
+            <button id="pause-run" type="button" hidden>Pause</button>
+            <button id="resume-run" type="button" hidden>Resume</button>
+            <button id="stop-run" type="button" hidden>Stop</button>
+          </div>
+          <p id="ide-error" class="ide-error hidden" role="alert" aria-live="assertive"></p>
+          <div id="conversation-messages" class="conversation-messages" aria-live="polite">
+            <p class="empty-copy">Open a workspace and start a conversation.</p>
+          </div>
+          <section id="approval-section" class="approval-section hidden" aria-label="Pending approvals">
+            <div class="activity-heading"><span>APPROVAL REQUIRED</span><span>USER DECISION</span></div>
+            <div id="pending-approvals" class="pending-approvals"></div>
+          </section>
+          <form id="message-form" class="message-form">
+            <label for="message-input">Message the agent</label>
+            <textarea id="message-input" rows="4" disabled placeholder="Ask Quiloo to inspect or change this repository"></textarea>
+            <div><span>Shift + Enter for a new line</span><button id="send-message" type="submit" disabled>Send</button></div>
+          </form>
         </section>
-        <section class="activity-section">
+
+        <section id="agent-view-activity" class="agent-view activity-section" data-agent-panel="activity" hidden>
           <div class="activity-heading"><span>ACTIVITY</span><span id="stream-state">OFFLINE</span></div>
+          <div id="agent-run-summary" class="agent-run-summary"></div>
+          <div id="agent-reasoning" class="agent-reasoning"></div>
           <div id="agent-activity" class="agent-activity" aria-live="polite"></div>
         </section>
-        <form id="message-form" class="message-form">
-          <label for="message-input">Message the agent</label>
-          <textarea id="message-input" rows="4" disabled placeholder="Ask Quiloo to inspect or change this repository"></textarea>
-          <div><span>Shift + Enter for a new line</span><button id="send-message" type="submit" disabled>Send</button></div>
-        </form>
+
+        <section id="agent-view-changes" class="agent-view changes-section" data-agent-panel="changes" hidden>
+          <div class="activity-heading"><span>RUN CHANGES</span><span id="changes-state">NO RUN</span></div>
+          <div id="agent-changes" class="agent-changes"></div>
+        </section>
       </aside>
     </div>
 
@@ -151,6 +161,8 @@
     <script src="/static/ide-markdown.js?v=20260925-1" defer></script>
     <script src="/static/ide-events.js?v=20260925-1" defer></script>
     <script src="/static/ide-layout.js?v=20260925-1" defer></script>
+    <script src="/static/ide-agent.js?v=20260925-1" defer></script>
+    <script src="/static/ide-changes.js?v=20260925-1" defer></script>
     <script src="/static/ide.js?v=20260925-1" defer></script>
   </body>
 </html>

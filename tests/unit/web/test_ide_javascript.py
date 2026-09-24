@@ -107,6 +107,36 @@ def test_workbench_layout_preserves_editor_space_and_recovers_preferences() -> N
 
 
 @pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
+def test_agent_view_models_group_activity_permissions_and_outcomes() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide-agent.js").read_text()
+    assertions = (project_root / "tests/js/ide_agent.test.js").read_text()
+    completed = subprocess.run(
+        [_javascript_runner() or "", "-e", f"{source}\n{assertions}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
+def test_changes_view_model_handles_text_binary_and_rename_operations() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide-changes.js").read_text()
+    assertions = (project_root / "tests/js/ide_changes.test.js").read_text()
+    completed = subprocess.run(
+        [_javascript_runner() or "", "-e", f"{source}\n{assertions}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
 def test_production_ide_script_parses() -> None:
     project_root = Path(__file__).parents[3]
     source = (project_root / "src/tcad_agent/web/static/ide.js").read_text()
@@ -123,6 +153,9 @@ def test_production_ide_script_parses() -> None:
 def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() -> None:
     project_root = Path(__file__).parents[3]
     source = (project_root / "src/tcad_agent/web/static/ide.js").read_text()
+    permission_source = (
+        project_root / "src/tcad_agent/web/static/ide-agent.js"
+    ).read_text()
 
     for required in (
         "refreshCoordinator.request",
@@ -138,7 +171,7 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         "Technical details",
         "permission_category",
     ):
-        assert required in source
+        assert required in source or required in permission_source
 
 
 def test_responsive_styles_keep_agent_panel_available_as_a_drawer() -> None:

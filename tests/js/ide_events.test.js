@@ -58,11 +58,14 @@ view.accept(event(18, "approval_requested", {approval_id: "approval-1", summary:
 assertEqual(view.snapshot().pendingApprovals.length, 1, "pending approval survives in presentation state");
 view.accept(event(19, "approval_resolved", {approval_id: "approval-1", decision: "deny"}));
 assertEqual(view.snapshot().pendingApprovals.length, 0, "resolved approval leaves pending state");
+assertEqual(view.snapshot().approvalHistory.length, 1, "approval remains visible in run activity");
+assertEqual(view.snapshot().approvalHistory[0].decision, "deny", "approval outcome is retained");
 
-view.accept(event(20, "run_state_changed", {state: "running"}));
-view.accept(event(21, "run_failed", {detail: "validation failed"}));
+view.accept(event(20, "run_state_changed", {run_id: "run-1", state: "running"}));
+view.accept(event(21, "run_failed", {run_id: "run-1", detail: "validation failed"}));
 snapshot = view.snapshot();
 assertEqual(snapshot.runState, "failed", "terminal event determines run state");
+assertEqual(snapshot.runId, "run-1", "run identity survives event restoration");
 assertEqual(snapshot.currentOperation, "Run failed", "terminal state has a useful operation label");
 
 const restored = globalThis.QuilooIDEEvents.createRunPresentation();

@@ -64,6 +64,12 @@ def test_workspace_conversation_route_restores_persisted_activity(
     assert 'data-agent-view="chat"' in restored_page.text
     assert 'data-agent-view="activity"' in restored_page.text
     assert 'data-agent-view="changes"' in restored_page.text
+    assert 'id="agent-view-chat"' in restored_page.text
+    assert 'id="agent-view-activity"' in restored_page.text
+    assert 'id="agent-view-changes"' in restored_page.text
+    assert 'id="agent-run-summary"' in restored_page.text
+    assert 'id="agent-reasoning"' in restored_page.text
+    assert 'id="agent-changes"' in restored_page.text
     assert "Foundation slice" not in restored_page.text
     assert [message["content"] for message in restored_messages] == [
         "Inspect the experiment definition"
