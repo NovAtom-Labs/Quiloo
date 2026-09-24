@@ -24,6 +24,7 @@ from tcad_agent.ide.models import (
     RepositorySnapshot,
     RunState,
     WorkspaceBaseline,
+    WorkspaceChangeSet,
     WorkspaceRecord,
     is_run_grantable,
 )
@@ -129,6 +130,12 @@ class SqliteIDEStore:
                 CREATE TABLE IF NOT EXISTS run_change_baselines (
                     run_id TEXT PRIMARY KEY REFERENCES agent_runs(id),
                     baseline_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS run_change_manifests (
+                    run_id TEXT PRIMARY KEY REFERENCES agent_runs(id),
+                    manifest_json TEXT NOT NULL,
                     created_at TEXT NOT NULL
                 );
                 """
@@ -239,6 +246,41 @@ class SqliteIDEStore:
         if row is None:
             raise IDEStoreError(f"run baseline does not exist: {run_id}")
         return WorkspaceBaseline.model_validate_json(row["baseline_json"])
+
+    def save_run_change_manifest(
+        self, run_id: UUID, manifest: WorkspaceChangeSet
+    ) -> None:
+        """Persist the first terminal manifest as immutable run evidence."""
+
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO run_change_manifests (
+                    run_id, manifest_json, created_at
+                ) VALUES (?, ?, ?)
+                """,
+                (
+                    str(run_id),
+                    manifest.model_dump_json(),
+                    manifest.generated_at.isoformat(),
+                ),
+            )
+
+    def get_run_change_manifest(
+        self, run_id: UUID
+    ) -> WorkspaceChangeSet | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT manifest_json
+                FROM run_change_manifests
+                WHERE run_id = ?
+                """,
+                (str(run_id),),
+            ).fetchone()
+        if row is None:
+            return None
+        return WorkspaceChangeSet.model_validate_json(row["manifest_json"])
 
     def create_conversation(
         self, workspace_id: UUID, title: str

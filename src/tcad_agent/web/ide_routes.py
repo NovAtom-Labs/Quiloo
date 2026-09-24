@@ -344,6 +344,26 @@ def build_ide_router(
         conversation = services.conversations.get(run.conversation_id)
         workspace = services.workspaces.get(conversation.workspace_id)
         baseline = services.store.get_run_baseline(run_id)
+        terminal_states = {
+            RunState.COMPLETED,
+            RunState.FAILED,
+            RunState.BLOCKED,
+            RunState.CANCELLED,
+        }
+        if run.state in terminal_states:
+            if manifest := services.store.get_run_change_manifest(run_id):
+                return manifest
+            return WorkspaceChangeSet(
+                run_id=run_id,
+                baseline_captured_at=baseline.captured_at,
+                generated_at=run.updated_at,
+                baseline_truncated=True,
+                manifest_warning=(
+                    "This run ended before immutable change evidence was recorded. "
+                    "No changed-file claims are shown."
+                ),
+                files=(),
+            )
         change_set = services.changes.compare(workspace.root, baseline).model_copy(
             update={"run_id": run_id},
         )

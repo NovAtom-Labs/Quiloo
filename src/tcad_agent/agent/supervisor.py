@@ -13,7 +13,7 @@ from openhands.sdk.conversation import ConversationExecutionStatus
 from openhands.sdk.event import Event
 
 from tcad_agent.agent.events import AgentEventBridge, safe_event_text
-from tcad_agent.ide.changes import WorkspaceChangeTracker
+from tcad_agent.ide.changes import WorkspaceChangeTracker, attribute_changes
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
 from tcad_agent.ide.models import (
@@ -123,7 +123,8 @@ class AgentSupervisor:
             run = self.services.store.create_run(conversation_id, conversation_id)
             baseline_warning: str | None = None
             try:
-                baseline = self.services.changes.capture(workspace.root)
+                tracker = getattr(self.services, "changes", WorkspaceChangeTracker())
+                baseline = tracker.capture(workspace.root)
             except Exception as error:
                 baseline_warning = safe_event_text(error)
                 baseline = WorkspaceBaseline(
@@ -211,6 +212,7 @@ class AgentSupervisor:
                     approval.revision,
                     ApprovalDecision.DENY,
                 )
+        self._persist_change_manifest(run_id)
         cancelled = self._transition(run_id, RunState.CANCELLED)
         self.services.events.append(
             cancelled.conversation_id,
@@ -312,12 +314,15 @@ class AgentSupervisor:
                     self._transition(run_id, RunState.PAUSED)
                 return
             if status is ConversationExecutionStatus.STUCK:
+                self._persist_change_manifest(run_id)
                 final = self._transition(run_id, RunState.BLOCKED)
                 kind = "run_blocked"
             elif status is ConversationExecutionStatus.ERROR:
+                self._persist_change_manifest(run_id)
                 final = self._transition(run_id, RunState.FAILED)
                 kind = "run_failed"
             else:
+                self._persist_change_manifest(run_id)
                 final = self._transition(run_id, RunState.COMPLETED)
                 kind = "run_completed"
             self.services.events.append(
@@ -326,6 +331,7 @@ class AgentSupervisor:
         except Exception as error:
             current = self.services.store.get_run(run_id)
             if current.state is not RunState.CANCELLED:
+                self._persist_change_manifest(run_id)
                 failed = self._transition(run_id, RunState.FAILED)
                 self.services.events.append(
                     failed.conversation_id,
@@ -334,6 +340,34 @@ class AgentSupervisor:
                 )
         finally:
             workspace_lock.release()
+
+    def _persist_change_manifest(self, run_id: UUID) -> None:
+        """Freeze bounded workspace evidence before a run reaches a terminal state."""
+
+        if self.services.store.get_run_change_manifest(run_id) is not None:
+            return
+        run = self.services.store.get_run(run_id)
+        try:
+            conversation = self.services.conversations.get(run.conversation_id)
+            workspace = self.services.workspaces.get(conversation.workspace_id)
+            baseline = self.services.store.get_run_baseline(run_id)
+            tracker = getattr(self.services, "changes", WorkspaceChangeTracker())
+            change_set = tracker.compare(workspace.root, baseline).model_copy(
+                update={"run_id": run_id}
+            )
+            run_events = tuple(
+                event
+                for event in self.services.events.iter_after(run.conversation_id, 0)
+                if event.payload.get("run_id") == str(run_id)
+            )
+            manifest = attribute_changes(change_set, run_events, root=workspace.root)
+            self.services.store.save_run_change_manifest(run_id, manifest)
+        except (IDEStoreError, OSError, ValueError) as error:
+            self.services.events.append(
+                run.conversation_id,
+                "change_manifest_warning",
+                {"run_id": str(run_id), "detail": safe_event_text(error)},
+            )
 
     def _transition(self, run_id: UUID, state: RunState) -> AgentRunRecord:
         current = self.services.store.get_run(run_id)

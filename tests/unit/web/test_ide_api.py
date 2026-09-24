@@ -228,6 +228,13 @@ def test_run_changes_endpoint_compares_against_starting_workspace(
         },
     )
     existing.write_text("already dirty\nagent line\n")
+    approval = services.store.list_pending_approvals(UUID(conversation["id"]))[0]
+    approved = web.post(
+        f"/api/approvals/{approval.id}/approve-category",
+        json={"expected_revision": approval.revision},
+    )
+    assert approved.status_code == 200
+    supervisor.join(UUID(run["id"]), timeout=2)
 
     response = web.get(f"/api/runs/{run['id']}/changes")
 
@@ -240,6 +247,10 @@ def test_run_changes_endpoint_compares_against_starting_workspace(
     assert payload["files"][0]["additions"] == 1
     assert payload["files"][0]["attributed_action_ids"] == ["edit-existing"]
     assert payload["files"][0]["attributed_tools"] == ["file_editor"]
+
+    existing.write_text("later run state\n")
+    restored = web.get(f"/api/runs/{run['id']}/changes").json()
+    assert restored == payload
 
 
 def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:

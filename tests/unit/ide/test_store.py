@@ -10,6 +10,7 @@ from tcad_agent.ide.models import (
     BaselineFile,
     RunState,
     WorkspaceBaseline,
+    WorkspaceChangeSet,
 )
 from tcad_agent.ide.store import IDEStoreError, SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
@@ -205,3 +206,27 @@ def test_run_baseline_is_persisted_and_first_capture_wins(tmp_path: Path) -> Non
     restored = SqliteIDEStore(database).get_run_baseline(run.id)
 
     assert restored == first
+
+
+def test_terminal_change_manifest_is_immutable(tmp_path: Path) -> None:
+    database = tmp_path / "ide.sqlite3"
+    store = SqliteIDEStore(database)
+    workspace = WorkspaceManager(store).open(tmp_path)
+    conversation = ConversationService(store, EventFeed(store)).create(
+        workspace.id, "Agent task"
+    )
+    run = store.create_run(conversation.id, conversation.id)
+    now = datetime.now(UTC)
+    first = WorkspaceChangeSet(
+        run_id=run.id,
+        baseline_captured_at=now,
+        generated_at=now,
+        baseline_truncated=False,
+        files=(),
+    )
+    later = first.model_copy(update={"baseline_truncated": True})
+
+    store.save_run_change_manifest(run.id, first)
+    store.save_run_change_manifest(run.id, later)
+
+    assert SqliteIDEStore(database).get_run_change_manifest(run.id) == first

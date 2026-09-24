@@ -180,10 +180,38 @@ def test_change_attribution_uses_explicit_successful_action_identity(
             },
             created_at=now,
         ),
+        IDEEvent(
+            id=3,
+            conversation_id=conversation_id,
+            kind="tool_call_started",
+            payload={
+                "run_id": run_id,
+                "action_id": "validate-1",
+                "tool_name": "terminal",
+                "phase": "validate",
+                "evidence_kind": "validation",
+                "validation_scope": "workspace",
+                "arguments": {"command": "pytest -q"},
+            },
+            created_at=now,
+        ),
+        IDEEvent(
+            id=4,
+            conversation_id=conversation_id,
+            kind="tool_call_completed",
+            payload={
+                "run_id": run_id,
+                "action_id": "validate-1",
+                "tool_name": "terminal",
+                "is_error": False,
+                "output": "1 passed",
+            },
+            created_at=now,
+        ),
     )
 
     attributed = attribute_changes(change_set, events)
 
     assert attributed.files[0].attributed_action_ids == ("edit-1",)
     assert attributed.files[0].attributed_tools == ("file_editor",)
-    assert attributed.files[0].validation_action_ids == ()
+    assert attributed.files[0].validation_action_ids == ("validate-1",)

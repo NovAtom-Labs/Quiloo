@@ -132,4 +132,14 @@ def test_openhands_edits_tests_and_delegates_inside_repository(tmp_path: Path) -
     ]
     assert any(event.payload.get("task_id") for event in completed)
     assert [event.kind for event in activity].count("tool_call_started") == 4
+    started = {
+        event.payload.get("tool_call_id"): event.payload.get("action_id")
+        for event in activity
+        if event.kind == "tool_call_started"
+    }
+    manifest = store.get_run_change_manifest(run.id)
+    assert manifest is not None
+    device_change = next(change for change in manifest.files if change.path == "device.txt")
+    assert started["edit-1"] in device_change.attributed_action_ids
+    assert started["test-1"] in device_change.validation_action_ids
     assert llm.remaining_responses == 0

@@ -80,7 +80,7 @@
       .map((step) => ({label: step.label, output: step.output || null}));
     const warnings = [];
     if (changeSet?.baseline_truncated) {
-      warnings.push("The workspace scan reached its safety limit. Create, delete, and rename attribution may be incomplete.");
+      warnings.push(changeSet.manifest_warning || "The workspace scan reached its safety limit. Create, delete, and rename attribution may be incomplete.");
     }
     if (failed) warnings.push(`Failed action: ${failed.label}`);
     (snapshot?.technicalEvents || [])

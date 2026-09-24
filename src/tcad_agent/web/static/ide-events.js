@@ -114,6 +114,9 @@
       step.status = step.isError ? "failed" : "completed";
       step.subagent = payload.subagent || step.subagent;
       step.taskStatus = payload.task_status || null;
+      step.affectedPaths = payload.affected_paths || step.affectedPaths;
+      step.artifactPaths = payload.artifact_paths || step.artifactPaths;
+      step.provenance = payload.provenance || step.provenance;
       state.currentOperation = step.isError ? `${step.summary} failed` : step.summary;
     }
 

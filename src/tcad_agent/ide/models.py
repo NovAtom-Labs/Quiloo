@@ -92,6 +92,7 @@ class WorkspaceChangeSet(StrictModel):
     baseline_captured_at: datetime
     generated_at: datetime
     baseline_truncated: bool
+    manifest_warning: str | None = None
     files: tuple[WorkspaceChange, ...]
 
 

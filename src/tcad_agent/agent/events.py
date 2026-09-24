@@ -38,9 +38,10 @@ from tcad_agent.agent.policy import (
     permission_category,
 )
 from tcad_agent.agent.tools import TcadDomainAction
+from tcad_agent.ide.changes import WorkspaceChangeTracker
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
-from tcad_agent.ide.models import PermissionCategory, is_run_grantable
+from tcad_agent.ide.models import PermissionCategory, WorkspaceBaseline, is_run_grantable
 from tcad_agent.ide.store import SqliteIDEStore
 
 MAX_EVENT_TEXT = 16_000
@@ -118,13 +119,28 @@ def structured_action_metadata(event: ActionEvent) -> dict[str, JsonValue]:
         if executable in inspection_commands:
             return {"phase": "inspect"}
         if executable in validation_commands:
-            return {"phase": "validate", "evidence_kind": "validation"}
+            return {
+                "phase": "validate",
+                "evidence_kind": "validation",
+                "validation_scope": "workspace",
+            }
+        python_executable = re.fullmatch(r"python(?:\d+(?:\.\d+)?)?", executable)
+        if python_executable and tokens[1:3] == ["-m", "pytest"]:
+            return {
+                "phase": "validate",
+                "evidence_kind": "validation",
+                "validation_scope": "workspace",
+            }
         if (
-            executable in {"python", "python3"}
+            python_executable
             and len(tokens) > 1
             and Path(tokens[1]).name == "check.py"
         ):
-            return {"phase": "validate", "evidence_kind": "validation"}
+            return {
+                "phase": "validate",
+                "evidence_kind": "validation",
+                "validation_scope": "workspace",
+            }
         return {"phase": "execute"}
     phases = {"task_tracker": "plan", "think": "plan", "finish": "report"}
     return {"phase": phases.get(event.tool_name, "unknown")}
@@ -176,6 +192,8 @@ class AgentEventBridge:
             if (value := os.getenv(name)) is not None
         )
         self._approval_actions: set[str] = set()
+        self._action_baselines: dict[str, WorkspaceBaseline] = {}
+        self._change_tracker = WorkspaceChangeTracker()
 
     def __call__(self, event: Event) -> None:
         if isinstance(event, ActionEvent):
@@ -221,9 +239,10 @@ class AgentEventBridge:
             else event.security_risk
         )
         category = permission_category(policy_workspace, event)
+        metadata = structured_action_metadata(event)
         payload: dict[str, JsonValue] = {
             **self._base(event),
-            **structured_action_metadata(event),
+            **metadata,
             "action_id": event.id,
             "risk": risk.value,
             "permission_category": category.value,
@@ -234,6 +253,17 @@ class AgentEventBridge:
         normalized = self._normalized_action(event)
         if normalized:
             payload["arguments"] = normalized
+        if self.workspace is not None and metadata.get("phase") in {
+            "edit",
+            "execute",
+            "delegate",
+        }:
+            try:
+                self._action_baselines[event.id] = self._change_tracker.capture(
+                    self.workspace
+                )
+            except OSError:
+                pass
         self.events.append(self.conversation_id, "tool_call_started", payload)
         grant_applies = is_run_grantable(category) and category in self.permission_grants
         if risk is SecurityRisk.HIGH and grant_applies:
@@ -281,6 +311,16 @@ class AgentEventBridge:
                     "task_status": event.observation.status,
                 }
             )
+        baseline = self._action_baselines.pop(event.action_id, None)
+        if baseline is not None and self.workspace is not None:
+            try:
+                action_changes = self._change_tracker.compare(self.workspace, baseline)
+            except (OSError, ValueError):
+                pass
+            else:
+                payload["affected_paths"] = [
+                    change.path for change in action_changes.files
+                ]
         self.events.append(
             self.conversation_id,
             "tool_call_completed",

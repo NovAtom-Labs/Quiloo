@@ -196,6 +196,7 @@ def test_supervisor_runs_in_background_and_persists_final_answer(services) -> No
     supervisor.join(run.id, timeout=2)
 
     assert services.store.get_run(run.id).state is RunState.COMPLETED
+    assert services.store.get_run_change_manifest(run.id) is not None
     assert services.store.list_messages(services.conversation.id)[-1].content == "Completed"
     kinds = [
         event.kind

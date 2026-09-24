@@ -772,11 +772,11 @@ function renderActivity(snapshot) {
 }
 
 function renderAgentPresentation() {
-  const snapshot = runPresentation.snapshot();
-  if (snapshot.runId) selectedRunId = snapshot.runId;
+  const snapshot = runPresentation.snapshot(selectedRunId);
   renderRunSummary(snapshot);
   renderReasoning(snapshot);
   renderActivity(snapshot);
+  renderRunIndicator();
 }
 
 function renderChanges(changeSet) {
@@ -791,12 +791,12 @@ function renderChanges(changeSet) {
   if (incomplete) {
     const warning = document.createElement("p");
     warning.className = "change-scan-warning";
-    warning.textContent = "The workspace scan reached its safety limit. Modified files shown here are exact, but create, delete, and rename attribution may be incomplete.";
+    warning.textContent = changeSet.manifest_warning || "The workspace scan reached its safety limit. Modified files shown here are exact, but create, delete, and rename attribution may be incomplete.";
     agentChanges.append(warning);
   }
   if (!rows.length) {
     agentChanges.append(emptyCopy("No workspace changes are attributed to this run."));
-    renderRunSummary(runPresentation.snapshot());
+    renderRunSummary(runPresentation.snapshot(selectedRunId));
     return;
   }
   rows.forEach((row) => {
@@ -823,7 +823,7 @@ function renderChanges(changeSet) {
     });
     agentChanges.append(button);
   });
-  renderRunSummary(runPresentation.snapshot());
+  renderRunSummary(runPresentation.snapshot(selectedRunId));
 }
 
 async function refreshChanges(runId = selectedRunId) {
@@ -1005,8 +1005,10 @@ function connectEvents(conversationId) {
     streamState.textContent = "LIVE";
     const event = JSON.parse(rawEvent.data);
     if (!runPresentation.accept(event)) return;
-    const snapshot = runPresentation.snapshot();
-    if (snapshot.runId) selectRun(snapshot.runId, {refresh: true});
+    const eventRunId = event.payload?.run_id ? String(event.payload.run_id) : null;
+    if (eventRunId && ["run_created", "run_started"].includes(event.kind)) {
+      selectRun(eventRunId, {refresh: true});
+    }
     renderAgentPresentation();
     updateRunFromEvent(event);
     if (event.kind === "message_created") void refreshMessages(conversationId);

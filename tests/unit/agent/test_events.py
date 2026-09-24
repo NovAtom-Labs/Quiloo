@@ -1,3 +1,5 @@
+import shlex
+import sys
 from pathlib import Path
 from uuid import UUID
 
@@ -183,6 +185,49 @@ def test_structured_phase_metadata_uses_typed_command_semantics() -> None:
     inspection = structured_action_metadata(
         _terminal_action("cat checks/input.txt", risk=SecurityRisk.LOW)
     )
+    module_validation = structured_action_metadata(
+        _terminal_action(
+            f"{shlex.quote(sys.executable)} -m pytest -q", risk=SecurityRisk.LOW
+        )
+    )
 
-    assert validation == {"phase": "validate", "evidence_kind": "validation"}
+    assert validation == {
+        "phase": "validate",
+        "evidence_kind": "validation",
+        "validation_scope": "workspace",
+    }
     assert inspection == {"phase": "inspect"}
+    assert module_validation == validation
+
+
+def test_successful_action_observation_records_action_scoped_changed_paths(
+    tmp_path: Path,
+) -> None:
+    store, events, conversations, conversation, run = _services(tmp_path)
+    workspace = tmp_path / "repository"
+    workspace.mkdir()
+    target = workspace / "generated.txt"
+    bridge = AgentEventBridge(
+        conversation.id,
+        run.id,
+        store,
+        events,
+        conversations,
+        workspace=workspace,
+    )
+    action = _terminal_action("python generate.py", risk=SecurityRisk.LOW)
+
+    bridge(action)
+    target.write_text("generated\n")
+    bridge(
+        ObservationEvent(
+            tool_name="terminal",
+            tool_call_id=action.tool_call_id,
+            action_id=action.id,
+            observation=_TestObservation.from_text("generated"),
+        )
+    )
+
+    completed = events.list_after(conversation.id, 0)[-1]
+    assert completed.kind == "tool_call_completed"
+    assert completed.payload["affected_paths"] == ["generated.txt"]
