@@ -9,6 +9,12 @@ from pathlib import Path
 from typing import cast
 from uuid import UUID
 
+from openhands.sdk.agent.stream_context import (
+    StreamAborted,
+    StreamDelta,
+    StreamProgress,
+    StreamStarted,
+)
 from openhands.sdk.event import (
     ActionEvent,
     AgentErrorEvent,
@@ -118,6 +124,39 @@ class AgentEventBridge:
                     "key": self._safe(event.key),
                     "value": self._safe(event.value),
                 },
+            )
+
+    def on_stream(self, frame: StreamProgress) -> None:
+        """Forward live thinking/text deltas as they generate.
+
+        Shown verbatim in the UI by product decision: the team chose live
+        reasoning visibility over the provider's usual guidance to keep
+        extended-thinking output hidden from end users. Secret redaction
+        still applies; only the "never show raw reasoning" rule is lifted.
+        """
+        if isinstance(frame, StreamStarted):
+            self.events.append(
+                self.conversation_id,
+                "thinking_started",
+                {"item_id": frame.item_id, "attempt": frame.attempt},
+            )
+        elif isinstance(frame, StreamDelta):
+            self.events.append(
+                self.conversation_id,
+                "thinking_delta",
+                {
+                    "item_id": frame.item_id,
+                    "attempt": frame.attempt,
+                    "order": frame.order,
+                    "delta_kind": frame.kind,
+                    "content": self._safe(frame.content),
+                },
+            )
+        elif isinstance(frame, StreamAborted):
+            self.events.append(
+                self.conversation_id,
+                "thinking_aborted",
+                {"item_id": frame.item_id, "reason": frame.reason},
             )
 
     def _action(self, event: ActionEvent) -> None:

@@ -1,6 +1,7 @@
 from pathlib import Path
 from uuid import UUID
 
+from openhands.sdk.agent.stream_context import StreamAborted, StreamDelta, StreamStarted
 from openhands.sdk.event import ActionEvent, MessageEvent, ObservationEvent
 from openhands.sdk.llm import Message, TextContent
 from openhands.sdk.llm.message import MessageToolCall
@@ -97,6 +98,35 @@ def test_high_risk_action_creates_one_pending_approval(tmp_path: Path) -> None:
     assert approvals[0].action_id == action.id
     assert approvals[0].payload == {"command": "git push"}
     assert store.get_run(run.id).state.value == "waiting_for_approval"
+
+
+def test_on_stream_shows_live_reasoning_but_still_redacts_secrets(
+    tmp_path: Path, monkeypatch
+) -> None:
+    store, events, conversations, conversation, run = _services(tmp_path)
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "secret-value")
+    bridge = AgentEventBridge(conversation.id, run.id, store, events, conversations)
+
+    bridge.on_stream(StreamStarted(item_id="item-1", attempt=1, anchor_seq=None))
+    bridge.on_stream(
+        StreamDelta(
+            item_id="item-1",
+            attempt=1,
+            order=0,
+            kind="reasoning",
+            content="thinking about it, token secret-value",
+        )
+    )
+    bridge.on_stream(
+        StreamAborted(item_id="item-1", attempt=1, reason="cancelled")
+    )
+
+    activity = events.list_after(conversation.id, 0)
+    kinds = [event.kind for event in activity]
+    assert kinds[-3:] == ["thinking_started", "thinking_delta", "thinking_aborted"]
+    delta_payload = activity[-2].payload
+    assert "thinking about it" in str(delta_payload["content"])
+    assert "secret-value" not in str(delta_payload["content"])
 
 
 def test_bridge_accepts_uuid_identifiers(tmp_path: Path) -> None:

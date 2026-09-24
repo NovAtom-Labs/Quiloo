@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import json
-import os
 
 from openhands.sdk import LLM, Message, TextContent
-from pydantic import SecretStr, ValidationError
+from pydantic import ValidationError
 
-from tcad_agent.agent.runtime import DEFAULT_LLM_MODEL
+from tcad_agent.agent.runtime import ModelConfigurationError, llm_from_environment
 from tcad_agent.control.models import ResearchRequest
 from tcad_agent.domain.models import ExperimentSpec
 from tcad_agent.model_gateway.base import AgentContextPacket, AgentProposal
 
-
-class ModelConfigurationError(RuntimeError):
-    pass
+__all__ = [
+    "ModelConfigurationError",
+    "ModelResponseError",
+    "OpenHandsBedrockGateway",
+]
 
 
 class ModelResponseError(RuntimeError):
@@ -48,20 +49,7 @@ class OpenHandsBedrockGateway:
 
     @classmethod
     def from_environment(cls) -> OpenHandsBedrockGateway:
-        token = os.getenv("AWS_BEARER_TOKEN_BEDROCK")
-        if not token:
-            raise ModelConfigurationError("AWS_BEARER_TOKEN_BEDROCK is not configured")
-        model = os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL)
-        region = os.getenv("AWS_REGION_NAME", "ap-south-1")
-        reasoning_effort = os.getenv("TCAD_REASONING_EFFORT", "medium")
-        llm = LLM(
-            model=model,
-            api_key=SecretStr(token),
-            aws_region_name=region,
-            reasoning_effort=reasoning_effort,
-            log_completions=False,
-        )
-        return cls(llm)
+        return cls(llm_from_environment())
 
     def propose(
         self, request: ResearchRequest, context: AgentContextPacket

@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 from uuid import UUID
 
-from openhands.sdk import LLM, Agent, AgentContext, Conversation, Tool
+from openhands.sdk import LLM, Agent, AgentContext, Tool
 from openhands.sdk.conversation.impl.local_conversation import LocalConversation
 from openhands.sdk.event import Event
 from openhands.sdk.security import ConfirmRisky, SecurityRisk
@@ -23,13 +23,37 @@ from openhands.tools.preset.default import (
 )
 from openhands.tools.task import TaskToolSet
 from openhands.tools.task.manager import ConfirmationHandler
+from pydantic import SecretStr
 
 from tcad_agent.agent.policy import WorkspaceSecurityAnalyzer, classify_action
 from tcad_agent.agent.supervisor import RuntimeConversation
 from tcad_agent.agent.tools import DomainTools, TcadDomainTool, build_tools
 
 DEFAULT_LLM_MODEL = "bedrock/global.anthropic.claude-sonnet-4-6"
+DEFAULT_AWS_REGION = "ap-south-1"
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
+
+
+class ModelConfigurationError(RuntimeError):
+    pass
+
+
+def llm_from_environment() -> LLM:
+    """Build the Bedrock LLM client from environment variables.
+
+    Shared by the IDE agent runtime and the structured proposal gateway so the
+    credential, region, and model resolution can't drift between them again.
+    """
+    token = os.getenv("AWS_BEARER_TOKEN_BEDROCK")
+    if not token:
+        raise ModelConfigurationError("AWS_BEARER_TOKEN_BEDROCK is not configured")
+    return LLM(
+        model=os.getenv("LLM_MODEL", DEFAULT_LLM_MODEL),
+        api_key=SecretStr(token),
+        aws_region_name=os.getenv("AWS_REGION_NAME", DEFAULT_AWS_REGION),
+        reasoning_effort=cast(Any, os.getenv("TCAD_REASONING_EFFORT", "medium")),
+        stream=True,
+    )
 
 if TYPE_CHECKING:
     from openhands.sdk.conversation.state import ConversationState
@@ -105,11 +129,7 @@ class OpenHandsRuntimeFactory:
         register_builtins_agents(enable_browser=False)
         register_file_agents(PROJECT_ROOT)
         register_file_agents(workspace)
-        llm = self.llm or LLM(
-                model=profile.model,
-                aws_region_name=os.getenv("AWS_REGION_NAME", "us-east-1"),
-                reasoning_effort=cast(Any, profile.reasoning_effort),
-            )
+        llm = self.llm or llm_from_environment()
         agent = Agent(
             llm=llm,
             tools=list(profile.tools),
@@ -121,18 +141,17 @@ class OpenHandsRuntimeFactory:
         )
         persistence_dir = self.runtime_root / "openhands"
         persistence_dir.mkdir(parents=True, exist_ok=True)
-        conversation = cast(
-            LocalConversation,
-            Conversation(
-                agent=agent,
-                workspace=workspace,
-                persistence_dir=persistence_dir,
-                conversation_id=conversation_id,
-                callbacks=[callback],
-                max_iteration_per_run=80,
-                visualizer=None,
-                delete_on_close=False,
-            ),
+        on_stream = getattr(callback, "on_stream", None)
+        conversation = LocalConversation(
+            agent=agent,
+            workspace=workspace,
+            persistence_dir=persistence_dir,
+            conversation_id=conversation_id,
+            callbacks=[callback],
+            stream_callbacks=[on_stream] if on_stream is not None else None,
+            max_iteration_per_run=80,
+            visualizer=None,
+            delete_on_close=False,
         )
         conversation.set_security_analyzer(
             WorkspaceSecurityAnalyzer(workspace=workspace.resolve())

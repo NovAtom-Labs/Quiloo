@@ -51,6 +51,7 @@ let eventSource = null;
 let sendingPrompt = false;
 let activeFile = null;
 let fileRequestGeneration = 0;
+const thinkingRows = new Map();
 const navigationGuard = window.QuilooIDEState.createNavigationGuard();
 const submissions = window.QuilooIDEState.createSubmissionTracker();
 const eventLedger = window.QuilooIDEState.createEventLedger();
@@ -496,6 +497,42 @@ function appendActivity(event) {
   agentActivity.scrollTop = agentActivity.scrollHeight;
 }
 
+function beginThinkingRow(itemId) {
+  const row = document.createElement("div");
+  const label = document.createElement("strong");
+  const body = document.createElement("pre");
+  row.className = "thinking-row is-live";
+  label.textContent = "Thinking";
+  row.append(label, body);
+  agentActivity.append(row);
+  agentActivity.scrollTop = agentActivity.scrollHeight;
+  const entry = {row, body, label};
+  thinkingRows.set(itemId, entry);
+  return entry;
+}
+
+function appendThinkingDelta(event) {
+  const payload = event.payload || {};
+  const itemId = payload.item_id;
+  if (!itemId) return;
+  const entry = thinkingRows.get(itemId) || beginThinkingRow(itemId);
+  entry.body.append(document.createTextNode(String(payload.content || "")));
+  agentActivity.scrollTop = agentActivity.scrollHeight;
+}
+
+function finishThinkingRow(itemId, {aborted = false} = {}) {
+  const entry = thinkingRows.get(itemId);
+  if (!entry) return;
+  entry.row.classList.remove("is-live");
+  entry.row.classList.add(aborted ? "is-aborted" : "is-done");
+  entry.label.textContent = aborted ? "Thinking (interrupted)" : "Thinking";
+  thinkingRows.delete(itemId);
+}
+
+function finishOpenThinkingRows() {
+  for (const itemId of Array.from(thinkingRows.keys())) finishThinkingRow(itemId);
+}
+
 function approvalTarget(approval) {
   const payload = approval.payload || {};
   return payload.path || payload.command || payload.operation || "Review the requested action";
@@ -579,6 +616,7 @@ function updateRunFromEvent(event) {
 function connectEvents(conversationId) {
   if (eventSource) eventSource.close();
   clearNode(agentActivity);
+  thinkingRows.clear();
   eventLedger.reset();
   streamState.textContent = "CONNECTING";
   eventSource = new EventSource(`/api/conversations/${conversationId}/events`);
@@ -587,6 +625,13 @@ function connectEvents(conversationId) {
     streamState.textContent = "LIVE";
     const event = JSON.parse(rawEvent.data);
     if (!eventLedger.accept(event.id)) return;
+    if (event.kind === "thinking_started") { beginThinkingRow(event.payload?.item_id); return; }
+    if (event.kind === "thinking_delta") { appendThinkingDelta(event); return; }
+    if (event.kind === "thinking_aborted") {
+      finishThinkingRow(event.payload?.item_id, {aborted: true});
+      return;
+    }
+    finishOpenThinkingRows();
     appendActivity(event);
     updateRunFromEvent(event);
     if (event.kind === "message_created") void refreshMessages(conversationId);
@@ -599,6 +644,7 @@ function connectEvents(conversationId) {
     "run_started", "tool_call_started", "tool_call_completed", "approval_requested",
     "approval_resolved", "run_completed", "run_failed", "run_blocked", "run_paused",
     "run_cancelled", "run_recovered_paused", "agent_error", "runtime_state_changed",
+    "thinking_started", "thinking_delta", "thinking_aborted",
   ].forEach((kind) => eventSource.addEventListener(kind, receive));
   eventSource.onopen = () => { streamState.textContent = "LIVE"; };
   eventSource.onerror = () => { streamState.textContent = "RECONNECTING"; };

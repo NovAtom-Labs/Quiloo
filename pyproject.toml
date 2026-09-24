@@ -7,7 +7,7 @@ name = "novatom-tcad-agent"
 version = "0.1.0"
 description = "Simulator-neutral TCAD research agent foundation"
 readme = "README.md"
-requires-python = ">=3.13,<3.14"
+requires-python = ">=3.13"
 dependencies = [
   "cryptography>=46,<51",
   "fastapi>=0.116,<1",
@@ -16,6 +16,7 @@ dependencies = [
   "numpy>=2.2,<3",
   "pint>=0.26,<0.27",
   "pydantic>=2.12,<3",
+  "python-dotenv>=1.2,<2",
   "pyyaml>=6.0,<7",
   "typer>=0.16,<1",
   "uvicorn>=0.35,<1",

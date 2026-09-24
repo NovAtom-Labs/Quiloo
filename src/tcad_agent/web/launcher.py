@@ -11,9 +11,12 @@ import urllib.request
 import webbrowser
 
 import uvicorn
+from dotenv import load_dotenv
 
 from tcad_agent.web.app import create_app
 from tcad_agent.web.runtime import runtime_fingerprint
+
+load_dotenv()
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765

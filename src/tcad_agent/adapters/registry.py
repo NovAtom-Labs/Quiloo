@@ -1,6 +1,7 @@
 """Single composition point for backend-specific adapters and runners."""
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -30,9 +31,14 @@ class BackendBinding:
 def get_backend(backend: str) -> BackendBinding:
     """Return the installed backend binding or refuse at one explicit seam."""
     if backend == "devsim":
+        devsim_venv = Path.cwd().parent / "devsim" / ".venv"
+        default_devsim_python = (
+            devsim_venv / "Scripts" / "python.exe"
+            if sys.platform == "win32"
+            else devsim_venv / "bin" / "python"
+        )
         devsim_python = Path(
-            os.getenv("TCAD_DEVSIM_PYTHON")
-            or str(Path.cwd().parent / "devsim" / ".venv" / "bin" / "python")
+            os.getenv("TCAD_DEVSIM_PYTHON") or str(default_devsim_python)
         )
         return BackendBinding(
             adapter=DevsimAdapter.from_defaults(),

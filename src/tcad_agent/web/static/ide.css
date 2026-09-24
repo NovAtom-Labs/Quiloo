@@ -408,6 +408,30 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .activity-row.is-tool_call_completed { border-left: 2px solid #5f8378; padding-left: 7px; }
 .activity-row.is-approval_requested { border-left: 2px solid var(--amber); padding-left: 7px; }
 .activity-row time { color: var(--muted-dim); font-family: var(--font-mono); }
+.thinking-row {
+  display: grid;
+  gap: 4px;
+  padding: 6px 3px 6px 7px;
+  border-bottom: 1px solid var(--border);
+  border-left: 2px solid #7a6bab;
+}
+.thinking-row > strong { color: #a99fd0; font-size: 0.62rem; font-weight: 550; }
+.thinking-row.is-live > strong::after { content: "…"; animation: thinking-pulse 1.2s steps(4, end) infinite; }
+.thinking-row.is-done > strong::after { content: ""; }
+.thinking-row.is-aborted > strong { color: #b08a8a; }
+.thinking-row pre {
+  margin: 0;
+  overflow-x: hidden;
+  color: #8f97a8;
+  font: 0.58rem/1.4 var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.thinking-row .thinking-text-delta { color: #98a2ad; }
+@keyframes thinking-pulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
 .message-form { padding: 10px; border-top: 1px solid var(--border); background: var(--surface); }
 .message-form textarea { min-height: 70px; font-size: 0.72rem; }
 .message-form > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 7px; }

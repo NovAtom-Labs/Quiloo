@@ -9,6 +9,7 @@ from uuid import uuid4
 
 import typer
 import yaml
+from dotenv import load_dotenv
 from pydantic import ValidationError
 
 from tcad_agent.adapters.registry import BackendAdapterUnavailable, get_backend
@@ -25,6 +26,8 @@ from tcad_agent.knowledge.retrieve import KnowledgeIndex
 from tcad_agent.runners.models import RunBudget
 from tcad_agent.runners.remote import BackendUnconfiguredError, RemoteProtocolError
 from tcad_agent.validation.engine import ValidationEngine
+
+load_dotenv()
 
 app = typer.Typer(help="Validate, compile, run, and report simulator-neutral TCAD studies.")
 knowledge_app = typer.Typer(help="Search the authorized versioned TCAD knowledge index.")
