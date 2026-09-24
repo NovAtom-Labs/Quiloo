@@ -12,6 +12,8 @@ from openhands.sdk.tool import Observation
 from openhands.tools.terminal.definition import TerminalAction
 
 from tcad_agent.agent.events import AgentEventBridge, structured_action_metadata
+from tcad_agent.agent.tools import TcadDomainAction, TcadDomainObservation
+from tcad_agent.ide.changes import WorkspaceChangeTracker
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
 from tcad_agent.ide.store import SqliteIDEStore
@@ -193,6 +195,9 @@ def test_structured_phase_metadata_uses_typed_command_semantics() -> None:
     formatting = structured_action_metadata(
         _terminal_action("ruff format src", risk=SecurityRisk.LOW)
     )
+    fixing = structured_action_metadata(
+        _terminal_action("ruff check --fix src", risk=SecurityRisk.LOW)
+    )
 
     assert validation == {
         "phase": "validate",
@@ -202,6 +207,61 @@ def test_structured_phase_metadata_uses_typed_command_semantics() -> None:
     assert inspection == {"phase": "inspect"}
     assert module_validation == validation
     assert formatting == {"phase": "execute"}
+    assert fixing == {"phase": "execute"}
+
+
+def test_domain_refusal_is_failed_activity_without_workspace_validation_claims(
+    tmp_path: Path,
+) -> None:
+    store, events, conversations, conversation, run = _services(tmp_path)
+    workspace = tmp_path / "repository"
+    workspace.mkdir()
+    baseline = WorkspaceChangeTracker().capture(workspace)
+    store.save_run_baseline(run.id, baseline)
+    bridge = AgentEventBridge(
+        conversation.id,
+        run.id,
+        store,
+        events,
+        conversations,
+        workspace=workspace,
+    )
+    action = ActionEvent(
+        thought=[],
+        action=TcadDomainAction(operation="validate_spec", payload={}),
+        tool_name="tcad_domain",
+        tool_call_id="domain-1",
+        tool_call=MessageToolCall(
+            id="domain-1",
+            name="tcad_domain",
+            arguments="{}",
+            origin="completion",
+        ),
+        llm_response_id="domain-response-1",
+        security_risk=SecurityRisk.LOW,
+    )
+
+    bridge(action)
+    (workspace / "unrelated.txt").write_text("not validated\n")
+    bridge(
+        ObservationEvent(
+            tool_name="tcad_domain",
+            tool_call_id=action.tool_call_id,
+            action_id=action.id,
+            observation=TcadDomainObservation.from_text(
+                text='{"status":"refused"}',
+                status="refused",
+                code="invalid_spec",
+                message="invalid",
+                data={},
+                is_error=False,
+            ),
+        )
+    )
+
+    completed = events.list_after(conversation.id, 0)[-1]
+    assert completed.payload["is_error"] is True
+    assert "validated_files" not in completed.payload
 
 
 def test_successful_action_observation_records_action_scoped_changed_paths(

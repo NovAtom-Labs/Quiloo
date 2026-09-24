@@ -175,6 +175,10 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         "Run active. Waiting for the next recorded action.",
         "change-validation-link",
         "data-action-id",
+        "row.affectedPaths",
+        "Affected file:",
+        "row.validationActionIds.forEach",
+        "unlinkedValidationChecks",
     ):
         assert required in source or required in permission_source
 

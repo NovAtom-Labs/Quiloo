@@ -75,8 +75,15 @@
       cancelled: "muted",
     };
     const changedPaths = (changeSet?.files || []).map((change) => change.path);
-    const validationEvidence = successful
-      .filter((step) => step.evidenceKind === "validation")
+    const validationActionIds = new Set(
+      (changeSet?.files || []).flatMap((change) => change.validation_action_ids || []),
+    );
+    const validationChecks = successful.filter((step) => step.evidenceKind === "validation");
+    const validationEvidence = validationChecks
+      .filter((step) => validationActionIds.has(step.id))
+      .map((step) => ({label: step.label, output: step.output || null}));
+    const unlinkedValidationChecks = validationChecks
+      .filter((step) => !validationActionIds.has(step.id))
       .map((step) => ({label: step.label, output: step.output || null}));
     const warnings = [];
     if (changeSet?.baseline_truncated) {
@@ -104,6 +111,7 @@
       phases: unique(steps.map((step) => step.phase)),
       commands: unique(steps.map((step) => step.command)),
       validationEvidence,
+      unlinkedValidationChecks,
       artifacts: (changeSet?.files || []).filter((change) => change.artifact).map((change) => change.path),
       provenance: unique(successful.map((step) => step.provenance).filter((item) => typeof item === "string")),
       warnings,

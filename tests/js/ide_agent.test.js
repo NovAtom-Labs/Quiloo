@@ -30,7 +30,10 @@ assertEqual(rows[0].phase, "Validate", "test execution is classified as validati
 
 const completed = agent.outcomeSummary(
   {runState: "completed", steps: rows, currentOperation: "Run completed"},
-  {files: [{path: "src/physics.py"}, {path: "report.md"}]},
+  {files: [
+    {path: "src/physics.py", validation_action_ids: ["action-1"]},
+    {path: "report.md"},
+  ]},
 );
 assertEqual(completed.tone, "success", "completed run uses success treatment");
 assertEqual(completed.title, "Run completed", "completion title is explicit");
@@ -38,8 +41,16 @@ assertEqual(completed.changedFiles, 2, "completion includes changed file count")
 assertEqual(completed.completedSteps, 1, "completion includes finished steps");
 assertEqual(completed.changedPaths.join(","), "src/physics.py,report.md", "completion names changed files");
 assertEqual(completed.validationEvidence.length, 1, "successful validation action becomes evidence");
+assertEqual(completed.unlinkedValidationChecks.length, 0, "linked validation is not called stale");
 assertEqual(completed.commands[0], "pytest tests/test_science.py -q", "completion retains executed commands");
 assertEqual(completed.nextActions.length, 1, "completed runs provide a grounded next action");
+
+const staleCheck = agent.outcomeSummary(
+  {runState: "completed", steps: rows, currentOperation: "Run completed"},
+  {files: [{path: "src/physics.py", validation_action_ids: []}]},
+);
+assertEqual(staleCheck.validationEvidence.length, 0, "stale check is not final evidence");
+assertEqual(staleCheck.unlinkedValidationChecks.length, 1, "stale check remains visible as executed");
 
 const honest = agent.activityRows({steps: [{
   id: "action-2",

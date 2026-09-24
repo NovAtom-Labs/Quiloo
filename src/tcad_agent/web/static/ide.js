@@ -665,6 +665,7 @@ function renderRunSummary(snapshot) {
     ["Changed files", summary.changedPaths?.join("\n")],
     ["Commands", summary.commands?.join("\n")],
     ["Validation", summary.validationEvidence?.map((item) => `${item.label}${item.output ? `: ${item.output}` : ""}`).join("\n")],
+    ["Executed checks, not final evidence", summary.unlinkedValidationChecks?.map((item) => `${item.label}${item.output ? `: ${item.output}` : ""}`).join("\n")],
     ["Artifacts", summary.artifacts?.join("\n")],
     ["Provenance", summary.provenance?.join("\n")],
     ["Warnings", summary.warnings?.join("\n")],
@@ -737,13 +738,19 @@ function renderActivity(snapshot) {
       output.textContent = String(row.output);
       technical.append(output);
     }
-    if (row.path) {
+    const affectedPaths = Array.from(new Set([row.path, ...row.affectedPaths].filter(Boolean)));
+    affectedPaths.forEach((affectedPath) => {
       const open = document.createElement("button");
       open.type = "button";
-      open.textContent = `Open ${row.path}`;
-      open.addEventListener("click", () => void openFile({path: row.path}));
+      open.textContent = `Affected file: ${affectedPath}`;
+      open.addEventListener("click", () => {
+        const changed = window.QuilooChanges.toRows(activeChangeSet)
+          .find((candidate) => candidate.label === affectedPath);
+        if (changed?.diff || (changed && !changed.canOpenFile)) showDiff(changed);
+        else void openFile({path: affectedPath});
+      });
       technical.append(open);
-    }
+    });
     if (!technical.childNodes.length) technical.append(emptyCopy("No additional technical output."));
     details.append(summary, technical);
     agentActivity.append(details);
@@ -826,22 +833,26 @@ function renderChanges(changeSet) {
     });
     item.append(button);
     if (row.validationActionIds.length) {
-      const validation = document.createElement("button");
-      const actionId = row.validationActionIds.at(-1);
-      validation.type = "button";
-      validation.className = "change-validation-link";
-      validation.textContent = row.validationActionIds.length === 1
-        ? "View validation evidence"
-        : `View ${row.validationActionIds.length} validation checks`;
-      validation.addEventListener("click", () => {
-        activateAgentView("activity");
-        const target = Array.from(agentActivity.querySelectorAll("[data-action-id]"))
-          .find((candidate) => candidate.dataset.actionId === actionId);
-        if (!target) return;
-        target.open = true;
-        target.scrollIntoView({block: "center"});
+      const validations = document.createElement("div");
+      validations.className = "change-validation-links";
+      row.validationActionIds.forEach((actionId, index) => {
+        const validation = document.createElement("button");
+        validation.type = "button";
+        validation.className = "change-validation-link";
+        validation.textContent = row.validationActionIds.length === 1
+          ? "View validation evidence"
+          : `Validation check ${index + 1}`;
+        validation.addEventListener("click", () => {
+          activateAgentView("activity");
+          const target = Array.from(agentActivity.querySelectorAll("[data-action-id]"))
+            .find((candidate) => candidate.dataset.actionId === actionId);
+          if (!target) return;
+          target.open = true;
+          target.scrollIntoView({block: "center"});
+        });
+        validations.append(validation);
       });
-      item.append(validation);
+      item.append(validations);
     }
     agentChanges.append(item);
   });

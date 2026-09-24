@@ -37,7 +37,7 @@ from tcad_agent.agent.policy import (
     classify_action,
     permission_category,
 )
-from tcad_agent.agent.tools import TcadDomainAction
+from tcad_agent.agent.tools import TcadDomainAction, TcadDomainObservation
 from tcad_agent.ide.changes import WorkspaceChangeTracker
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
@@ -124,7 +124,12 @@ def structured_action_metadata(event: ActionEvent) -> dict[str, JsonValue]:
                 "evidence_kind": "validation",
                 "validation_scope": "workspace",
             }
-        if executable == "ruff" and tokens[1:2] == ["check"]:
+        ruff_mutates = any(
+            token in {"--add-noqa", "--fix", "--fix-only"}
+            or token.startswith(("--fix=", "--fix-only="))
+            for token in tokens[2:]
+        )
+        if executable == "ruff" and tokens[1:2] == ["check"] and not ruff_mutates:
             return {
                 "phase": "validate",
                 "evidence_kind": "validation",
@@ -308,10 +313,14 @@ class AgentEventBridge:
 
     def _observation(self, event: ObservationEvent) -> None:
         metadata = self._action_metadata.pop(event.action_id, {})
+        observation_failed = event.observation.is_error or (
+            isinstance(event.observation, TcadDomainObservation)
+            and event.observation.status != "ok"
+        )
         payload: dict[str, JsonValue] = {
             **self._base(event),
             "action_id": event.action_id,
-            "is_error": event.observation.is_error,
+            "is_error": observation_failed,
             "output": self._safe(event.observation.text),
             "tool_call_id": event.tool_call_id,
             "tool_name": event.tool_name,
@@ -338,8 +347,9 @@ class AgentEventBridge:
                     change.path for change in action_changes.files
                 ]
         if (
-            not event.observation.is_error
+            not observation_failed
             and metadata.get("evidence_kind") == "validation"
+            and metadata.get("validation_scope") == "workspace"
             and self.workspace is not None
         ):
             try:
