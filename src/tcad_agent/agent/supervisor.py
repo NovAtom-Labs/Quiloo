@@ -17,6 +17,7 @@ from tcad_agent.ide.events import EventFeed
 from tcad_agent.ide.models import (
     AgentRunRecord,
     ApprovalDecision,
+    PermissionCategory,
     RunState,
 )
 from tcad_agent.ide.store import IDEStoreError, SqliteIDEStore
@@ -90,6 +91,7 @@ class AgentSupervisor:
         self._guard = threading.RLock()
         self._threads: dict[UUID, threading.Thread] = {}
         self._runtimes: dict[UUID, RuntimeConversation] = {}
+        self._permission_grants: dict[UUID, set[PermissionCategory]] = {}
         self._workspace_locks: dict[Path, threading.Lock] = {}
         self._recover_interrupted_runs()
 
@@ -113,6 +115,7 @@ class AgentSupervisor:
             if persist_message:
                 self.services.conversations.add_user_message(conversation_id, prompt)
             run = self.services.store.create_run(conversation_id, conversation_id)
+            permission_grants = self._grants_for(run.id)
             bridge = AgentEventBridge(
                 conversation_id,
                 run.id,
@@ -120,6 +123,7 @@ class AgentSupervisor:
                 self.services.events,
                 self.services.conversations,
                 workspace=workspace.root,
+                permission_grants=permission_grants,
             )
             runtime = self.runtime_factory.create(
                 workspace.root, run.sdk_conversation_id, bridge
@@ -137,6 +141,15 @@ class AgentSupervisor:
         approval = self.services.store.resolve_approval(
             approval_id, expected_revision, ApprovalDecision.APPROVE
         )
+        return self._continue(approval.run_id)
+
+    def approve_category(
+        self, approval_id: UUID, expected_revision: int
+    ) -> AgentRunRecord:
+        approval = self.services.store.resolve_approval_with_grant(
+            approval_id, expected_revision
+        )
+        self._grants_for(approval.run_id).add(approval.permission_category)
         return self._continue(approval.run_id)
 
     def deny(
@@ -205,6 +218,7 @@ class AgentSupervisor:
             run = self.services.store.get_run(run_id)
             conversation = self.services.conversations.get(run.conversation_id)
             workspace = self.services.workspaces.get(conversation.workspace_id)
+            permission_grants = self._grants_for(run.id)
             bridge = AgentEventBridge(
                 conversation.id,
                 run.id,
@@ -212,12 +226,25 @@ class AgentSupervisor:
                 self.services.events,
                 self.services.conversations,
                 workspace=workspace.root,
+                permission_grants=permission_grants,
             )
             runtime = self.runtime_factory.create(
                 workspace.root, run.sdk_conversation_id, bridge
             )
             self._runtimes[run_id] = runtime
             return runtime
+
+    def _grants_for(self, run_id: UUID) -> set[PermissionCategory]:
+        with self._guard:
+            existing = self._permission_grants.get(run_id)
+            if existing is not None:
+                return existing
+            restored = {
+                PermissionCategory(value)
+                for value in self.services.store.list_run_permission_grants(run_id)
+            }
+            self._permission_grants[run_id] = restored
+            return restored
 
     def _launch(
         self,

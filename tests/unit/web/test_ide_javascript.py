@@ -73,3 +73,39 @@ def test_production_ide_script_parses() -> None:
     )
 
     assert completed.returncode == 0, completed.stderr
+
+
+def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide.js").read_text()
+
+    for required in (
+        "refreshCoordinator.request",
+        'document.addEventListener("visibilitychange"',
+        "setInterval",
+        'querySelector("#toggle-agent-panel")',
+        'querySelector("#refresh-conversation")',
+        'querySelector("#file-viewer-edit")',
+        'querySelector("#file-editor")',
+        "/files/content",
+        "/approve-category",
+        "Approve all like this",
+        "Technical details",
+        "permission_category",
+    ):
+        assert required in source
+
+
+def test_responsive_styles_keep_agent_panel_available_as_a_drawer() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide.css").read_text()
+
+    assert ".toggle-agent-panel" in source
+    assert ".agent-panel.is-open" in source
+    assert "position: fixed" in source
+    assert ".file-editor" in source
+    assert ".panel-title > span:first-child" in source
+    assert ".panel-title > span:last-child" in source
+    assert "text-overflow: ellipsis" in source
+    assert ".approval-technical" in source
+    assert ".is-approve-category" in source

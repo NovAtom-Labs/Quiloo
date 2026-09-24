@@ -45,6 +45,13 @@ class WorkspaceFilePreview(StrictModel):
     content: str | None = None
 
 
+class WorkspaceTextFile(StrictModel):
+    path: str
+    content: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size: int = Field(ge=0)
+
+
 class WorkspaceRecord(StrictModel):
     id: UUID
     root: Path
@@ -102,6 +109,28 @@ class ApprovalDecision(StrEnum):
     DENY = "deny"
 
 
+class PermissionCategory(StrEnum):
+    EXTERNAL_FILE_ACCESS = "external_file_access"
+    SENSITIVE_FILE_ACCESS = "sensitive_file_access"
+    PACKAGE_INSTALLATION = "package_installation"
+    NETWORK_ACCESS = "network_access"
+    REMOTE_EXECUTION = "remote_execution"
+    DESTRUCTIVE_COMMAND = "destructive_command"
+    GIT_MUTATION = "git_mutation"
+    SYSTEM_CHANGE = "system_change"
+    COMPLEX_SHELL = "complex_shell"
+    UNRECOGNIZED_ACTION = "unrecognized_action"
+
+
+def is_run_grantable(category: PermissionCategory) -> bool:
+    """Return whether a category is narrow enough for run-scoped approval."""
+
+    return category not in {
+        PermissionCategory.COMPLEX_SHELL,
+        PermissionCategory.UNRECOGNIZED_ACTION,
+    }
+
+
 class AgentRunRecord(StrictModel):
     id: UUID
     conversation_id: UUID
@@ -118,6 +147,7 @@ class ApprovalRequestRecord(StrictModel):
     action_id: str
     tool_name: str
     risk: str
+    permission_category: PermissionCategory
     summary: str
     payload: dict[str, JsonValue]
     decision: ApprovalDecision | None = None

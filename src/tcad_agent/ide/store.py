@@ -20,9 +20,11 @@ from tcad_agent.ide.models import (
     ConversationState,
     GitSnapshot,
     IDEEvent,
+    PermissionCategory,
     RepositorySnapshot,
     RunState,
     WorkspaceRecord,
+    is_run_grantable,
 )
 
 
@@ -101,6 +103,7 @@ class SqliteIDEStore:
                     action_id TEXT NOT NULL,
                     tool_name TEXT NOT NULL,
                     risk TEXT NOT NULL,
+                    permission_category TEXT NOT NULL DEFAULT 'unrecognized_action',
                     summary TEXT NOT NULL,
                     payload_json TEXT NOT NULL,
                     decision TEXT,
@@ -114,8 +117,29 @@ class SqliteIDEStore:
 
                 CREATE INDEX IF NOT EXISTS idx_approvals_run_pending
                 ON approval_requests(run_id, decision, created_at);
+
+                CREATE TABLE IF NOT EXISTS run_permission_grants (
+                    run_id TEXT NOT NULL REFERENCES agent_runs(id),
+                    permission_category TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY (run_id, permission_category)
+                );
                 """
             )
+            approval_columns = {
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(approval_requests)"
+                ).fetchall()
+            }
+            if "permission_category" not in approval_columns:
+                connection.execute(
+                    """
+                    ALTER TABLE approval_requests
+                    ADD COLUMN permission_category TEXT NOT NULL
+                    DEFAULT 'unrecognized_action'
+                    """
+                )
 
     def open_workspace(self, snapshot: RepositorySnapshot) -> WorkspaceRecord:
         now = datetime.now(UTC)
@@ -422,6 +446,10 @@ class SqliteIDEStore:
         risk: str,
         summary: str,
         payload: dict[str, JsonValue],
+        *,
+        permission_category: PermissionCategory | str = (
+            PermissionCategory.UNRECOGNIZED_ACTION
+        ),
     ) -> ApprovalRequestRecord:
         payload_json = self._payload_json(payload)
         now = datetime.now(UTC)
@@ -437,9 +465,9 @@ class SqliteIDEStore:
             connection.execute(
                 """
                 INSERT INTO approval_requests (
-                    id, run_id, action_id, tool_name, risk, summary,
+                    id, run_id, action_id, tool_name, risk, permission_category, summary,
                     payload_json, decision, revision, created_at, resolved_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, NULL)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, ?, NULL)
                 """,
                 (
                     str(approval_id),
@@ -447,6 +475,7 @@ class SqliteIDEStore:
                     action_id,
                     tool_name,
                     risk,
+                    PermissionCategory(permission_category).value,
                     summary,
                     payload_json,
                     now.isoformat(),
@@ -482,8 +511,103 @@ class SqliteIDEStore:
                 "approval_id": str(approval.id),
                 "run_id": str(run_id),
                 "risk": approval.risk,
+                "permission_category": approval.permission_category.value,
                 "summary": approval.summary,
                 "tool_name": approval.tool_name,
+            },
+        )
+        return approval
+
+    def list_run_permission_grants(self, run_id: UUID) -> tuple[str, ...]:
+        self.get_run(run_id)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT permission_category
+                FROM run_permission_grants
+                WHERE run_id = ?
+                ORDER BY permission_category ASC
+                """,
+                (str(run_id),),
+            ).fetchall()
+        return tuple(row["permission_category"] for row in rows)
+
+    def resolve_approval_with_grant(
+        self,
+        approval_id: UUID,
+        expected_revision: int,
+    ) -> ApprovalRequestRecord:
+        """Approve one action and grant its category for the same run atomically."""
+
+        now = datetime.now(UTC)
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM approval_requests WHERE id = ?",
+                (str(approval_id),),
+            ).fetchone()
+            if (
+                row is None
+                or row["revision"] != expected_revision
+                or row["decision"] is not None
+            ):
+                raise IDEStoreError(f"stale approval revision for {approval_id}")
+            category = PermissionCategory(row["permission_category"])
+            if not is_run_grantable(category):
+                raise IDEStoreError(
+                    f"permission category cannot be granted for a run: {category.value}"
+                )
+            cursor = connection.execute(
+                """
+                UPDATE approval_requests
+                SET decision = ?, revision = revision + 1, resolved_at = ?
+                WHERE id = ? AND revision = ? AND decision IS NULL
+                """,
+                (
+                    ApprovalDecision.APPROVE.value,
+                    now.isoformat(),
+                    str(approval_id),
+                    expected_revision,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise IDEStoreError(f"stale approval revision for {approval_id}")
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO run_permission_grants (
+                    run_id, permission_category, created_at
+                ) VALUES (?, ?, ?)
+                """,
+                (row["run_id"], row["permission_category"], now.isoformat()),
+            )
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+        approval = self.get_approval(approval_id)
+        run = self.get_run(approval.run_id)
+        self.append_event(
+            run.conversation_id,
+            "permission_grant_created",
+            {
+                "approval_id": str(approval.id),
+                "permission_category": approval.permission_category.value,
+                "run_id": str(run.id),
+                "scope": "run",
+            },
+        )
+        self.append_event(
+            run.conversation_id,
+            "approval_resolved",
+            {
+                "approval_id": str(approval.id),
+                "decision": ApprovalDecision.APPROVE.value,
+                "permission_category": approval.permission_category.value,
+                "run_id": str(run.id),
             },
         )
         return approval
@@ -675,6 +799,7 @@ class SqliteIDEStore:
             action_id=row["action_id"],
             tool_name=row["tool_name"],
             risk=row["risk"],
+            permission_category=PermissionCategory(row["permission_category"]),
             summary=row["summary"],
             payload=cast(dict[str, JsonValue], json.loads(row["payload_json"])),
             decision=ApprovalDecision(decision) if decision is not None else None,

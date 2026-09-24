@@ -143,21 +143,25 @@ def test_agent_run_and_approval_api_lifecycle(tmp_path: Path) -> None:
     assert approvals.status_code == 200
     approval = approvals.json()[0]
     assert approval["payload"] == {"command": "git push"}
+    assert approval["permission_category"] == "git_mutation"
     assert duplicate.status_code == 409
     assert duplicate.json()["code"] == "agent_run_conflict"
 
     approved = web.post(
-        f"/api/approvals/{approval['id']}/approve",
+        f"/api/approvals/{approval['id']}/approve-category",
         json={"expected_revision": approval["revision"]},
     )
     assert approved.status_code == 200
+    assert services.store.list_run_permission_grants(UUID(run["id"])) == (
+        "git_mutation",
+    )
     supervisor.join(UUID(run["id"]), timeout=2)
 
     messages = web.get(
         f"/api/conversations/{conversation['id']}/messages"
     ).json()
     stale = web.post(
-        f"/api/approvals/{approval['id']}/approve",
+        f"/api/approvals/{approval['id']}/approve-category",
         json={"expected_revision": approval["revision"]},
     )
     assert [item["role"] for item in messages] == ["user", "assistant"]
@@ -357,6 +361,98 @@ def test_workspace_file_preview_rejects_directories_and_workspace_escape(
         "message": "The workspace path is unavailable or invalid.",
     }
     assert "secret" not in escaped.text
+
+
+def test_workspace_text_file_can_be_loaded_and_saved_with_conflict_protection(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    target = root / "model.py"
+    target.write_text("value = 1\n")
+    web = ide_client(tmp_path)
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+    endpoint = f"/api/workspaces/{workspace['id']}/files/content"
+
+    loaded = web.get(endpoint, params={"path": "model.py"})
+
+    assert loaded.status_code == 200
+    original = loaded.json()
+    assert original["content"] == "value = 1\n"
+    assert len(original["sha256"]) == 64
+
+    saved = web.put(
+        endpoint,
+        json={
+            "path": "model.py",
+            "content": "value = 2\n",
+            "expected_sha256": original["sha256"],
+        },
+    )
+
+    assert saved.status_code == 200
+    assert saved.json()["content"] == "value = 2\n"
+    assert target.read_text() == "value = 2\n"
+
+    stale = web.put(
+        endpoint,
+        json={
+            "path": "model.py",
+            "content": "value = 3\n",
+            "expected_sha256": original["sha256"],
+        },
+    )
+    assert stale.status_code == 409
+    assert stale.json() == {
+        "code": "workspace_file_conflict",
+        "message": "The file changed after it was opened. Refresh before saving.",
+    }
+    assert target.read_text() == "value = 2\n"
+
+
+def test_workspace_editor_refuses_nul_content_on_save(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    target = root / "model.py"
+    target.write_text("value = 1\n")
+    web = ide_client(tmp_path)
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+    endpoint = f"/api/workspaces/{workspace['id']}/files/content"
+    original = web.get(endpoint, params={"path": "model.py"}).json()
+
+    response = web.put(
+        endpoint,
+        json={
+            "path": "model.py",
+            "content": "value = 2\x00\n",
+            "expected_sha256": original["sha256"],
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_workspace_path"
+    assert target.read_text() == "value = 1\n"
+
+
+@pytest.mark.parametrize("relative", [".env", "large.log", "mesh.bin"])
+def test_workspace_editor_refuses_sensitive_truncated_and_binary_files(
+    tmp_path: Path, relative: str
+) -> None:
+    root = tmp_path / "repo"
+    root.mkdir()
+    (root / ".env").write_text("SECRET=value\n")
+    (root / "large.log").write_text("x" * (1024 * 1024 + 1))
+    (root / "mesh.bin").write_bytes(b"\x00\x01")
+    web = ide_client(tmp_path)
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+
+    response = web.get(
+        f"/api/workspaces/{workspace['id']}/files/content",
+        params={"path": relative},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "invalid_workspace_path"
 
 
 def test_local_directory_picker_returns_selected_directory(

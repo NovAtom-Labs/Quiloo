@@ -12,6 +12,7 @@ from openhands.tools.task.definition import TaskAction
 from openhands.tools.task_tracker.definition import TaskItem, TaskTrackerAction
 from openhands.tools.terminal.definition import TerminalAction
 
+import tcad_agent.agent.policy as policy_module
 from tcad_agent.agent.policy import (
     WorkspaceSecurityAnalyzer,
     action_summary,
@@ -235,3 +236,44 @@ def test_security_analyzer_uses_workspace_policy(workspace: Path) -> None:
 
     assert analyzer.security_risk(terminal_event("pytest -q")) is SecurityRisk.LOW
     assert analyzer.security_risk(terminal_event("git push")) is SecurityRisk.HIGH
+
+
+@pytest.mark.parametrize(
+    "command,category,plain_text",
+    [
+        ("pip install devsim", "package_installation", "install or update software"),
+        ("curl https://example.com", "network_access", "connect to the internet"),
+        ("ssh tcad-host", "remote_execution", "connect to another computer"),
+        ("rm -rf build", "destructive_command", "delete files"),
+        ("git push", "git_mutation", "change Git history"),
+    ],
+)
+def test_permission_categories_have_plain_language_explanations(
+    workspace: Path, command: str, category: str, plain_text: str
+) -> None:
+    event = terminal_event(command)
+
+    result = policy_module.permission_category(workspace, event)
+    explanation = policy_module.approval_explanation(workspace, event, result)
+
+    assert result.value == category
+    assert explanation.startswith("Quiloo wants to")
+    assert plain_text in explanation
+    assert command not in explanation
+
+
+def test_run_grant_downgrades_only_the_matching_permission_category(
+    workspace: Path,
+) -> None:
+    granted = policy_module.permission_category(workspace, terminal_event("git push"))
+    analyzer = WorkspaceSecurityAnalyzer(
+        workspace=workspace,
+        permission_grants={granted},
+    )
+
+    assert analyzer.security_risk(terminal_event("git push")) is SecurityRisk.LOW
+    assert analyzer.security_risk(terminal_event("ssh tcad-host")) is SecurityRisk.HIGH
+    assert (
+        analyzer.security_risk(terminal_event("git status /etc/passwd"))
+        is SecurityRisk.HIGH
+    )

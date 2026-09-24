@@ -207,13 +207,20 @@ Read AGENTS.md and RESEARCH_TASK.md, then complete the research task end to end.
 
 Expected evidence includes five passing tests, corrected source code, generated JSON and Markdown artifacts, unchanged researcher-owned inputs, a delegated review result, and a grader score of 100.
 
-## 10. Verify the guided TCAD workflow
+## 10. Verify the TCAD agent workflow
 
-Open `/simulate` from the application navigation and use the prompt in `examples/prompts/al-pn-al-equilibrium.md`.
+Open a repository workspace, create an Agent conversation, and paste the prompt in
+`examples/prompts/al-pn-al-equilibrium.md`. Ask the agent to inspect the request, prepare the
+portable specification, check DEVSIM capabilities, run only the explicit supported subset, and
+report the generated evidence.
 
-For local DEVSIM execution, approve only the explicit DEVSIM subset. It uses ohmic contacts, Boltzmann statistics, constant mobility, and SRH. Aluminum work functions, Fermi statistics, Auger recombination, band-gap narrowing, band profiles, mobility output, and recombination output remain visible as unsupported local capabilities.
+The local DEVSIM subset uses ohmic contacts, Boltzmann statistics, constant mobility, and SRH.
+Aluminum work functions, Fermi statistics, Auger recombination, band-gap narrowing, band profiles,
+mobility output, and recombination output remain visible as unsupported local capabilities.
 
-The full request is represented by `examples/al-pn-al-equilibrium.yaml` for the Sentaurus adapter. Licensed execution must remain unavailable until the remote host passes the Sentaurus integration and conformance checklist.
+The full request is represented by `examples/al-pn-al-equilibrium.yaml` for the Sentaurus adapter.
+Licensed execution must remain unavailable until the remote host passes the Sentaurus integration
+and conformance checklist.
 
 ## 11. Optional Bedrock smoke test
 

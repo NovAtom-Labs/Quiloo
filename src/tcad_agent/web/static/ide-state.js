@@ -74,7 +74,7 @@
     const running = state === "queued" || state === "running";
     const waiting = state === "waiting_for_approval" || state === "waiting_for_user";
     const paused = state === "paused";
-    const active = running || waiting || paused;
+    const active = isActiveState(state);
     return {
       pause: running,
       resume: paused,
@@ -83,10 +83,39 @@
     };
   }
 
+  function isActiveState(state) {
+    return ["queued", "running", "waiting_for_approval", "waiting_for_user", "paused"].includes(state);
+  }
+
+  function createRefreshCoordinator(refresh) {
+    let inFlight = null;
+    let activeConversationId = null;
+
+    return {
+      request(conversationId) {
+        if (inFlight && activeConversationId === conversationId) return inFlight;
+        activeConversationId = conversationId;
+        try {
+          inFlight = Promise.resolve(refresh(conversationId)).finally(() => {
+            inFlight = null;
+            activeConversationId = null;
+          });
+        } catch (error) {
+          inFlight = null;
+          activeConversationId = null;
+          throw error;
+        }
+        return inFlight;
+      },
+    };
+  }
+
   globalThis.QuilooIDEState = {
     controlsForState,
+    createRefreshCoordinator,
     createEventLedger,
     createNavigationGuard,
     createSubmissionTracker,
+    isActiveState,
   };
 })();

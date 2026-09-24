@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import shlex
+from collections.abc import Callable
 from pathlib import Path
 
 from openhands.sdk.event import ActionEvent
@@ -14,8 +15,10 @@ from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task.definition import TaskAction
 from openhands.tools.task_tracker.definition import TaskTrackerAction
 from openhands.tools.terminal.definition import TerminalAction
+from pydantic import Field
 
 from tcad_agent.agent.tools import TcadDomainAction
+from tcad_agent.ide.models import PermissionCategory, is_run_grantable
 
 _SAFE_COMMANDS = {
     "basename",
@@ -97,6 +100,11 @@ _KNOWN_TOOL_NAMES = {
     "think",
 }
 _SHELL_CONTROL = re.compile(r"(?:&&|\|\||[;|`$]|>|<)")
+_PACKAGE_COMMANDS = {"apt", "apt-get", "brew", "dnf", "npm", "npx", "pip", "pip3", "uv", "yum"}
+_NETWORK_COMMANDS = {"curl", "nc", "wget"}
+_REMOTE_COMMANDS = {"scp", "ssh"}
+_DESTRUCTIVE_COMMANDS = {"dd", "kill", "killall", "pkill", "rm"}
+_SYSTEM_COMMANDS = {"chmod", "chown", "docker", "podman", "sudo"}
 
 
 def _inside_workspace(workspace: Path, candidate: Path) -> bool:
@@ -196,6 +204,120 @@ def classify_action(workspace: Path, event: ActionEvent) -> SecurityRisk:
     return SecurityRisk.HIGH
 
 
+def _terminal_permission_category(
+    workspace: Path, action: TerminalAction
+) -> PermissionCategory:
+    command = action.command.strip()
+    if _SHELL_CONTROL.search(command):
+        wrapped = _workspace_wrapped_command(workspace, command)
+        if wrapped is None or _SHELL_CONTROL.search(wrapped):
+            return PermissionCategory.COMPLEX_SHELL
+        command = wrapped
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return PermissionCategory.COMPLEX_SHELL
+    if not tokens:
+        return PermissionCategory.UNRECOGNIZED_ACTION
+
+    categories: set[PermissionCategory] = set()
+    executable = Path(tokens[0]).name
+    if executable in _PACKAGE_COMMANDS:
+        categories.add(PermissionCategory.PACKAGE_INSTALLATION)
+    elif executable in _NETWORK_COMMANDS:
+        categories.add(PermissionCategory.NETWORK_ACCESS)
+    elif executable in _REMOTE_COMMANDS:
+        categories.add(PermissionCategory.REMOTE_EXECUTION)
+    elif executable in _DESTRUCTIVE_COMMANDS:
+        categories.add(PermissionCategory.DESTRUCTIVE_COMMAND)
+    elif executable == "git":
+        git_arguments = tokens[1:]
+        if git_arguments and git_arguments[0] == "--no-pager":
+            git_arguments = git_arguments[1:]
+        if not git_arguments or git_arguments[0] not in _SAFE_GIT_COMMANDS:
+            categories.add(PermissionCategory.GIT_MUTATION)
+    elif executable in _SYSTEM_COMMANDS:
+        categories.add(PermissionCategory.SYSTEM_CHANGE)
+    elif executable not in _SAFE_COMMANDS:
+        categories.add(PermissionCategory.UNRECOGNIZED_ACTION)
+
+    for token in tokens[1:]:
+        if token.startswith("-"):
+            continue
+        candidate = Path(token)
+        if _credential_path(candidate):
+            categories.add(PermissionCategory.SENSITIVE_FILE_ACCESS)
+        if ".." in candidate.parts or not _inside_workspace(workspace, candidate):
+            categories.add(PermissionCategory.EXTERNAL_FILE_ACCESS)
+    if len(categories) == 1:
+        return categories.pop()
+    return PermissionCategory.UNRECOGNIZED_ACTION
+
+
+def permission_category(workspace: Path, event: ActionEvent) -> PermissionCategory:
+    """Group a risky action into a deterministic, run-scoped permission."""
+
+    action = event.action
+    if isinstance(action, FileEditorAction):
+        target = Path(action.path)
+        sensitive = _credential_path(target)
+        external = not _inside_workspace(workspace, target)
+        if sensitive and external:
+            return PermissionCategory.UNRECOGNIZED_ACTION
+        if sensitive:
+            return PermissionCategory.SENSITIVE_FILE_ACCESS
+        if external:
+            return PermissionCategory.EXTERNAL_FILE_ACCESS
+    if isinstance(action, TerminalAction):
+        return _terminal_permission_category(workspace, action)
+    return PermissionCategory.UNRECOGNIZED_ACTION
+
+
+_APPROVAL_EXPLANATIONS = {
+    PermissionCategory.EXTERNAL_FILE_ACCESS: (
+        "Quiloo wants to access a file outside the opened project."
+    ),
+    PermissionCategory.SENSITIVE_FILE_ACCESS: (
+        "Quiloo wants to access a file that may contain passwords or credentials."
+    ),
+    PermissionCategory.PACKAGE_INSTALLATION: (
+        "Quiloo wants to install or update software on this computer."
+    ),
+    PermissionCategory.NETWORK_ACCESS: (
+        "Quiloo wants to connect to the internet or transfer data."
+    ),
+    PermissionCategory.REMOTE_EXECUTION: (
+        "Quiloo wants to connect to another computer and run a remote operation."
+    ),
+    PermissionCategory.DESTRUCTIVE_COMMAND: (
+        "Quiloo wants to delete files or stop a running process."
+    ),
+    PermissionCategory.GIT_MUTATION: (
+        "Quiloo wants to change Git history or send changes to a remote repository."
+    ),
+    PermissionCategory.SYSTEM_CHANGE: (
+        "Quiloo wants to change system settings, permissions, or managed services."
+    ),
+    PermissionCategory.COMPLEX_SHELL: (
+        "Quiloo wants to run a combined shell command that can perform several operations."
+    ),
+    PermissionCategory.UNRECOGNIZED_ACTION: (
+        "Quiloo wants to perform a higher-risk action that it cannot classify more narrowly."
+    ),
+}
+
+
+def approval_explanation(
+    workspace: Path,
+    event: ActionEvent,
+    category: PermissionCategory | None = None,
+) -> str:
+    """Explain an approval in plain language without exposing command contents."""
+
+    selected = category or permission_category(workspace, event)
+    return _APPROVAL_EXPLANATIONS[selected]
+
+
 def action_summary(event: ActionEvent) -> str:
     """Return a content-free, bounded description safe for an approval dialog."""
 
@@ -232,6 +354,20 @@ class WorkspaceSecurityAnalyzer(SecurityAnalyzerBase):
     """Apply Quiloo's workspace policy to every OpenHands action."""
 
     workspace: Path
+    permission_grants: set[PermissionCategory] = Field(default_factory=set)
+    grant_checker: Callable[[PermissionCategory], bool] | None = Field(
+        default=None, exclude=True
+    )
 
     def security_risk(self, action: ActionEvent) -> SecurityRisk:
-        return classify_action(self.workspace, action)
+        risk = classify_action(self.workspace, action)
+        if risk is not SecurityRisk.HIGH:
+            return risk
+        category = permission_category(self.workspace, action)
+        if not is_run_grantable(category):
+            return risk
+        if category in self.permission_grants:
+            return SecurityRisk.LOW
+        if self.grant_checker is not None and self.grant_checker(category):
+            return SecurityRisk.LOW
+        return risk

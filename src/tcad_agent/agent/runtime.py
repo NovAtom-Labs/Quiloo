@@ -28,6 +28,7 @@ from pydantic import SecretStr
 from tcad_agent.agent.policy import WorkspaceSecurityAnalyzer, classify_action
 from tcad_agent.agent.supervisor import RuntimeConversation
 from tcad_agent.agent.tools import DomainTools, TcadDomainTool, build_tools
+from tcad_agent.ide.models import PermissionCategory
 
 DEFAULT_LLM_MODEL = "bedrock/global.anthropic.claude-sonnet-4-6"
 DEFAULT_AWS_REGION = "ap-south-1"
@@ -153,8 +154,14 @@ class OpenHandsRuntimeFactory:
             visualizer=None,
             delete_on_close=False,
         )
+        permission_grants = cast(
+            set[PermissionCategory], getattr(callback, "permission_grants", set())
+        )
         conversation.set_security_analyzer(
-            WorkspaceSecurityAnalyzer(workspace=workspace.resolve())
+            WorkspaceSecurityAnalyzer(
+                workspace=workspace.resolve(),
+                grant_checker=permission_grants.__contains__,
+            )
         )
         conversation.set_confirmation_policy(ConfirmRisky())
         return cast(RuntimeConversation, conversation)

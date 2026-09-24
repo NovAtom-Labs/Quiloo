@@ -69,6 +69,7 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert parser.elements["workspace-tabs"] == "nav"
     assert parser.elements["file-viewer"] == "section"
     assert parser.elements["file-viewer-body"] == "div"
+    assert parser.elements["file-editor"] == "textarea"
     assert parser.elements["file-viewer-download"] == "a"
     assert parser.elements["agent-panel"] == "aside"
     assert parser.elements["conversation-messages"] == "div"
@@ -76,24 +77,34 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert parser.elements["open-workspace"] == "button"
     assert parser.elements["browse-workspace"] == "button"
     assert parser.elements["create-conversation"] == "button"
+    assert parser.elements["refresh-conversation"] == "button"
+    assert parser.elements["toggle-agent-panel"] == "button"
+    assert parser.elements["close-agent-panel"] == "button"
+    assert parser.elements["file-viewer-edit"] == "button"
+    assert parser.elements["file-viewer-save"] == "button"
+    assert parser.elements["file-viewer-cancel"] == "button"
+    assert 'href="/simulate"' not in page.text
 
 
-def test_guided_simulation_remains_available(tmp_path: Path) -> None:
-    page = client(tmp_path).get("/simulate")
-    assert page.status_code == 200
-    assert 'id="workflow-progress"' in page.text
-    assert 'id="results-workspace"' in page.text
-
-
-def test_workspace_and_simulation_share_scientific_theme(tmp_path: Path) -> None:
+def test_legacy_guided_pages_redirect_to_repository_workspace(tmp_path: Path) -> None:
     web = client(tmp_path)
+    simulation = web.get("/simulate", follow_redirects=False)
+    request_stage = web.get(
+        f"/requests/{uuid4()}/results", follow_redirects=False
+    )
 
+    assert simulation.status_code == 307
+    assert simulation.headers["location"] == "/"
+    assert request_stage.status_code == 307
+    assert request_stage.headers["location"] == "/"
+
+
+def test_workspace_uses_scientific_theme(tmp_path: Path) -> None:
+    web = client(tmp_path)
     workspace_page = web.get("/")
-    simulation_page = web.get("/simulate")
     theme = web.get("/static/theme.css?v=20260924-1")
 
     assert 'href="/static/theme.css?v=20260924-1"' in workspace_page.text
-    assert 'href="/static/theme.css?v=20260924-1"' in simulation_page.text
     assert theme.status_code == 200
     assert theme.headers["content-type"].startswith("text/css")
 
@@ -118,45 +129,6 @@ def test_create_request_enters_clarification(tmp_path: Path) -> None:
         "geometry.n_region_thickness",
         "contacts.treatment",
     }
-
-
-def test_clarification_form_has_explicit_continue_action(tmp_path: Path) -> None:
-    page = client(tmp_path).get("/simulate")
-    parser = ButtonTextParser()
-    parser.feed(page.text)
-    assert parser.buttons["answer"] == "Continue to plan"
-
-
-def test_researcher_page_exposes_workflow_review_and_results_regions(
-    tmp_path: Path,
-) -> None:
-    page = client(tmp_path).get("/simulate")
-    parser = ButtonTextParser()
-    parser.feed(page.text)
-    assert parser.elements["workflow-progress"] == "ol"
-    assert parser.elements["request-page"] == "section"
-    assert parser.elements["clarify-page"] == "section"
-    assert parser.elements["review-page"] == "section"
-    assert parser.elements["results-page"] == "section"
-    assert parser.elements["plan-summary"] == "div"
-    assert parser.elements["review-details"] == "div"
-    assert parser.elements["results-overview"] == "div"
-    assert parser.elements["field-selector"] == "select"
-    assert parser.elements["field-scale"] == "select"
-    assert parser.elements["field-chart"] == "svg"
-    assert parser.elements["bias-results"] == "tbody"
-    assert parser.elements["field-data"] == "tbody"
-    assert parser.elements["validation-list"] == "div"
-    assert parser.elements["artifacts"] == "details"
-
-
-def test_persistent_workflow_urls_serve_the_application_shell(tmp_path: Path) -> None:
-    web = client(tmp_path)
-    request_id = uuid4()
-    for stage in ("clarify", "review", "results"):
-        response = web.get(f"/requests/{request_id}/{stage}")
-        assert response.status_code == 200
-        assert 'id="workflow-progress"' in response.text
 
 
 def test_invalid_request_identifier_is_rejected(tmp_path: Path) -> None:

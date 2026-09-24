@@ -60,9 +60,9 @@ conversation, and return to the same conversation URL after a browser or service
 2. Select a file to inspect source, Markdown, JSON, CSV/TSV data, raster images, PDFs, or binary metadata in the central workspace.
 3. Create a conversation and describe the intended repository task.
 4. Quiloo reads and edits files, searches the repository, runs tests or validation commands, uses typed TCAD operations, and may delegate bounded work to a specialist subagent.
-5. Live activity shows tool names, canonical paths, commands, outcomes, validation evidence, and delegated task results. Internal chain-of-thought is never shown or stored.
+5. Live activity shows tool names, canonical paths, commands, outcomes, validation evidence, delegated task results, and the model's streamed reasoning after secret redaction.
 6. Repository-local reads, edits, tests, builds, and validation run without interruption. Access outside the selected repository, package installation, network activity, destructive commands, Git mutation, and remote mutation stop at an approval card.
-7. The researcher can approve once, deny, pause, resume, stop, refresh, or return later. Conversations, messages, run state, approvals, and normalized events are persisted locally.
+7. The researcher can approve one action, approve future actions in the same permission category for the current run, deny, pause, resume, stop, refresh, or return later. Conversations, messages, run state, approvals, run-scoped grants, and normalized events are persisted locally.
 
 The selected repository is the default authority boundary. A parent agent and every delegated subagent use the same canonical workspace and policy. A subagent cannot widen access. High-risk child actions are denied, and the primary agent must request the equivalent action itself if a browser approval decision is required.
 
@@ -114,25 +114,19 @@ Try this against the generated acceptance repository:
 Inspect this repository and RESEARCH_TASK.md. Diagnose and fix the scientific validation failures without changing researcher-owned inputs, run the repository checks, delegate a read-only scientific review, and report exact evidence.
 ```
 
-The `Guided simulation` view retains the established TCAD workflow. In that view, the researcher:
-
-1. Describes the intended device study and selects a backend.
-2. Answers missing values that affect the physical structure or boundary conditions.
-3. Reviews normalized geometry, doping, contacts, study parameters, equations, models, observables, backend, and declared limitations.
-4. Approves the immutable plan digest.
-5. Runs the simulation.
-6. Explores spatial fields, operating points, device structure, and validation evidence in the interactive results workspace.
-7. Downloads the evidence bundle when files are needed for audit or external analysis.
-
-Repeated Run actions return the existing terminal state. They do not create duplicate simulator jobs.
-Each stage has a persistent URL. Refreshing or revisiting a clarification, review, or results page restores the same request from the local request database.
+TCAD work now starts in the same repository conversation as code and data work. The researcher can
+ask the agent to inspect an existing `ExperimentSpec`, create a new portable specification, check a
+backend capability, run an approved DEVSIM study, validate canonical results, and build a report.
+The typed `tcad_domain` tool keeps those operations behind schemas, capability manifests,
+deterministic adapters, runners, and validators. Unsupported Sentaurus-only physics remains visible
+instead of being silently removed.
 
 ## What works now
 
 | Area | Current capability |
 | --- | --- |
-| Repository IDE | Three-panel local workspace with canonical repository paths, Git state, directory inspection, safe in-workspace file previews, persistent conversations, activity streaming, and stable URLs |
-| Guided research interface | Four sequential local pages for request, clarification, plan approval, and interactive results at `/simulate` |
+| Repository IDE | Repository browser, central file workspace, responsive Agent drawer, safe text editing, Git state, persistent conversations, recoverable activity streaming, and stable URLs |
+| TCAD workflow | Conversation-driven specification, capability, compilation, validation, and report operations through the typed `tcad_domain` boundary |
 | Portable specification | Strict one-dimensional `ExperimentSpec` with dimensional quantities and rejection of unknown fields |
 | Structures | Composable ordered silicon regions, without named-device execution branches |
 | Doping | Constant donor and acceptor profiles |
@@ -193,9 +187,20 @@ Completed simulations open inside the application rather than forcing researcher
 
 ### Repository file viewer
 
-Selecting a repository file opens a read-only viewer in the central workspace. Text and code use a line-numbered source view. Markdown is rendered through a restricted DOM renderer with a source toggle, JSON has a collapsible tree, and CSV or TSV data opens as a bounded scrollable table. PNG, JPEG, WebP, and GIF files support zoom and dimension inspection, while PDFs use the browser viewer. Unknown binary formats show metadata and a download action.
+Selecting a repository file opens it in the central workspace. Text and code use a line-numbered
+source view and eligible UTF-8 text files can be edited with explicit Save and Cancel controls.
+Markdown is rendered through a restricted DOM renderer with a source toggle, JSON has a collapsible
+tree, and CSV or TSV data opens as a bounded scrollable table. PNG, JPEG, WebP, and GIF files support
+zoom and dimension inspection, while PDFs use the browser viewer. Unknown binary formats show
+metadata and a download action.
 
-Preview paths are resolved against the canonical repository root. Traversal and escaping symlinks are rejected, executable HTML is never rendered, unknown binaries cannot be served inline, responses disable MIME sniffing, and text previews are capped at 1 MiB. Large tables and unusually long source files are bounded again in the browser to keep the local application responsive.
+Preview and edit paths are resolved against the canonical repository root. Writes are atomic and
+use a content hash to prevent overwriting a file that changed after it was opened. Traversal,
+symlinks, binaries, oversized files, credential files, private keys, `.git`, `.ssh`, and `.aws`
+content are refused for in-browser editing. Executable HTML is never rendered, unknown binaries
+cannot be served inline, responses disable MIME sniffing, and text previews are capped at 1 MiB.
+Large tables and unusually long source files are bounded again in the browser to keep the local
+application responsive.
 
 ## Deliberate pilot limits
 
@@ -216,7 +221,7 @@ Quiloo is currently intended for small exploratory drift-diffusion studies, arch
 | DEVSIM approximation | Metal work function, Fermi statistics, Auger, band-gap narrowing, band diagrams, mobility output, and recombination output are outside the reviewed local adapter |
 | Sentaurus host absent | Command generation and result contracts exist, but real licensed execution remains disabled |
 | Local-process isolation | Repository commands run as the current OS user; the pilot does not yet provide a container, VM, or per-researcher operating-system sandbox |
-| Approval granularity | Approval is per high-risk action. There is no durable allow-always rule in the pilot |
+| Approval granularity | Approve authorizes one action. Approve all like this authorizes one deterministic permission category for the current run only. A new run starts with no category grants |
 | Single-model pilot | The primary agent and delegated agents use the configured Bedrock model. Multi-model routing remains a later optimization |
 
 No arbitrary user or model-generated simulator syntax is executed. Adding a new material, model, profile, contact, study, or observable requires a schema change, capability declaration, deterministic adapter mapping, normalization, validation, and tests.
@@ -239,7 +244,7 @@ The stable product is the experiment and evidence workflow. DEVSIM and Sentaurus
 | `bundles` | Atomic evidence packaging, reports, manifests, and artifact hashes |
 | `agent` | OpenHands runtime, repository policy, normalized events, typed TCAD tools, and bounded subagents |
 | `ide` | Canonical local workspaces, persistent conversations, runs, approvals, messages, and ordered activity events |
-| `web` | Browser IDE, guided TCAD workflow, local HTTP API, and Server-Sent Events |
+| `web` | Browser repository IDE, safe text editor, local HTTP API, and recoverable Server-Sent Events |
 
 Every backend implements the same conceptual boundary:
 
@@ -362,14 +367,14 @@ owns that port, the updated application starts on the next available loopback po
 1. Select `Open folder` to use the native desktop picker. On headless Linux, enter an absolute repository path instead.
 2. Select `Open path` to register the canonical path and inspect its top-level entries.
 3. Select `New conversation`, provide a title, and send the first prompt.
-4. Watch file, command, validation, and subagent events in the activity stream. Resolve an approval card only after checking its exact target and effect.
-5. Pause, resume, or stop the active run when needed.
-6. Bookmark or reload the resulting `/workspaces/<id>/conversations/<id>` URL to restore the workspace, conversation, messages, run state, approvals, and activity stream.
-7. Select `Simulation` to open the validated TCAD workflow at `/simulate`.
+4. Watch file, command, validation, and subagent events in the activity stream. Permission cards lead with a plain-language explanation and keep the exact tool, category, risk, command, or path under Technical details.
+5. Select Approve for one action, Approve all like this for matching actions during this run only, or Deny. Every decision and automatic use of a run grant remains visible in the event ledger.
+6. Pause, resume, or stop the active run when needed.
+7. Bookmark or reload the resulting `/workspaces/<id>/conversations/<id>` URL to restore the workspace, conversation, messages, run state, approvals, and activity stream.
+8. Ask for TCAD work in the same conversation. The agent uses typed domain operations and writes evidence back into the selected repository.
 
 Workspace metadata, conversations, messages, and IDE events are stored in
-`.tcad-agent/ide.sqlite3` by default. Guided requests remain in
-`.tcad-agent/requests.sqlite3`, and simulation bundles remain below the same runtime root. Change
+`.tcad-agent/ide.sqlite3` by default. Simulation bundles remain below the same runtime root. Change
 the root with `TCAD_WORKSPACE`. Stop the local service before copying that directory for backup so
 the SQLite database and write-ahead log remain consistent.
 
@@ -403,7 +408,7 @@ OPENHANDS_SUPPRESS_BANNER=1 .venv/bin/pytest tests/e2e/test_agentic_repl.py \
   --run-live-bedrock -m live_bedrock -q
 ```
 
-For the main pilot demonstration, paste [the Al / p-Si / n-Si / Al prompt](examples/prompts/al-pn-al-equilibrium.md), select DEVSIM, and answer the requested thickness and contact questions. The local run covers the DEVSIM-supported subset. Verify all omitted Sentaurus-only physics during plan review.
+For the main pilot demonstration, paste [the Al / p-Si / n-Si / Al prompt](examples/prompts/al-pn-al-equilibrium.md) into an Agent conversation and ask it to prepare and run the explicit DEVSIM-supported subset. Verify every omitted Sentaurus-only capability in the returned plan and evidence.
 
 ## CLI examples
 

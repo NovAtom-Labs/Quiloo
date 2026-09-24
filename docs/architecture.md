@@ -28,7 +28,7 @@ The browser is the interface, while repository paths, Git inspection, conversati
 history, simulator execution, knowledge, and credentials remain on the researcher's Linux
 machine.
 
-The first delivered slice establishes these contracts:
+The repository IDE establishes these contracts:
 
 ```text
 repository path
@@ -49,14 +49,16 @@ IDE events. Conversation pages use stable URLs. An SSE client resumes strictly a
 event identifier, so browser reconnection does not duplicate earlier activity. State is persisted
 before it is streamed.
 
-The root route serves the IDE. The existing guided request flow remains at `/simulate`, and its
-request-specific clarification, review, and results URLs remain unchanged.
+The root route serves the repository IDE. Legacy `/simulate` and request-stage browser URLs redirect
+to that single product surface. The underlying typed request and simulator APIs remain available to
+the agent, CLI, and integrations.
 
-This foundation does not yet expose repository file writes or a terminal to OpenHands. The next
-slice adds atomic editing, repository search, bounded process execution, diffs, and recoverable
-checkpoints against these persisted records. A later permission slice adds exact, auditable
-external-path grants. Until those slices land, IDE prompts are stored but not autonomously
-executed.
+The IDE exposes repository-confined OpenHands file operations, search, bounded terminal execution,
+typed TCAD tools, and delegated subagents. Eligible UTF-8 text files can also be edited directly in
+the central workspace through atomic, hash-checked saves. External-path access, package or network
+commands, destructive actions, Git mutation, and remote mutation stop at an auditable approval
+request. Conversation refresh is available manually and resynchronizes automatically after stream
+reconnection, browser visibility changes, and during active runs.
 
 ## Stable contracts
 

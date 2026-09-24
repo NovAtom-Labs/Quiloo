@@ -211,6 +211,30 @@ def test_approval_resumes_and_denial_rejects_pending_action(services) -> None:
     assert resumed.id == run.id
 
 
+def test_approve_category_grants_only_the_current_run(services) -> None:
+    runtime = ScriptedRuntimeFactory(
+        [], status=ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+    )
+    supervisor = AgentSupervisor(services, runtime)
+    run = supervisor.start(services.conversation.id, "Push changes")
+    supervisor.join(run.id, timeout=2)
+    approval = services.store.create_approval(
+        run.id,
+        "action-1",
+        "terminal",
+        "HIGH",
+        "Quiloo wants to change Git history or send changes online.",
+        {"command": "git push"},
+        permission_category="git_mutation",
+    )
+
+    resumed = supervisor.approve_category(approval.id, approval.revision)
+    supervisor.join(run.id, timeout=2)
+
+    assert resumed.id == run.id
+    assert services.store.list_run_permission_grants(run.id) == ("git_mutation",)
+
+
 def test_stop_cancels_pending_approval(services) -> None:
     runtime = ScriptedRuntimeFactory(
         [], status=ConversationExecutionStatus.WAITING_FOR_CONFIRMATION

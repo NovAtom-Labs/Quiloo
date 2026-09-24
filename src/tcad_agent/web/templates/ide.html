@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260924-6">
+    <link rel="stylesheet" href="/static/ide.css?v=20260924-7">
   </head>
   <body>
     <div class="ide-shell">
@@ -26,7 +26,7 @@
         </div>
         <div class="header-actions">
           <span class="runtime-state">Local runtime</span>
-          <a class="guided-link" href="/simulate">Simulation</a>
+          <button id="toggle-agent-panel" class="toggle-agent-panel" type="button" aria-controls="agent-panel" aria-expanded="false">Agent</button>
         </div>
       </header>
 
@@ -52,7 +52,6 @@
       <main id="workspace-main" class="workspace-main">
         <nav id="workspace-tabs" class="workspace-tabs" aria-label="Workspace views">
           <button class="is-active" type="button">Workspace</button>
-          <a href="/simulate">Simulation</a>
         </nav>
         <section id="workspace-welcome" class="workspace-welcome">
           <span class="section-label">Workspace</span>
@@ -77,6 +76,9 @@
                 <button id="file-viewer-source" type="button">Source</button>
               </div>
               <button id="file-viewer-refresh" type="button">Refresh</button>
+              <button id="file-viewer-edit" type="button">Edit</button>
+              <button id="file-viewer-save" type="button" hidden>Save</button>
+              <button id="file-viewer-cancel" type="button" hidden>Cancel</button>
               <a id="file-viewer-download" href="#" download>Download</a>
               <button id="file-viewer-close" type="button" aria-label="Close file">Close</button>
             </div>
@@ -87,14 +89,21 @@
             <span id="file-viewer-state">Read only</span>
           </div>
           <p id="file-viewer-notice" class="file-viewer-notice hidden"></p>
-          <div id="file-viewer-body" class="file-viewer-body"></div>
+          <div class="file-viewer-content">
+            <div id="file-viewer-body" class="file-viewer-body"></div>
+            <textarea id="file-editor" class="file-editor hidden" spellcheck="false" aria-label="File editor"></textarea>
+          </div>
         </section>
       </main>
 
       <aside id="agent-panel" class="agent-panel" aria-label="Agent conversation">
         <div class="agent-heading">
           <div><span>SESSION · <b id="run-state">IDLE</b></span><strong id="conversation-title">No conversation</strong></div>
-          <button id="create-conversation" type="button" disabled>New conversation</button>
+          <div class="agent-heading-actions">
+            <button id="refresh-conversation" type="button" disabled>Refresh</button>
+            <button id="create-conversation" type="button" disabled>New conversation</button>
+            <button id="close-agent-panel" type="button" aria-label="Close agent panel">Close</button>
+          </div>
         </div>
         <div id="run-controls" class="run-controls" aria-label="Agent run controls">
           <button id="pause-run" type="button" hidden>Pause</button>
@@ -133,8 +142,8 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/ide-state.js?v=20260924-3" defer></script>
+    <script src="/static/ide-state.js?v=20260924-4" defer></script>
     <script src="/static/file-viewer.js?v=20260924-1" defer></script>
-    <script src="/static/ide.js?v=20260924-5" defer></script>
+    <script src="/static/ide.js?v=20260924-6" defer></script>
   </body>
 </html>

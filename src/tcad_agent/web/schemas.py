@@ -47,6 +47,12 @@ class StartAgentRunRequest(WebRequest):
     message_id: UUID
 
 
+class SaveWorkspaceFileRequest(WebRequest):
+    path: str = Field(min_length=1, max_length=4096)
+    content: str = Field(max_length=1_048_576)
+    expected_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
 class ResolveAgentApprovalRequest(WebRequest):
     expected_revision: int = Field(ge=0)
 

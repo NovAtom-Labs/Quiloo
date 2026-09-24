@@ -90,6 +90,65 @@ def test_approval_resolution_is_optimistic_and_persisted(tmp_path: Path) -> None
         )
 
 
+def test_permission_category_grant_is_scoped_to_one_run_and_persisted(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "ide.sqlite3"
+    store = SqliteIDEStore(database)
+    workspace = WorkspaceManager(store).open(tmp_path)
+    conversation = ConversationService(store, EventFeed(store)).create(
+        workspace.id, "Agent task"
+    )
+    first_run = store.create_run(conversation.id, conversation.id)
+    approval = store.create_approval(
+        first_run.id,
+        "action-1",
+        "terminal",
+        "HIGH",
+        "Quiloo wants to change Git history or send changes online.",
+        {"command": "git push"},
+        permission_category="git_mutation",
+    )
+
+    resolved = store.resolve_approval_with_grant(
+        approval.id,
+        approval.revision,
+    )
+    restored = SqliteIDEStore(database)
+
+    assert resolved.decision is ApprovalDecision.APPROVE
+    assert restored.list_run_permission_grants(first_run.id) == ("git_mutation",)
+    second_run = restored.create_run(conversation.id, conversation.id)
+    assert restored.list_run_permission_grants(second_run.id) == ()
+
+    with pytest.raises(IDEStoreError, match="stale approval revision"):
+        restored.resolve_approval_with_grant(approval.id, approval.revision)
+
+
+def test_broad_unrecognized_permission_cannot_be_granted_for_a_run(
+    tmp_path: Path,
+) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    workspace = WorkspaceManager(store).open(tmp_path)
+    conversation = ConversationService(store, EventFeed(store)).create(
+        workspace.id, "Agent task"
+    )
+    run = store.create_run(conversation.id, conversation.id)
+    approval = store.create_approval(
+        run.id,
+        "action-1",
+        "terminal",
+        "HIGH",
+        "Quiloo wants to perform a higher-risk action.",
+        {"command": "unknown-tool && rm -rf /tmp/output"},
+    )
+
+    with pytest.raises(IDEStoreError, match="cannot be granted"):
+        store.resolve_approval_with_grant(approval.id, approval.revision)
+
+    assert store.get_approval(approval.id).decision is None
+
+
 def test_terminal_run_does_not_expose_stale_pending_approval(tmp_path: Path) -> None:
     store = SqliteIDEStore(tmp_path / "ide.sqlite3")
     workspace = WorkspaceManager(store).open(tmp_path)

@@ -7,7 +7,11 @@ const workspaceStatus = document.querySelector("#workspace-status");
 const gitState = document.querySelector("#git-state");
 const repositoryTree = document.querySelector("#repository-tree");
 const conversationList = document.querySelector("#conversation-list");
+const agentPanel = document.querySelector("#agent-panel");
+const toggleAgentPanel = document.querySelector("#toggle-agent-panel");
+const closeAgentPanel = document.querySelector("#close-agent-panel");
 const createConversation = document.querySelector("#create-conversation");
+const refreshConversation = document.querySelector("#refresh-conversation");
 const conversationDialog = document.querySelector("#conversation-dialog");
 const conversationForm = document.querySelector("#conversation-form");
 const conversationTitleInput = document.querySelector("#conversation-title-input");
@@ -41,8 +45,12 @@ const fileViewerModes = document.querySelector("#file-viewer-modes");
 const fileViewerPreview = document.querySelector("#file-viewer-preview");
 const fileViewerSource = document.querySelector("#file-viewer-source");
 const fileViewerRefresh = document.querySelector("#file-viewer-refresh");
+const fileViewerEdit = document.querySelector("#file-viewer-edit");
+const fileViewerSave = document.querySelector("#file-viewer-save");
+const fileViewerCancel = document.querySelector("#file-viewer-cancel");
 const fileViewerDownload = document.querySelector("#file-viewer-download");
 const fileViewerClose = document.querySelector("#file-viewer-close");
+const fileEditor = document.querySelector("#file-editor");
 
 let activeWorkspace = null;
 let activeConversation = null;
@@ -50,6 +58,7 @@ let activeRun = null;
 let eventSource = null;
 let sendingPrompt = false;
 let activeFile = null;
+let editingFile = null;
 let fileRequestGeneration = 0;
 const thinkingRows = new Map();
 const navigationGuard = window.QuilooIDEState.createNavigationGuard();
@@ -116,6 +125,8 @@ function renderWorkspace(workspace) {
 function closeFileViewer() {
   fileRequestGeneration += 1;
   activeFile = null;
+  editingFile = null;
+  setFileEditing(false);
   fileViewer.classList.add("hidden");
   workspaceWelcome.classList.remove("hidden");
   document.querySelectorAll(".tree-entry.is-selected").forEach((entry) => entry.classList.remove("is-selected"));
@@ -124,6 +135,81 @@ function closeFileViewer() {
 function setViewerNotice(message = "") {
   fileViewerNotice.textContent = message;
   fileViewerNotice.classList.toggle("hidden", !message);
+}
+
+function fileCanBeEdited(preview) {
+  const editableKinds = new Set(["text", "markdown", "json", "csv", "tsv"]);
+  const protectedPath = /(^|\/)(\.env|\.git|\.ssh|\.aws|credentials|id_rsa|id_ed25519)(\/|$)/i;
+  const protectedSuffix = /\.(key|pem)$/i;
+  return editableKinds.has(preview.kind)
+    && !preview.truncated
+    && !protectedPath.test(preview.path)
+    && !protectedSuffix.test(preview.path);
+}
+
+function setFileEditing(isEditing) {
+  fileViewerBody.classList.toggle("hidden", isEditing);
+  fileEditor.classList.toggle("hidden", !isEditing);
+  fileViewerEdit.hidden = isEditing || !activeFile || !fileCanBeEdited(activeFile);
+  fileViewerSave.hidden = !isEditing;
+  fileViewerCancel.hidden = !isEditing;
+  fileViewerRefresh.disabled = isEditing;
+  fileViewerModes.hidden = isEditing || !activeFile
+    || window.QuilooFileViewer.viewModes(activeFile.kind).length < 2;
+  if (activeFile) fileViewerState.textContent = isEditing ? "Editing" : "Read only";
+}
+
+async function beginFileEdit() {
+  if (!activeWorkspace || !activeFile || !fileCanBeEdited(activeFile)) return;
+  const workspaceId = activeWorkspace.id;
+  const path = activeFile.path;
+  showError();
+  fileViewerEdit.disabled = true;
+  try {
+    const editable = await api(
+      `/api/workspaces/${workspaceId}/files/content?path=${encodeURIComponent(path)}`,
+    );
+    if (activeWorkspace?.id !== workspaceId || activeFile?.path !== path) return;
+    editingFile = editable;
+    fileEditor.value = editable.content;
+    setFileEditing(true);
+    fileEditor.focus();
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    fileViewerEdit.disabled = false;
+  }
+}
+
+function cancelFileEdit() {
+  editingFile = null;
+  fileEditor.value = "";
+  setFileEditing(false);
+}
+
+async function saveFileEdit() {
+  if (!activeWorkspace || !editingFile) return;
+  const workspaceId = activeWorkspace.id;
+  const path = editingFile.path;
+  showError();
+  fileViewerSave.disabled = true;
+  try {
+    await api(`/api/workspaces/${workspaceId}/files/content`, {
+      method: "PUT",
+      body: JSON.stringify({
+        path,
+        content: fileEditor.value,
+        expected_sha256: editingFile.sha256,
+      }),
+    });
+    if (activeWorkspace?.id !== workspaceId || activeFile?.path !== path) return;
+    cancelFileEdit();
+    await openFile({path});
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    fileViewerSave.disabled = false;
+  }
 }
 
 function renderSource(content) {
@@ -320,6 +406,7 @@ function renderFileContent(mode = "preview") {
 
 function showFile(preview) {
   activeFile = preview;
+  editingFile = null;
   workspaceWelcome.classList.add("hidden");
   fileViewer.classList.remove("hidden");
   fileViewerKind.textContent = preview.kind.toUpperCase();
@@ -334,6 +421,7 @@ function showFile(preview) {
   fileViewerModes.hidden = modes.length < 2;
   fileViewerPreview.hidden = !modes.includes("preview");
   fileViewerSource.hidden = !modes.includes("source");
+  setFileEditing(false);
   renderFileContent(modes[0]);
 }
 
@@ -452,6 +540,41 @@ async function refreshMessages(conversationId = activeConversation?.id) {
   renderRunIndicator();
 }
 
+async function synchronizeConversation(conversationId) {
+  if (!conversationId || activeConversation?.id !== conversationId) return;
+  const [messages, run, approvals] = await Promise.all([
+    api(`/api/conversations/${conversationId}/messages`),
+    api(`/api/conversations/${conversationId}/runs/active`),
+    api(`/api/conversations/${conversationId}/approvals`),
+  ]);
+  if (activeConversation?.id !== conversationId) return;
+  clearNode(conversationMessages);
+  if (!messages.length) conversationMessages.append(emptyCopy("Send the first task for this workspace."));
+  messages.forEach(appendMessage);
+  setRun(run);
+  renderApprovals(approvals);
+}
+
+const refreshCoordinator = window.QuilooIDEState.createRefreshCoordinator(
+  synchronizeConversation,
+);
+
+async function requestConversationRefresh(conversationId = activeConversation?.id) {
+  if (!conversationId) return;
+  refreshConversation.disabled = true;
+  refreshConversation.textContent = "Refreshing…";
+  try {
+    await refreshCoordinator.request(conversationId);
+  } catch (error) {
+    if (activeConversation?.id === conversationId) showError(error.message);
+  } finally {
+    if (activeConversation?.id === conversationId) {
+      refreshConversation.disabled = false;
+      refreshConversation.textContent = "Refresh";
+    }
+  }
+}
+
 function setRun(run) {
   activeRun = run;
   const state = run?.state || "idle";
@@ -464,6 +587,7 @@ function setRun(run) {
   messageInput.disabled = !activeConversation || !controls.send || sendingPrompt;
   sendMessage.disabled = messageInput.disabled;
   sendMessage.textContent = sendingPrompt ? "Starting…" : "Send";
+  refreshConversation.disabled = !activeConversation;
   renderRunIndicator();
 }
 
@@ -476,6 +600,8 @@ function activityDescription(event) {
     return `${owner}${output}`;
   }
   if (event.kind === "approval_requested") return `${payload.risk || "HIGH"} · ${payload.summary || "Approval required"}`;
+  if (event.kind === "permission_grant_created") return `Allowed ${permissionCategoryLabel(payload.permission_category)} for this run`;
+  if (event.kind === "permission_grant_used") return `Used this run's ${permissionCategoryLabel(payload.permission_category)} permission`;
   if (payload.state) return String(payload.state).replaceAll("_", " ");
   if (payload.detail) return String(payload.detail).slice(0, 260);
   return event.kind.replaceAll("_", " ");
@@ -541,10 +667,12 @@ function approvalTarget(approval) {
 async function decideApproval(approval, decision) {
   showError();
   try {
-    const suffix = decision === "approve" ? "approve" : "deny";
+    let endpoint = `/api/approvals/${approval.id}/deny`;
+    if (decision === "approve") endpoint = `/api/approvals/${approval.id}/approve`;
+    if (decision === "approve-category") endpoint = `/api/approvals/${approval.id}/approve-category`;
     const body = {expected_revision: approval.revision};
     if (decision === "deny") body.reason = "Denied by the user";
-    const run = await api(`/api/approvals/${approval.id}/${suffix}`, {
+    const run = await api(endpoint, {
       method: "POST",
       body: JSON.stringify(body),
     });
@@ -556,6 +684,14 @@ async function decideApproval(approval, decision) {
   }
 }
 
+function permissionCategoryLabel(value) {
+  return String(value || "unrecognized action").replaceAll("_", " ");
+}
+
+function canApproveCategory(value) {
+  return !["complex_shell", "unrecognized_action"].includes(value);
+}
+
 function renderApprovals(approvals) {
   clearNode(pendingApprovals);
   approvalSection.classList.toggle("hidden", approvals.length === 0);
@@ -565,26 +701,49 @@ function renderApprovals(approvals) {
     const tool = document.createElement("strong");
     const risk = document.createElement("span");
     const summary = document.createElement("p");
+    const technical = document.createElement("details");
+    const technicalLabel = document.createElement("summary");
+    const technicalBody = document.createElement("div");
+    const toolDetail = document.createElement("span");
+    const categoryDetail = document.createElement("span");
+    const riskDetail = document.createElement("span");
     const target = document.createElement("code");
     const actions = document.createElement("div");
     const deny = document.createElement("button");
     const approve = document.createElement("button");
+    const approveCategory = document.createElement("button");
     card.className = "approval-card";
-    tool.textContent = approval.tool_name;
-    risk.textContent = approval.risk;
+    tool.textContent = "Permission required";
+    risk.textContent = "Needs approval";
     heading.append(tool, risk);
     summary.textContent = approval.summary;
+    technical.className = "approval-technical";
+    technicalLabel.textContent = "Technical details";
+    toolDetail.textContent = `Tool: ${approval.tool_name}`;
+    categoryDetail.textContent = `Permission type: ${permissionCategoryLabel(approval.permission_category)}`;
+    riskDetail.textContent = `Risk level: ${approval.risk}`;
     target.textContent = approvalTarget(approval);
+    technicalBody.append(toolDetail, categoryDetail, riskDetail, target);
+    technical.append(technicalLabel, technicalBody);
     deny.type = "button";
     deny.className = "is-deny";
     deny.textContent = "Deny";
     approve.type = "button";
     approve.className = "is-approve";
-    approve.textContent = "Approve once";
+    approve.textContent = "Approve";
+    approveCategory.type = "button";
+    approveCategory.className = "is-approve-category";
+    approveCategory.textContent = "Approve all like this";
+    approveCategory.title = "Allow this permission type for the rest of this run only";
     deny.addEventListener("click", () => void decideApproval(approval, "deny"));
     approve.addEventListener("click", () => void decideApproval(approval, "approve"));
-    actions.append(deny, approve);
-    card.append(heading, summary, target, actions);
+    if (canApproveCategory(approval.permission_category)) {
+      approveCategory.addEventListener("click", () => void decideApproval(approval, "approve-category"));
+      actions.append(deny, approve, approveCategory);
+    } else {
+      actions.append(deny, approve);
+    }
+    card.append(heading, summary, technical, actions);
     pendingApprovals.append(card);
   });
 }
@@ -638,15 +797,22 @@ function connectEvents(conversationId) {
     if (event.kind === "approval_requested" || event.kind === "approval_resolved") {
       void loadApprovals(conversationId);
     }
+    if (["run_completed", "run_failed", "run_blocked", "run_cancelled"].includes(event.kind)) {
+      void refreshCoordinator.request(conversationId).catch((error) => showError(error.message));
+    }
   };
   [
     "conversation_created", "message_created", "run_created", "run_state_changed",
     "run_started", "tool_call_started", "tool_call_completed", "approval_requested",
-    "approval_resolved", "run_completed", "run_failed", "run_blocked", "run_paused",
+    "approval_resolved", "permission_grant_created", "permission_grant_used",
+    "run_completed", "run_failed", "run_blocked", "run_paused",
     "run_cancelled", "run_recovered_paused", "agent_error", "runtime_state_changed",
     "thinking_started", "thinking_delta", "thinking_aborted",
   ].forEach((kind) => eventSource.addEventListener(kind, receive));
-  eventSource.onopen = () => { streamState.textContent = "LIVE"; };
+  eventSource.onopen = () => {
+    streamState.textContent = "LIVE";
+    void refreshCoordinator.request(conversationId).catch((error) => showError(error.message));
+  };
   eventSource.onerror = () => { streamState.textContent = "RECONNECTING"; };
 }
 
@@ -654,6 +820,7 @@ async function loadConversation(conversationId, routeToken) {
   const conversation = await api(`/api/conversations/${conversationId}`);
   if (!navigationGuard.isCurrent(routeToken)) return;
   activeConversation = conversation;
+  setAgentPanelOpen(true);
   conversationTitle.textContent = activeConversation.title;
   await refreshMessages(conversationId);
   if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
@@ -676,8 +843,14 @@ function clearConversation() {
   clearNode(agentActivity);
   renderApprovals([]);
   streamState.textContent = "OFFLINE";
+  refreshConversation.disabled = true;
   if (eventSource) eventSource.close();
   eventSource = null;
+}
+
+function setAgentPanelOpen(open) {
+  agentPanel.classList.toggle("is-open", open);
+  toggleAgentPanel.setAttribute("aria-expanded", String(open));
 }
 
 async function restoreRoute() {
@@ -818,12 +991,29 @@ async function controlRun(action) {
 pauseRun.addEventListener("click", () => void controlRun("pause"));
 resumeRun.addEventListener("click", () => void controlRun("resume"));
 stopRun.addEventListener("click", () => void controlRun("stop"));
+refreshConversation.addEventListener("click", () => void requestConversationRefresh());
+toggleAgentPanel.addEventListener("click", () => {
+  setAgentPanelOpen(!agentPanel.classList.contains("is-open"));
+});
+closeAgentPanel.addEventListener("click", () => setAgentPanelOpen(false));
 fileViewerPreview.addEventListener("click", () => renderFileContent("preview"));
 fileViewerSource.addEventListener("click", () => renderFileContent("source"));
+fileViewerEdit.addEventListener("click", () => void beginFileEdit());
+fileViewerSave.addEventListener("click", () => void saveFileEdit());
+fileViewerCancel.addEventListener("click", cancelFileEdit);
 fileViewerRefresh.addEventListener("click", () => {
   if (activeFile) void openFile({path: activeFile.path});
 });
 fileViewerClose.addEventListener("click", closeFileViewer);
 window.addEventListener("popstate", () => void restoreRoute());
 window.addEventListener("beforeunload", () => eventSource?.close());
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void requestConversationRefresh();
+});
+setInterval(() => {
+  if (!activeConversation) return;
+  const shouldRefresh = window.QuilooIDEState.isActiveState(activeRun?.state)
+    || streamState.textContent === "RECONNECTING";
+  if (shouldRefresh) void refreshCoordinator.request(activeConversation.id).catch((error) => showError(error.message));
+}, 5000);
 void restoreRoute();

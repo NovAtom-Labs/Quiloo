@@ -56,3 +56,37 @@ const pausedControls = globalThis.QuilooIDEState.controlsForState("paused");
 assertEqual(pausedControls.resume, true, "paused work can be resumed");
 const finishedControls = globalThis.QuilooIDEState.controlsForState("completed");
 assertEqual(finishedControls.send, true, "a terminal run re-enables prompting");
+
+assertEqual(
+  globalThis.QuilooIDEState.isActiveState("waiting_for_approval"),
+  true,
+  "approval waits should continue background synchronization",
+);
+assertEqual(
+  globalThis.QuilooIDEState.isActiveState("completed"),
+  false,
+  "terminal runs should not trigger active-run polling",
+);
+
+let refreshCalls = 0;
+let releaseRefresh;
+const refreshCoordinator = globalThis.QuilooIDEState.createRefreshCoordinator(
+  () => {
+    refreshCalls += 1;
+    return new Promise((resolve) => { releaseRefresh = resolve; });
+  },
+);
+const firstRefresh = refreshCoordinator.request("conversation-b");
+const duplicateRefresh = refreshCoordinator.request("conversation-b");
+assertEqual(firstRefresh, duplicateRefresh, "overlapping refreshes should be coalesced");
+assertEqual(refreshCalls, 1, "coalesced refreshes should issue one request");
+releaseRefresh();
+Promise.all([firstRefresh, duplicateRefresh]).then(async () => {
+  const nextRefresh = refreshCoordinator.request("conversation-b");
+  assertEqual(refreshCalls, 2, "a completed refresh should allow the next sync");
+  releaseRefresh();
+  await nextRefresh;
+}).catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

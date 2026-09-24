@@ -2,8 +2,12 @@
 
 import json
 import mimetypes
+import os
 import subprocess
+import tempfile
+from hashlib import sha256
 from pathlib import Path
+from typing import ClassVar
 
 from tcad_agent.ide.models import (
     GitSnapshot,
@@ -11,6 +15,7 @@ from tcad_agent.ide.models import (
     WorkspaceEntry,
     WorkspaceFileKind,
     WorkspaceFilePreview,
+    WorkspaceTextFile,
 )
 from tcad_agent.ide.paths import (
     WorkspacePathError,
@@ -21,6 +26,17 @@ from tcad_agent.ide.paths import (
 
 class RepositoryInspector:
     preview_limit = 1024 * 1024
+    edit_limit = 1024 * 1024
+
+    _protected_edit_names: ClassVar[set[str]] = {
+        ".env",
+        ".git",
+        ".ssh",
+        ".aws",
+        "credentials",
+        "id_ed25519",
+        "id_rsa",
+    }
 
     def inspect(self, root: Path) -> RepositorySnapshot:
         canonical_root = canonical_directory(root)
@@ -140,6 +156,85 @@ class RepositoryInspector:
             content=content,
         )
 
+    def editable_file(self, root: Path, relative: str) -> WorkspaceTextFile:
+        canonical_root, target = self._editable_target(root, relative)
+        try:
+            raw = target.read_bytes()
+        except OSError as exc:
+            raise WorkspacePathError("workspace file is unavailable") from exc
+        if len(raw) > self.edit_limit or b"\x00" in raw:
+            raise WorkspacePathError("workspace file is not editable text")
+        try:
+            content = raw.decode("utf-8")
+        except UnicodeDecodeError as exc:
+            raise WorkspacePathError("workspace file is not UTF-8 text") from exc
+        return WorkspaceTextFile(
+            path=target.relative_to(canonical_root).as_posix(),
+            content=content,
+            sha256=sha256(raw).hexdigest(),
+            size=len(raw),
+        )
+
+    def save_editable_file(
+        self,
+        root: Path,
+        relative: str,
+        content: str,
+        expected_sha256: str,
+    ) -> WorkspaceTextFile:
+        canonical_root, target = self._editable_target(root, relative)
+        try:
+            current = target.read_bytes()
+        except OSError as exc:
+            raise WorkspacePathError("workspace file is unavailable") from exc
+        if sha256(current).hexdigest() != expected_sha256:
+            raise WorkspaceFileConflictError
+        encoded = content.encode("utf-8")
+        if b"\x00" in encoded:
+            raise WorkspacePathError("workspace file is not editable text")
+        if len(encoded) > self.edit_limit:
+            raise WorkspacePathError("workspace file exceeds the edit limit")
+        temporary: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                mode="wb", dir=target.parent, prefix=f".{target.name}.", delete=False
+            ) as stream:
+                stream.write(encoded)
+                stream.flush()
+                os.fsync(stream.fileno())
+                temporary = Path(stream.name)
+            os.chmod(temporary, target.stat().st_mode)
+            os.replace(temporary, target)
+        except OSError as exc:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+            raise WorkspacePathError("workspace file could not be saved") from exc
+        return WorkspaceTextFile(
+            path=target.relative_to(canonical_root).as_posix(),
+            content=content,
+            sha256=sha256(encoded).hexdigest(),
+            size=len(encoded),
+        )
+
+    def _editable_target(self, root: Path, relative: str) -> tuple[Path, Path]:
+        canonical_root = canonical_directory(root)
+        relative_path = Path(relative)
+        if any(
+            part.casefold() in self._protected_edit_names
+            or part.casefold().endswith((".key", ".pem"))
+            for part in relative_path.parts
+        ):
+            raise WorkspacePathError("protected workspace file cannot be edited")
+        cursor = canonical_root
+        for part in relative_path.parts:
+            cursor /= part
+            if cursor.is_symlink():
+                raise WorkspacePathError("symlinked workspace file cannot be edited")
+        target = resolve_workspace_path(canonical_root, relative)
+        if not target.is_file():
+            raise WorkspacePathError("workspace entry is not a file")
+        return canonical_root, target
+
     @staticmethod
     def _mime_type(path: Path) -> str:
         suffix = path.suffix.casefold()
@@ -206,3 +301,7 @@ class RepositoryInspector:
             branch=branch.stdout.strip() or None,
             dirty=bool(status.stdout.strip()),
         )
+
+
+class WorkspaceFileConflictError(RuntimeError):
+    """Raised when a file changed since the editor loaded it."""

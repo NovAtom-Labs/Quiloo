@@ -10,7 +10,13 @@ from typing import Literal, Protocol, cast
 from uuid import UUID
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import (
+    FileResponse,
+    JSONResponse,
+    RedirectResponse,
+    Response,
+    StreamingResponse,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -232,8 +238,8 @@ def create_app(
         return templates.TemplateResponse(request, "ide.html", {})
 
     @app.get("/simulate")
-    def simulation_page(request: Request) -> Response:
-        return templates.TemplateResponse(request, "index.html", {})
+    def simulation_page() -> RedirectResponse:
+        return RedirectResponse("/")
 
     @app.get("/requests/{request_id}/{stage}")
     def workflow_page(
@@ -241,8 +247,8 @@ def create_app(
         request_id: UUID,
         stage: Literal["request", "clarify", "review", "results"],
     ) -> Response:
-        del request_id, stage
-        return templates.TemplateResponse(request, "index.html", {})
+        del request, request_id, stage
+        return RedirectResponse("/")
 
     @app.post("/api/requests", status_code=201)
     def create_request(payload: CreateResearchRequest) -> RequestView:

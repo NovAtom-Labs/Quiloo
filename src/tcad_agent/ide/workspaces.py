@@ -3,7 +3,12 @@
 from pathlib import Path
 from uuid import UUID
 
-from tcad_agent.ide.models import WorkspaceEntry, WorkspaceFilePreview, WorkspaceRecord
+from tcad_agent.ide.models import (
+    WorkspaceEntry,
+    WorkspaceFilePreview,
+    WorkspaceRecord,
+    WorkspaceTextFile,
+)
 from tcad_agent.ide.repository import RepositoryInspector
 from tcad_agent.ide.store import SqliteIDEStore
 
@@ -41,3 +46,19 @@ class WorkspaceManager:
     def file_path(self, workspace_id: UUID, relative: str) -> Path:
         workspace = self.get(workspace_id)
         return self.inspector.file_path(workspace.root, relative)
+
+    def editable_file(self, workspace_id: UUID, relative: str) -> WorkspaceTextFile:
+        workspace = self.get(workspace_id)
+        return self.inspector.editable_file(workspace.root, relative)
+
+    def save_editable_file(
+        self,
+        workspace_id: UUID,
+        relative: str,
+        content: str,
+        expected_sha256: str,
+    ) -> WorkspaceTextFile:
+        workspace = self.get(workspace_id)
+        return self.inspector.save_editable_file(
+            workspace.root, relative, content, expected_sha256
+        )

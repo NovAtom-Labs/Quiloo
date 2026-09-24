@@ -28,7 +28,9 @@ from tcad_agent.ide.models import (
     WorkspaceEntry,
     WorkspaceFilePreview,
     WorkspaceRecord,
+    WorkspaceTextFile,
 )
+from tcad_agent.ide.repository import WorkspaceFileConflictError
 from tcad_agent.ide.store import IDEStoreError, MessageNotFoundError, SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
 from tcad_agent.web.schemas import (
@@ -37,6 +39,7 @@ from tcad_agent.web.schemas import (
     DenyAgentApprovalRequest,
     OpenWorkspaceRequest,
     ResolveAgentApprovalRequest,
+    SaveWorkspaceFileRequest,
     StartAgentRunRequest,
 )
 
@@ -243,6 +246,30 @@ def build_ide_router(
             },
         )
 
+    @router.get("/workspaces/{workspace_id}/files/content")
+    def workspace_file_content(
+        workspace_id: UUID, path: str
+    ) -> WorkspaceTextFile:
+        return services.workspaces.editable_file(workspace_id, path)
+
+    @router.put("/workspaces/{workspace_id}/files/content")
+    def save_workspace_file(
+        workspace_id: UUID, payload: SaveWorkspaceFileRequest
+    ) -> WorkspaceTextFile:
+        try:
+            return services.workspaces.save_editable_file(
+                workspace_id,
+                payload.path,
+                payload.content,
+                payload.expected_sha256,
+            )
+        except WorkspaceFileConflictError as exc:
+            raise AgentAPIError(
+                409,
+                "workspace_file_conflict",
+                "The file changed after it was opened. Refresh before saving.",
+            ) from exc
+
     @router.post("/workspaces/{workspace_id}/conversations", status_code=201)
     def create_conversation(
         workspace_id: UUID, payload: CreateConversationRequest
@@ -327,7 +354,14 @@ def build_ide_router(
         return services.store.list_pending_approvals(conversation_id)
 
     def resolve_approval_error(exc: IDEStoreError) -> AgentAPIError:
-        code = "stale_revision" if "stale" in str(exc).lower() else "approval_not_found"
+        detail = str(exc).lower()
+        if "cannot be granted" in detail:
+            return AgentAPIError(
+                400,
+                "permission_category_not_grantable",
+                "This action is too broad to approve by category. Approve only this action.",
+            )
+        code = "stale_revision" if "stale" in detail else "approval_not_found"
         status = 409 if code == "stale_revision" else 404
         message = (
             "The approval changed. Refresh before deciding again."
@@ -342,6 +376,17 @@ def build_ide_router(
     ) -> AgentRunRecord:
         try:
             return supervisor.approve(approval_id, payload.expected_revision)
+        except IDEStoreError as exc:
+            raise resolve_approval_error(exc) from exc
+
+    @router.post("/approvals/{approval_id}/approve-category")
+    def approve_agent_action_category(
+        approval_id: UUID, payload: ResolveAgentApprovalRequest
+    ) -> AgentRunRecord:
+        try:
+            return supervisor.approve_category(
+                approval_id, payload.expected_revision
+            )
         except IDEStoreError as exc:
             raise resolve_approval_error(exc) from exc
 

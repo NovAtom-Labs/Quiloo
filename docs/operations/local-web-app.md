@@ -29,9 +29,10 @@ The launcher binds only to `127.0.0.1`. If a healthy matching instance is alread
 1. Select `Open folder` and choose a repository with the native desktop picker. On headless Linux, enter an absolute path and select `Open path`.
 2. Create a conversation and send a concrete repository task.
 3. Watch normalized file, terminal, TCAD, validation, and subagent events in the activity panel.
-4. Approve or deny any action that crosses the selected repository boundary or changes the wider machine. The approval card shows the tool, risk, canonical path or clipped command, and effect.
-5. Use Pause, Resume, or Stop as needed. Refreshing the page restores the persisted run and pending decisions.
-6. Inspect the repository diff and the agent's final evidence before accepting the change.
+4. Decide any action that crosses the selected repository boundary or changes the wider machine. The approval card first explains the request in plain language. Expand Technical details to inspect the tool, permission category, risk, canonical path, or clipped command.
+5. Select Approve for the current action, Approve all like this for matching permission categories during the current run, or Deny. Run-scoped grants expire when that run finishes and never carry into a new run.
+6. Use Pause, Resume, or Stop as needed. Refreshing the page restores the persisted run, its category grants, and pending decisions.
+7. Inspect the repository diff and the agent's final evidence before accepting the change.
 
 Repository-local reads, edits, tests, builds, and validation commands run without interruption. The following actions require an explicit decision:
 
@@ -70,16 +71,18 @@ Expected evidence includes three repaired source files, five passing visible tes
   --workspace test-workspaces/pn-junction-research
 ```
 
-## Guided simulation workflow
+## TCAD work in a repository conversation
 
-1. Paste a research problem and select DEVSIM or Sentaurus.
-2. Answer only the displayed consequential questions, such as missing layer thickness or contact treatment.
-3. Review the normalized specification, capability result, warnings, and exact plan digest.
-4. Approve that plan.
-5. Run once. Repeated Run clicks return the existing terminal state and do not create duplicate simulator jobs.
-6. Inspect stage events, validation results, the Markdown report, canonical result, native output, and manifest hashes.
+1. Open the repository that owns the specification, data, or requested evidence.
+2. Create an Agent conversation and describe the research task, backend, geometry, materials, contacts, study, models, and required outputs.
+3. Ask the agent to inspect or create a portable `ExperimentSpec` and check the selected backend capability.
+4. Review the exact unsupported fields and any proposed approximation before authorizing execution.
+5. Let the agent run the deterministic adapter, bounded runner, canonical normalizer, validators, and report builder through the typed `tcad_domain` tool.
+6. Inspect changed repository files, activity evidence, validation results, and the final response.
 
-The interface shows concrete actions and stage progress, not hidden model reasoning.
+The interface shows concrete actions and stage progress, not hidden model reasoning. The separate
+simulation workstation is no longer part of the browser product. Legacy `/simulate` links redirect
+to the repository IDE, while the simulator APIs and CLI remain available.
 
 ## Backend behavior
 
@@ -98,10 +101,10 @@ Stop the service before backing up `TCAD_WORKSPACE` so the SQLite database and w
 ## Current limits
 
 - Commands run as the current OS user. The pilot does not yet provide container or VM isolation.
-- Approval is per action; there is no persistent allow-always rule.
+- Approve applies to one action. Approve all like this applies to one permission category for the current run only. There is no cross-run allow-always rule.
 - The pilot uses one configured Bedrock model for primary and delegated reasoning. Multi-model routing is planned later.
 - Browser-based web research is disabled.
-- The repository tree is an inspector, not yet a full embedded code editor or Git diff view.
+- Eligible UTF-8 text files can be edited in the workspace, but the pilot does not yet provide a rich language server or embedded Git diff editor. Binary, oversized, sensitive, and symlinked files remain read-only or refused.
 - DEVSIM supports the reviewed one-dimensional silicon subset. Sentaurus execution remains unavailable until the licensed host passes conformance testing.
 
 ## Troubleshooting

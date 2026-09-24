@@ -97,7 +97,35 @@ def test_high_risk_action_creates_one_pending_approval(tmp_path: Path) -> None:
     assert len(approvals) == 1
     assert approvals[0].action_id == action.id
     assert approvals[0].payload == {"command": "git push"}
+    assert approvals[0].permission_category.value == "git_mutation"
+    assert approvals[0].summary.startswith("Quiloo wants to change Git history")
     assert store.get_run(run.id).state.value == "waiting_for_approval"
+
+
+def test_event_bridge_skips_approval_for_a_granted_run_category(
+    tmp_path: Path,
+) -> None:
+    store, events, conversations, conversation, run = _services(tmp_path)
+    bridge = AgentEventBridge(
+        conversation.id,
+        run.id,
+        store,
+        events,
+        conversations,
+        workspace=tmp_path,
+        permission_grants={"git_mutation"},
+    )
+
+    bridge(_terminal_action("git push", risk=SecurityRisk.HIGH))
+
+    assert store.list_pending_approvals(conversation.id) == ()
+    grant_events = [
+        event
+        for event in events.list_after(conversation.id, 0)
+        if event.kind == "permission_grant_used"
+    ]
+    assert len(grant_events) == 1
+    assert grant_events[0].payload["permission_category"] == "git_mutation"
 
 
 def test_on_stream_shows_live_reasoning_but_still_redacts_secrets(

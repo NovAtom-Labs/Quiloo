@@ -33,10 +33,16 @@ from openhands.tools.task.definition import TaskAction, TaskObservation
 from openhands.tools.terminal.definition import TerminalAction
 from pydantic import JsonValue
 
-from tcad_agent.agent.policy import action_summary, classify_action
+from tcad_agent.agent.policy import (
+    action_summary,
+    approval_explanation,
+    classify_action,
+    permission_category,
+)
 from tcad_agent.agent.tools import TcadDomainAction
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
+from tcad_agent.ide.models import PermissionCategory, is_run_grantable
 from tcad_agent.ide.store import SqliteIDEStore
 
 MAX_EVENT_TEXT = 16_000
@@ -80,6 +86,7 @@ class AgentEventBridge:
         conversations: ConversationService,
         *,
         workspace: Path | None = None,
+        permission_grants: set[PermissionCategory] | set[str] | None = None,
         secret_values: tuple[str, ...] | None = None,
     ) -> None:
         self.conversation_id = conversation_id
@@ -88,6 +95,11 @@ class AgentEventBridge:
         self.events = events
         self.conversations = conversations
         self.workspace = workspace.resolve() if workspace is not None else None
+        raw_grants = permission_grants if permission_grants is not None else set()
+        normalized_grants = {PermissionCategory(value) for value in raw_grants}
+        raw_grants.clear()
+        raw_grants.update(normalized_grants)
+        self.permission_grants = cast(set[PermissionCategory], raw_grants)
         self.secret_values = secret_values or tuple(
             value
             for name in _SECRET_ENV_NAMES
@@ -160,15 +172,18 @@ class AgentEventBridge:
             )
 
     def _action(self, event: ActionEvent) -> None:
+        policy_workspace = self.workspace or Path.cwd()
         risk = (
-            classify_action(self.workspace, event)
+            classify_action(policy_workspace, event)
             if self.workspace is not None
             else event.security_risk
         )
+        category = permission_category(policy_workspace, event)
         payload: dict[str, JsonValue] = {
             **self._base(event),
             "action_id": event.id,
             "risk": risk.value,
+            "permission_category": category.value,
             "summary": self._safe(action_summary(event)),
             "tool_call_id": event.tool_call_id,
             "tool_name": event.tool_name,
@@ -177,8 +192,22 @@ class AgentEventBridge:
         if normalized:
             payload["arguments"] = normalized
         self.events.append(self.conversation_id, "tool_call_started", payload)
+        grant_applies = is_run_grantable(category) and category in self.permission_grants
+        if risk is SecurityRisk.HIGH and grant_applies:
+            self.events.append(
+                self.conversation_id,
+                "permission_grant_used",
+                {
+                    **self._base(event),
+                    "action_id": event.id,
+                    "permission_category": category.value,
+                    "scope": "run",
+                    "tool_name": event.tool_name,
+                },
+            )
         if (
             risk is SecurityRisk.HIGH
+            and not grant_applies
             and event.id not in self._approval_actions
         ):
             self._approval_actions.add(event.id)
@@ -187,8 +216,9 @@ class AgentEventBridge:
                 event.id,
                 event.tool_name,
                 risk.value,
-                self._safe(action_summary(event)),
+                approval_explanation(policy_workspace, event, category),
                 normalized,
+                permission_category=category,
             )
 
     def _observation(self, event: ObservationEvent) -> None:
