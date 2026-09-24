@@ -1,6 +1,6 @@
 # Mature Agentic Workbench Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Turn Quiloo's existing repository UI into a responsive scientific agent workbench with structured activity, safe rendered chat, run-scoped changes, stable panes, and verifiable recovery behavior.
 
@@ -48,7 +48,7 @@
 - Produces: `SqliteIDEStore.save_run_baseline(run_id, baseline)` and `SqliteIDEStore.get_run_baseline(run_id)`.
 - Consumes: existing `AgentRunRecord`, workspace roots, and strict Pydantic models.
 
-- [ ] **Step 1: Write failing model and tracker tests**
+- [x] **Step 1: Write failing model and tracker tests**
 
 ```python
 def test_change_tracker_excludes_dirty_state_that_predates_run(tmp_path: Path) -> None:
@@ -72,13 +72,13 @@ def test_change_tracker_marks_large_binary_comparison_uncertain(tmp_path: Path) 
     assert changes.files[0].diff is None
 ```
 
-- [ ] **Step 2: Run the focused tests and confirm missing contracts fail**
+- [x] **Step 2: Run the focused tests and confirm missing contracts fail**
 
 Run: `pytest tests/unit/ide/test_changes.py tests/unit/ide/test_store.py -q`
 
 Expected: failure because the change models, tracker, and baseline store methods do not exist.
 
-- [ ] **Step 3: Add strict change contracts**
+- [x] **Step 3: Add strict change contracts**
 
 ```python
 class BaselineFile(StrictModel):
@@ -116,15 +116,15 @@ class WorkspaceChangeSet(StrictModel):
     files: tuple[WorkspaceChange, ...]
 ```
 
-- [ ] **Step 4: Implement bounded capture and comparison**
+- [x] **Step 4: Implement bounded capture and comparison**
 
 `WorkspaceChangeTracker.capture(root)` must skip `.git`, `.tcad-agent`, caches, symlinks, and protected credential paths. It records metadata for at most 5,000 files, hashes at most 1 MiB per file, stores UTF-8 baseline text subject to a 20 MiB total content budget, and marks the baseline truncated when limits are reached. `compare(root, baseline)` classifies create, modify, delete, and exact-hash rename operations. It uses `difflib.unified_diff` for stored UTF-8 text, caps each returned diff at 256 KiB with `diff_truncated=True`, and marks metadata-only changes uncertain.
 
-- [ ] **Step 5: Persist baselines in SQLite**
+- [x] **Step 5: Persist baselines in SQLite**
 
 Add a `run_change_baselines` table with `run_id`, `baseline_json`, and `created_at`. Store and restore with strict model validation. Repeated writes for the same run are idempotent and never replace the original baseline.
 
-- [ ] **Step 6: Run focused tests and commit**
+- [x] **Step 6: Run focused tests and commit**
 
 Run: `pytest tests/unit/ide/test_changes.py tests/unit/ide/test_store.py -q`
 
@@ -145,7 +145,7 @@ Commit: `feat: track run scoped workspace changes`
 - Produces: `GET /api/runs/{run_id}/changes` returning `WorkspaceChangeSet`.
 - Produces: a baseline captured after the run record exists and before any runtime tool executes.
 
-- [ ] **Step 1: Write failing supervisor and API tests**
+- [x] **Step 1: Write failing supervisor and API tests**
 
 ```python
 def test_start_captures_baseline_before_runtime_runs(services, runtime) -> None:
@@ -164,15 +164,15 @@ def test_run_changes_endpoint_excludes_preexisting_edits(web, repository) -> Non
     assert response.json()["files"][0]["path"] == "existing.txt"
 ```
 
-- [ ] **Step 2: Run focused tests and verify baseline timing fails**
+- [x] **Step 2: Run focused tests and verify baseline timing fails**
 
 Run: `pytest tests/unit/agent/test_supervisor.py tests/unit/web/test_ide_api.py -q`
 
-- [ ] **Step 3: Wire the tracker through IDE services**
+- [x] **Step 3: Wire the tracker through IDE services**
 
 Add a `changes` service to the supervisor service protocol and `IDEServices`. In `AgentSupervisor.start`, create the run record, capture and persist the baseline, then create the runtime, send the prompt, transition the run, and launch its thread. If baseline capture fails, store an explicitly truncated empty baseline and emit a sanitized `change_baseline_warning` event rather than starting without an attribution boundary.
 
-- [ ] **Step 4: Add the read-only changes endpoint**
+- [x] **Step 4: Add the read-only changes endpoint**
 
 ```python
 @router.get("/runs/{run_id}/changes")
@@ -188,7 +188,7 @@ def run_changes(run_id: UUID) -> WorkspaceChangeSet:
 
 The endpoint performs no Git mutation and never returns content outside the workspace.
 
-- [ ] **Step 5: Run focused tests and commit**
+- [x] **Step 5: Run focused tests and commit**
 
 Run: `pytest tests/unit/agent/test_supervisor.py tests/unit/web/test_ide_api.py -q`
 
@@ -209,7 +209,7 @@ Commit: `feat: expose honest per run change sets`
 - Produces: `QuilooMarkdown.render(container, source)` and `QuilooMarkdown.blocks(source)`.
 - Consumes: current persisted and live `IDEEvent` objects without changing the SSE wire format.
 
-- [ ] **Step 1: Write failing event-reducer tests**
+- [x] **Step 1: Write failing event-reducer tests**
 
 ```javascript
 const view = globalThis.QuilooIDEEvents.createRunPresentation();
@@ -224,29 +224,29 @@ assertEqual(view.snapshot().lastEventId, 12, "duplicate replay is ignored");
 Include cases for subagent ownership, interrupted thinking, pending approvals, low-value event
 suppression, and restored plus live events producing the same snapshot.
 
-- [ ] **Step 2: Write failing Markdown safety tests**
+- [x] **Step 2: Write failing Markdown safety tests**
 
 Test headings, lists, emphasis, inline code, fenced code, safe HTTP links, escaped raw HTML, and
 rejected `javascript:` links. Rendering must use text nodes and constructed elements only.
 
-- [ ] **Step 3: Run focused JavaScript tests and verify failure**
+- [x] **Step 3: Run focused JavaScript tests and verify failure**
 
 Run: `pytest tests/unit/web/test_ide_javascript.py -q`
 
-- [ ] **Step 4: Implement the pure event reducer**
+- [x] **Step 4: Implement the pure event reducer**
 
 The reducer stores steps by `action_id` or stable fallback identity, maintains insertion order,
 maps terminal events to run state, associates thinking summaries by item ID, and derives a
 compact current operation. Unknown events are retained in `technicalEvents` without appearing
 in the default activity list.
 
-- [ ] **Step 5: Implement the safe Markdown renderer**
+- [x] **Step 5: Implement the safe Markdown renderer**
 
 Reuse the existing `markdownBlocks` behavior, add inline token rendering without raw HTML, and
 share it with the file viewer. Allowed link schemes are `http:`, `https:`, and workspace-local
 relative references. Links opening outside the application receive safe target attributes.
 
-- [ ] **Step 6: Run focused tests and commit**
+- [x] **Step 6: Run focused tests and commit**
 
 Run: `pytest tests/unit/web/test_ide_javascript.py -q`
 
@@ -267,7 +267,7 @@ Commit: `feat: add deterministic agent presentation state`
 - Produces: `QuilooLayout.clampLayout(input)` and `QuilooLayout.createController(options)`.
 - Consumes: workspace ID for preference keys and existing agent-panel open state.
 
-- [ ] **Step 1: Write failing geometry and shell tests**
+- [x] **Step 1: Write failing geometry and shell tests**
 
 ```javascript
 assertDeepEqual(
@@ -287,30 +287,30 @@ Changes tabs, and separate drawer controls. The JavaScript test must also assert
 increments, double-click reset values, corrupt stored-value rejection, and transition to drawers
 before the center falls below 480 px.
 
-- [ ] **Step 2: Run focused tests and verify failure**
+- [x] **Step 2: Run focused tests and verify failure**
 
 Run: `pytest tests/unit/web/test_ide_javascript.py tests/e2e/test_ide_shell.py -q`
 
-- [ ] **Step 3: Add and verify the official local logo asset**
+- [x] **Step 3: Add and verify the official local logo asset**
 
 Copy the official `novatom-logo-horizontal-white.svg` asset from `novatomlabs.com` into the
 static package. Confirm the SVG contains no scripts, remote references, or credentials.
 
-- [ ] **Step 4: Implement the layout controller**
+- [x] **Step 4: Implement the layout controller**
 
 Use CSS custom properties `--explorer-width` and `--agent-width`. Pointer and keyboard resize
 events update those values through `clampLayout`. Store valid desktop widths under
 `quiloo.layout.<workspace-id>`. Double-click restores 218 px and 356 px. Media changes switch to
 tablet or narrow drawer state and never keep a center smaller than 480 px.
 
-- [ ] **Step 5: Rebuild the page shell and visual system**
+- [x] **Step 5: Rebuild the page shell and visual system**
 
 Create a contiguous three-pane grid with one shared border, 31 px pane headers, 10 px and 12 px
 content tokens, compact NovAtom and Quiloo branding, restrained state colors, and no gradients,
 glow, floating primary cards, or decorative chat bubbles. Ensure pane-specific selectors do not
 inherit page container margins or padding.
 
-- [ ] **Step 6: Run focused tests and commit**
+- [x] **Step 6: Run focused tests and commit**
 
 Run: `pytest tests/unit/web/test_ide_javascript.py tests/e2e/test_ide_shell.py -q`
 
@@ -335,14 +335,14 @@ Commit: `feat: build continuous resizable research workbench`
 - Produces: tab rendering, step expansion, file and diff navigation callbacks, completion focus,
   and plain-language permission cards.
 
-- [ ] **Step 1: Write failing view-model and DOM-contract tests**
+- [x] **Step 1: Write failing view-model and DOM-contract tests**
 
 Test that lifecycle noise is absent from default Activity, one tool call produces one expandable
 step, a subagent nests under its owner, a completed run creates a structured summary, and a
 failed run retains partial evidence. Test that permission cards include explanation, target,
 risk, technical details, Deny, Approve, and Approve all like this for grantable categories.
 
-- [ ] **Step 2: Write failing changes-view tests**
+- [x] **Step 2: Write failing changes-view tests**
 
 ```javascript
 const rows = QuilooChanges.toRows(changeSet);
@@ -353,35 +353,35 @@ assertEqual(rows[0].uncertain, false);
 
 Include created, deleted, renamed, binary, uncertain, empty, and unavailable cases.
 
-- [ ] **Step 3: Run focused tests and verify failure**
+- [x] **Step 3: Run focused tests and verify failure**
 
 Run: `pytest tests/unit/web/test_ide_javascript.py tests/e2e/test_ide_shell.py -q`
 
-- [ ] **Step 4: Render assistant messages as safe technical notes**
+- [x] **Step 4: Render assistant messages as safe technical notes**
 
 Replace plain `textContent` message bodies with `QuilooMarkdown.render`. Preserve authorship and
 timestamps. When a final assistant message arrives, scroll its top into view without forcing
 the activity timeline to its bottom.
 
-- [ ] **Step 5: Replace raw activity appends with presentation rendering**
+- [x] **Step 5: Replace raw activity appends with presentation rendering**
 
 Feed restored and live events through one reducer. Render grouped steps, operational reasoning,
 subagents, durations, affected files, collapsed commands, output, and technical events. Keep
 pause, resume, stop, reconnection, and refresh behavior intact.
 
-- [ ] **Step 6: Implement Chat, Activity, and Changes tabs**
+- [x] **Step 6: Implement Chat, Activity, and Changes tabs**
 
 Tabs retain independent scroll positions. Pending approvals remain visible in Chat and produce
 an Activity marker. Changes refresh after file-affecting tools and terminal run states. File
 clicks use the existing viewer; diff clicks open a dedicated diff surface in the center pane.
 
-- [ ] **Step 7: Implement completion and failure reports**
+- [x] **Step 7: Implement completion and failure reports**
 
 Completion shows changed files, validation evidence, artifacts, warnings, and suggested next
 actions available from actual events and the change set. Failure shows the failed step, last
 successful step, retained output, affected files, and retry or inspect actions.
 
-- [ ] **Step 8: Run focused tests and commit**
+- [x] **Step 8: Run focused tests and commit**
 
 Run: `pytest tests/unit/web/test_ide_javascript.py tests/e2e/test_ide_shell.py tests/unit/web/test_ide_api.py -q`
 
@@ -399,24 +399,24 @@ Commit: `feat: present agent work as structured scientific activity`
 - Consumes: all previous tasks.
 - Produces: one reproducible acceptance path and final verified branch state.
 
-- [ ] **Step 1: Add a failing acceptance test for the complete run evidence**
+- [x] **Step 1: Add a failing acceptance test for the complete run evidence**
 
 Extend the deterministic repository runtime scenario to assert baseline creation, terminal-made
 changes, grouped activity, final `WorkspaceChangeSet`, and unchanged simulator-neutral
 execution boundaries.
 
-- [ ] **Step 2: Run the focused end-to-end scenario**
+- [x] **Step 2: Run the focused end-to-end scenario**
 
 Run: `pytest tests/e2e/test_agentic_repl.py -q`
 
-- [ ] **Step 3: Update user-facing documentation**
+- [x] **Step 3: Update user-facing documentation**
 
 Document the three panes, Chat and Activity and Changes views, resizers, drawers, safe Markdown,
 permission behavior, run-scoped attribution, and the exact realistic test-workspace walkthrough.
 Do not claim interactive TTY, collaboration, automatic Git mutation, or unsupported simulator
 capabilities.
 
-- [ ] **Step 4: Run static verification**
+- [x] **Step 4: Run static verification**
 
 Run:
 
@@ -426,25 +426,25 @@ mypy src/tcad_agent
 pytest tests/unit/web tests/unit/ide tests/unit/agent tests/e2e/test_ide_shell.py tests/e2e/test_agentic_repl.py -q
 ```
 
-- [ ] **Step 5: Run the complete test suite**
+- [x] **Step 5: Run the complete test suite**
 
 Run: `pytest -q`
 
 Expected: all installed, non-environment-dependent tests pass. Existing simulator or live-model
 tests may skip only under their documented markers or missing external dependencies.
 
-- [ ] **Step 6: Exercise the live UI**
+- [x] **Step 6: Exercise the live UI**
 
 Start Quiloo locally, open the realistic test repository, create a conversation, run a safe
 read-only prompt, inspect Chat and Activity and Changes, test both dividers at desktop width,
 test tablet and narrow drawer modes, open and edit a file, and verify that completion begins at
 the top of its report. Capture console errors and fix every product-owned error.
 
-- [ ] **Step 7: Commit the verified integration**
+- [x] **Step 7: Commit the verified integration**
 
 Commit: `docs: document mature agentic workbench workflow`
 
-- [ ] **Step 8: Review the complete branch diff**
+- [x] **Step 8: Review the complete branch diff**
 
 Run:
 

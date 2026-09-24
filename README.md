@@ -54,15 +54,30 @@ The local application now opens into a Linux-first repository IDE. A researcher 
 Git or non-Git repository, inspect its directory tree and Git state, create a persistent
 conversation, and return to the same conversation URL after a browser or service restart.
 
+### Workbench layout
+
+Quiloo uses one continuous three-pane workbench:
+
+- The Repository pane opens a local folder, reports Git state, lists saved conversations, and browses files.
+- The central Workspace previews and edits text, code, Markdown, JSON, CSV or TSV data, images, and PDFs. It also displays unified run diffs without requiring a download.
+- The Agent pane separates Chat, Activity, and Changes. Chat contains the researcher conversation and approvals. Activity groups each tool start and completion into one expandable action with duration, owner, command, output, delegated-agent identity, and collapsed operational reasoning. Changes lists only files attributable to the selected run and opens either the current file or its recorded diff.
+
+At desktop width, the Repository and Agent dividers resize independently and preserve consistent
+one-pixel pane boundaries. The widths are saved per workspace. At tablet width, Repository becomes
+a drawer. At narrow width, Agent also becomes a drawer, so the file workspace retains useful room.
+Assistant responses use a restricted Markdown renderer. Raw HTML and unsafe link schemes are not
+inserted into the page.
+
 ### Repository agent workflow
 
 1. Open a repository with the native folder picker or enter its absolute path.
 2. Select a file to inspect source, Markdown, JSON, CSV/TSV data, raster images, PDFs, or binary metadata in the central workspace.
 3. Create a conversation and describe the intended repository task.
 4. Quiloo reads and edits files, searches the repository, runs tests or validation commands, uses typed TCAD operations, and may delegate bounded work to a specialist subagent.
-5. Live activity shows tool names, canonical paths, commands, outcomes, validation evidence, delegated task results, and the model's streamed reasoning after secret redaction.
+5. Open Activity to inspect grouped tool actions, commands, outcomes, validation evidence, delegated task results, and collapsed operational reasoning after secret redaction.
 6. Repository-local reads, edits, tests, builds, and validation run without interruption. Access outside the selected repository, package installation, network activity, destructive commands, Git mutation, and remote mutation stop at an approval card.
-7. The researcher can approve one action, approve future actions in the same permission category for the current run, deny, pause, resume, stop, refresh, or return later. Conversations, messages, run state, approvals, run-scoped grants, and normalized events are persisted locally.
+7. Open Changes to inspect the run-scoped file list, exact line counts, rename metadata, uncertainty labels for non-text changes, and unified diffs.
+8. The researcher can approve one action, approve future actions in the same permission category for the current run, deny, pause, resume, stop, refresh, or return later. Category approval expires when that run ends. Conversations, messages, run state, approvals, run-scoped grants, and normalized events are persisted locally.
 
 The selected repository is the default authority boundary. A parent agent and every delegated subagent use the same canonical workspace and policy. A subagent cannot widen access. High-risk child actions are denied, and the primary agent must request the equivalent action itself if a browser approval decision is required.
 
@@ -125,7 +140,7 @@ instead of being silently removed.
 
 | Area | Current capability |
 | --- | --- |
-| Repository IDE | Repository browser, central file workspace, responsive Agent drawer, safe text editing, Git state, persistent conversations, recoverable activity streaming, and stable URLs |
+| Repository IDE | Three-pane repository workbench, persisted resizers, responsive drawers, safe preview and text editing, Git state, persistent conversations, structured activity, run diffs, and stable URLs |
 | TCAD workflow | Conversation-driven specification, capability, compilation, validation, and report operations through the typed `tcad_domain` boundary |
 | Portable specification | Strict one-dimensional `ExperimentSpec` with dimensional quantities and rejection of unknown fields |
 | Structures | Composable ordered silicon regions, without named-device execution branches |
@@ -367,11 +382,13 @@ owns that port, the updated application starts on the next available loopback po
 1. Select `Open folder` to use the native desktop picker. On headless Linux, enter an absolute repository path instead.
 2. Select `Open path` to register the canonical path and inspect its top-level entries.
 3. Select `New conversation`, provide a title, and send the first prompt.
-4. Watch file, command, validation, and subagent events in the activity stream. Permission cards lead with a plain-language explanation and keep the exact tool, category, risk, command, or path under Technical details.
+4. Use Chat for the conversation and pending approvals. Permission cards lead with a plain-language explanation and keep the exact tool, category, risk, command, or path under Technical details.
 5. Select Approve for one action, Approve all like this for matching actions during this run only, or Deny. Every decision and automatic use of a run grant remains visible in the event ledger.
-6. Pause, resume, or stop the active run when needed.
-7. Bookmark or reload the resulting `/workspaces/<id>/conversations/<id>` URL to restore the workspace, conversation, messages, run state, approvals, and activity stream.
-8. Ask for TCAD work in the same conversation. The agent uses typed domain operations and writes evidence back into the selected repository.
+6. Use Activity for one row per agent action. Expand a row for its exact command or output. Operational reasoning and technical events remain collapsed until requested.
+7. Use Changes for the files attributable to this run. Select a text change to open its unified diff in the central workspace. Binary or size-limited comparisons are labeled explicitly instead of being guessed.
+8. Pause, resume, or stop the active run when needed. Resize both desktop dividers by pointer or keyboard, or double-click a divider to restore its default width.
+9. Bookmark or reload the resulting `/workspaces/<id>/conversations/<id>` URL to restore the workspace, conversation, messages, run state, approvals, and event-derived activity.
+10. Ask for TCAD work in the same conversation. The agent uses typed domain operations and writes evidence back into the selected repository.
 
 Workspace metadata, conversations, messages, and IDE events are stored in
 `.tcad-agent/ide.sqlite3` by default. Simulation bundles remain below the same runtime root. Change
@@ -391,6 +408,17 @@ Add `--include-external-fixture` when testing the approval boundary. This create
 ```bash
 OPENHANDS_SUPPRESS_BANNER=1 .venv/bin/pytest tests/e2e/test_agentic_repl.py -q
 ```
+
+For a repeatable manual workbench check, open that generated folder and use this prompt:
+
+```text
+Inspect this repository and RESEARCH_TASK.md. Diagnose and fix the scientific validation failures without changing researcher-owned inputs, run the repository checks, delegate a read-only scientific review, and report exact evidence.
+```
+
+The expected run modifies only `src/junction_lab/physics.py`, `src/junction_lab/report.py`, and
+`src/junction_lab/validation.py`. Chat ends with the evidence report. Activity shows paired file,
+terminal, and delegated-review actions. Changes shows exactly those three modified paths and opens
+their unified diffs. The deterministic grader below must still report a score of 100.
 
 After a live repository-agent run, grade the actual workspace independently:
 

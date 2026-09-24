@@ -197,15 +197,19 @@ In Quiloo:
 Read AGENTS.md and RESEARCH_TASK.md, then complete the research task end to end. Inspect and explain the execution path, run the failing checks, fix root causes only in src/junction_lab, rerun all checks, generate the requested artifacts, review the diff, and delegate one independent read-only physics review before finishing. Stay inside this repository. Do not use network services or git mutations. Do not edit tests, experiment.toml, or reference data.
 ```
 
-4. Inspect every approval card before accepting it.
-5. Wait for the final response, then run the deterministic grader:
+4. Confirm the three-pane layout. At desktop width, resize both dividers and double-click each one to restore its default. At tablet width, open Repository as a drawer. At narrow width, open Agent as a drawer.
+5. Use Chat for the conversation and approval decisions. Inspect the plain-language explanation before opening Technical details. Approve all like this applies only to the displayed permission category and expires when the run ends.
+6. Use Activity to inspect one expandable row per tool action, including delegated ownership, duration, commands, and output. Operational reasoning is collapsed by default.
+7. Use Changes to confirm that only the files attributable to this run appear. Select a changed text file and verify that its unified diff opens in the central workspace.
+8. Open a safe text file, select Edit, make a disposable change, and save it. Restore that manual edit before grading so it is not confused with agent work.
+9. Wait for the final response, then run the deterministic grader:
 
 ```bash
 .venv/bin/python evaluations/repl/grade_workspace.py \
   --workspace test-workspaces/pn-junction-research
 ```
 
-Expected evidence includes five passing tests, corrected source code, generated JSON and Markdown artifacts, unchanged researcher-owned inputs, a delegated review result, and a grader score of 100.
+Expected evidence includes five passing tests, corrected source code, generated JSON and Markdown artifacts, unchanged researcher-owned inputs, a delegated review result, and a grader score of 100. The run-scoped Changes view should list exactly `src/junction_lab/physics.py`, `src/junction_lab/report.py`, and `src/junction_lab/validation.py` for the deterministic repair scenario.
 
 ## 10. Verify the TCAD agent workflow
 

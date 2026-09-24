@@ -221,9 +221,13 @@ def test_repository_agent_repairs_validates_and_delegates_end_to_end(
     supervisor.join(run_id, timeout=30)
 
     completed = services.store.get_run(run_id)
+    baseline = services.store.get_run_baseline(run_id)
     messages = web.get(
         f"/api/conversations/{conversation['id']}/messages"
     ).json()
+    changes_response = web.get(f"/api/runs/{run_id}/changes")
+    assert changes_response.status_code == 200
+    changes = changes_response.json()
     activity = services.events.list_after(conversation_id, 0)
     grade = subprocess.run(
         [sys.executable, str(GRADER), "--workspace", str(repository)],
@@ -257,9 +261,25 @@ def test_repository_agent_repairs_validates_and_delegates_end_to_end(
         "src/junction_lab/report.py",
         "src/junction_lab/validation.py",
     ]
+    assert baseline.root == repository.resolve()
+    assert completed.created_at <= baseline.captured_at <= completed.updated_at
+    assert not baseline.truncated
+    assert [row["path"] for row in changes["files"]] == changed
+    assert {row["operation"] for row in changes["files"]} == {"modified"}
+    assert all(row["diff"] and not row["uncertain"] for row in changes["files"])
+    assert changes["run_id"] == str(run_id)
+    started_actions = {
+        str(event.payload["action_id"])
+        for event in activity
+        if event.kind == "tool_call_started"
+    }
     completed_tools = [
         event for event in activity if event.kind == "tool_call_completed"
     ]
+    assert started_actions == {
+        str(event.payload["action_id"]) for event in completed_tools
+    }
+    assert len(started_actions) == len(completed_tools)
     assert any("Ran 5 tests" in str(event.payload) for event in completed_tools), [
         event.payload for event in completed_tools
     ]
