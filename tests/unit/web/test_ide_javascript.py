@@ -62,6 +62,36 @@ def test_file_viewer_helpers_preserve_scientific_data_and_safe_markdown() -> Non
 
 
 @pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
+def test_agent_events_reduce_restored_and_live_activity_deterministically() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide-events.js").read_text()
+    assertions = (project_root / "tests/js/ide_events.test.js").read_text()
+    completed = subprocess.run(
+        [_javascript_runner() or "", "-e", f"{source}\n{assertions}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
+def test_agent_markdown_constructs_safe_document_nodes() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide-markdown.js").read_text()
+    assertions = (project_root / "tests/js/ide_markdown.test.js").read_text()
+    completed = subprocess.run(
+        [_javascript_runner() or "", "-e", f"{source}\n{assertions}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
 def test_production_ide_script_parses() -> None:
     project_root = Path(__file__).parents[3]
     source = (project_root / "src/tcad_agent/web/static/ide.js").read_text()
