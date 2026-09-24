@@ -20,6 +20,7 @@ from tcad_agent.agent.tools import TcadDomainAction
 _SAFE_COMMANDS = {
     "basename",
     "cargo",
+    "cat",
     "cmake",
     "cp",
     "devsim",
@@ -27,6 +28,7 @@ _SAFE_COMMANDS = {
     "dirname",
     "find",
     "git",
+    "grep",
     "head",
     "ls",
     "make",
@@ -85,7 +87,16 @@ _CREDENTIAL_COMPONENTS = {
     "id_rsa",
     "secrets",
 }
-_SHELL_CONTROL = re.compile(r"(?:&&|\|\||[;|`]|\$\(|>|<)")
+_KNOWN_TOOL_NAMES = {
+    "file_editor",
+    "finish",
+    "task",
+    "task_tracker",
+    "tcad_domain",
+    "terminal",
+    "think",
+}
+_SHELL_CONTROL = re.compile(r"(?:&&|\|\||[;|`$]|>|<)")
 
 
 def _inside_workspace(workspace: Path, candidate: Path) -> bool:
@@ -102,11 +113,35 @@ def _credential_path(path: Path) -> bool:
     return bool(lowered & _CREDENTIAL_COMPONENTS)
 
 
+def _workspace_wrapped_command(workspace: Path, command: str) -> str | None:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return None
+    if len(tokens) < 4 or tokens[0] != "cd" or tokens[2] != "&&":
+        return None
+    if not _inside_workspace(workspace, Path(tokens[1])):
+        return None
+    body = tokens[3:]
+    if body and body[-1] == "2>&1":
+        body.pop()
+    if not body:
+        return None
+    return shlex.join(body)
+
+
 def _terminal_risk(workspace: Path, action: TerminalAction) -> SecurityRisk:
     command = action.command.strip()
     if action.is_input:
         return SecurityRisk.MEDIUM
-    if not command or _SHELL_CONTROL.search(command):
+    if not command:
+        return SecurityRisk.HIGH
+    if _SHELL_CONTROL.search(command):
+        wrapped = _workspace_wrapped_command(workspace, command)
+        if wrapped is None:
+            return SecurityRisk.HIGH
+        command = wrapped
+    if _SHELL_CONTROL.search(command):
         return SecurityRisk.HIGH
     try:
         tokens = shlex.split(command)
@@ -117,7 +152,10 @@ def _terminal_risk(workspace: Path, action: TerminalAction) -> SecurityRisk:
 
     executable = Path(tokens[0]).name
     if executable == "git":
-        if len(tokens) < 2 or tokens[1] not in _SAFE_GIT_COMMANDS:
+        git_arguments = tokens[1:]
+        if git_arguments and git_arguments[0] == "--no-pager":
+            git_arguments = git_arguments[1:]
+        if not git_arguments or git_arguments[0] not in _SAFE_GIT_COMMANDS:
             return SecurityRisk.HIGH
     elif executable in _DANGEROUS_COMMANDS or executable not in _SAFE_COMMANDS:
         return SecurityRisk.HIGH
@@ -128,7 +166,8 @@ def _terminal_risk(workspace: Path, action: TerminalAction) -> SecurityRisk:
         candidate = Path(token)
         if ".." in candidate.parts:
             return SecurityRisk.HIGH
-        if candidate.is_absolute() and not _inside_workspace(workspace, candidate):
+        expanded = candidate.expanduser()
+        if not _inside_workspace(workspace, expanded):
             return SecurityRisk.HIGH
         if _credential_path(candidate):
             return SecurityRisk.HIGH
@@ -139,6 +178,8 @@ def classify_action(workspace: Path, event: ActionEvent) -> SecurityRisk:
     """Classify an action conservatively against a canonical repository root."""
 
     action = event.action
+    if action is None and event.tool_name in _KNOWN_TOOL_NAMES:
+        return SecurityRisk.LOW
     if isinstance(action, FileEditorAction):
         target = Path(action.path)
         if not _inside_workspace(workspace, target) or _credential_path(target):
@@ -159,6 +200,8 @@ def action_summary(event: ActionEvent) -> str:
     """Return a content-free, bounded description safe for an approval dialog."""
 
     action = event.action
+    if action is None and event.tool_name in _KNOWN_TOOL_NAMES:
+        return f"{event.tool_name}: invalid or incomplete action"
     if isinstance(action, FileEditorAction):
         target = Path(action.path).expanduser().resolve(strict=False)
         return f"file_editor {action.command}: {target}"

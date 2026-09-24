@@ -41,7 +41,7 @@ Repository-local reads, edits, tests, builds, and validation commands run withou
 - Git staging, commits, pushes, and other repository-history mutation
 - remote or otherwise unknown actions
 
-Subagents inherit the same workspace. High-risk child actions are denied and cannot widen the parent agent's access.
+Subagents inherit the same workspace. High-risk child actions are denied and cannot widen the parent agent's access. When such an action is genuinely required, the primary agent must request it directly so the browser can present an approval card.
 
 ### Tools and subagents
 

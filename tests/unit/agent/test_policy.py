@@ -56,6 +56,8 @@ def file_event(path: str, command: CommandLiteral = "view") -> ActionEvent:
 @pytest.mark.parametrize(
     "command",
     [
+        "cat README.md",
+        "grep -n TODO src/model.py",
         "pytest -q",
         "git diff",
         "rg TODO src",
@@ -78,6 +80,9 @@ def test_repository_commands_are_low_risk(workspace: Path, command: str) -> None
         "git push",
         "rm -rf build",
         "cat /etc/passwd",
+        "ls ~",
+        "ls $HOME",
+        "head -20 ~/notes.txt",
         "curl https://example.com",
         "sed -n 1p ../secret.txt",
     ],
@@ -96,6 +101,47 @@ def test_repository_file_actions_are_low_risk(workspace: Path) -> None:
         classify_action(workspace, file_event(str(target), command="create"))
         is SecurityRisk.LOW
     )
+
+
+def test_terminal_symlink_escape_requires_confirmation(
+    workspace: Path, tmp_path: Path
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (workspace / "external").symlink_to(outside, target_is_directory=True)
+
+    assert (
+        classify_action(workspace, terminal_event("cat external/secret.txt"))
+        is SecurityRisk.HIGH
+    )
+
+
+@pytest.mark.parametrize(
+    "inner_command",
+    [
+        "python scripts/check.py 2>&1",
+        "git --no-pager diff 2>&1",
+    ],
+)
+def test_workspace_cd_wrapper_for_safe_command_is_low_risk(
+    workspace: Path, inner_command: str
+) -> None:
+    command = f'cd "{workspace}" && {inner_command}'
+
+    assert classify_action(workspace, terminal_event(command)) is SecurityRisk.LOW
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        'cd "/tmp" && python scripts/check.py 2>&1',
+        "cd . && rm -rf build",
+    ],
+)
+def test_cd_wrapper_cannot_widen_or_bypass_policy(
+    workspace: Path, command: str
+) -> None:
+    assert classify_action(workspace, terminal_event(command)) is SecurityRisk.HIGH
 
 
 def test_file_action_outside_workspace_requires_confirmation(workspace: Path) -> None:
@@ -153,6 +199,19 @@ def test_builtin_and_tcad_actions_are_low_risk(
 
 def test_unknown_action_fails_closed(workspace: Path) -> None:
     assert classify_action(workspace, action_event("mystery", None)) is SecurityRisk.HIGH
+
+
+@pytest.mark.parametrize(
+    "tool_name",
+    ["file_editor", "terminal", "task", "task_tracker", "tcad_domain"],
+)
+def test_invalid_known_tool_action_surfaces_validation_without_approval(
+    workspace: Path, tool_name: str
+) -> None:
+    event = action_event(tool_name, None)
+
+    assert classify_action(workspace, event) is SecurityRisk.LOW
+    assert action_summary(event) == f"{tool_name}: invalid or incomplete action"
 
 
 def test_summary_excludes_file_content_and_clips_commands(workspace: Path) -> None:

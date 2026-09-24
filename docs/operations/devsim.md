@@ -1,16 +1,15 @@
 # DEVSIM Operations
 
-## Installed runtime
+## Supported runtime
 
 - Python: 3.13
 - DEVSIM package: 2.9.1
-- executable: `/Users/satyagni/Documents/NovAtom Labs/devsim/.venv/bin/python`
-- source: `/Users/satyagni/Documents/NovAtom Labs/devsim/source`
-- source commit: `43b41ca845184c47e22b72d144db7e7db8509377`
+- default executable: `../devsim/.venv/bin/python` relative to the Quiloo checkout
+- reviewed source commit: `43b41ca845184c47e22b72d144db7e7db8509377`
 
 DEVSIM has its own virtual environment so product dependencies and simulator dependencies cannot silently alter each other.
 
-If the simulator is not in the sibling `devsim` directory, set `TCAD_DEVSIM_PYTHON` to its absolute Python executable path.
+If the simulator is not in the sibling `devsim` directory, set `TCAD_DEVSIM_PYTHON` to its absolute Python executable path. See [Installation and setup](../../INSTALLATION.md) for the Linux installation procedure.
 
 ## Validate, compile, and run
 
@@ -66,7 +65,7 @@ The current one-dimensional compiler reports terminal current density in `A/m^2`
 ```bash
 .venv/bin/tcad-agent knowledge build \
   --manifest knowledge-sources/manifests/sources.yaml \
-  --root "/Users/satyagni/Documents/NovAtom Labs"
+  --root /absolute/path/to/approved/knowledge
 
 .venv/bin/tcad-agent knowledge search "ohmic drift diffusion contact" \
   --backend devsim \

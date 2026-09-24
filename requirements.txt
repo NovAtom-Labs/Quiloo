@@ -1,0 +1,28 @@
+# Supported cross-platform direct dependency set for the Linux pilot.
+# Versions match the verified development lock. Pip resolves transitive
+# packages for the target operating system and Python 3.13 interpreter.
+cryptography==50.0.1
+fastapi==0.141.1
+httpx==0.28.1
+jinja2==3.1.6
+numpy==2.5.3
+pint==0.26.1
+pydantic==2.13.4
+pyyaml==6.0.3
+typer==0.27.2
+uvicorn==0.53.0
+
+# OpenHands repository-agent runtime
+openhands-sdk==1.49.4
+openhands-tools==1.49.4
+
+# Authorized local knowledge retrieval
+fastembed==0.8.1
+
+# Verification and dependency maintenance
+mypy==1.20.2
+pip-tools==7.5.2
+pytest==9.1.1
+pytest-cov==7.1.0
+ruff==0.16.8
+types-pyyaml==6.0.12.20260906

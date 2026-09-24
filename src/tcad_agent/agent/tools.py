@@ -221,11 +221,13 @@ class TcadDomainExecutor(ToolExecutor[TcadDomainAction, TcadDomainObservation]):
             )
         else:
             response = self.tools.build_report(action.payload)
-        return TcadDomainObservation(
+        serialized = json.loads(response.model_dump_json())
+        return TcadDomainObservation.from_text(
+            text=json.dumps(serialized, sort_keys=True),
             status=response.status,
             code=response.code,
             message=response.message,
-            data=json.loads(response.model_dump_json())["data"],
+            data=serialized["data"],
             is_error=response.status == "error",
         )
 

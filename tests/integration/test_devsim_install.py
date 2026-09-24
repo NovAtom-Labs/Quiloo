@@ -1,7 +1,12 @@
+import os
 import subprocess
 from pathlib import Path
 
-DEVSIM_PYTHON = Path("/Users/satyagni/Documents/NovAtom Labs/devsim/.venv/bin/python")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEVSIM_PYTHON = Path(
+    os.getenv("TCAD_DEVSIM_PYTHON")
+    or PROJECT_ROOT.parent / "devsim" / ".venv" / "bin" / "python"
+)
 
 
 def test_devsim_sibling_install_imports_and_reports_version() -> None:

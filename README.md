@@ -64,7 +64,7 @@ conversation, and return to the same conversation URL after a browser or service
 6. Repository-local reads, edits, tests, builds, and validation run without interruption. Access outside the selected repository, package installation, network activity, destructive commands, Git mutation, and remote mutation stop at an approval card.
 7. The researcher can approve once, deny, pause, resume, stop, refresh, or return later. Conversations, messages, run state, approvals, and normalized events are persisted locally.
 
-The selected repository is the default authority boundary. A parent agent and every delegated subagent use the same canonical workspace and policy. A subagent cannot widen access, and a high-risk child action is denied until the parent workflow obtains an allowed decision.
+The selected repository is the default authority boundary. A parent agent and every delegated subagent use the same canonical workspace and policy. A subagent cannot widen access. High-risk child actions are denied, and the primary agent must request the equivalent action itself if a browser approval decision is required.
 
 Available agent tools are:
 
@@ -75,6 +75,38 @@ Available agent tools are:
 - native OpenHands task delegation
 
 Built-in `code-explorer`, `bash-runner`, and `general-purpose` subagents are available. Quiloo also registers `tcad-researcher` for evidence-backed TCAD investigation and `tcad-reviewer` for read-only checks of units, capability support, requested outputs, and validation evidence. Network-enabled research is disabled by default.
+
+### Agent execution model
+
+The repository agent changes the selected files on the local machine. It is not a chat-only mock and it does not copy the repository into an invisible remote environment. Every successful file edit is immediately visible to the researcher, the file viewer, terminal commands, and Git.
+
+One primary agent owns the final write sequence for a run. It can delegate bounded investigations and reviews to multiple specialist agents, but read-only delegation is preferred when several agents inspect the same checkout. This avoids nondeterministic overlapping edits while still allowing independent physics, code, and validation review. The primary agent integrates findings, applies changes, runs checks, and reports the resulting diff.
+
+The runtime supports the following loop:
+
+1. Inspect repository instructions, files, Git status, and existing tests.
+2. Create or update a persistent task list.
+3. Edit repository files with workspace-confined file operations.
+4. Run repository-local commands and consume their real output.
+5. Use typed TCAD operations for portable specification, capability, knowledge, result, and report work.
+6. Delegate bounded analysis or verification to a registered subagent.
+7. Reinspect changed files and rerun checks until the task reaches a terminal result.
+8. Return exact evidence, modified paths, validation results, and remaining limitations.
+
+The user can pause, resume, or stop this loop. A stopped run keeps completed local edits. Quiloo does not automatically stage, commit, push, or discard those changes.
+
+### Repository-agent capability boundary
+
+| Action | Default behavior |
+| --- | --- |
+| Read or preview a file inside the selected repository | Allowed |
+| Create or edit a file inside the selected repository | Allowed and immediately local |
+| Search files or run a repository-local test, build, or validation command | Allowed when the command is on the reviewed command allowlist |
+| Track tasks, reason internally, finish, or call a typed TCAD operation | Allowed |
+| Delegate a bounded task | Allowed; every child action is rechecked against the same workspace policy |
+| Read outside the selected repository | Requires approval when requested by the primary agent; denied inside a delegated child task |
+| Install packages, access the network, run destructive commands, or mutate Git history | Requires explicit approval |
+| Execute arbitrary simulator syntax | Refused; simulator execution must pass through a deterministic adapter and bounded runner |
 
 Try this against the generated acceptance repository:
 
@@ -248,6 +280,8 @@ Public DEVSIM material can be indexed locally. Proprietary Sentaurus manuals and
 - an Amazon Bedrock API key for the natural-language model gateway
 - Sentaurus only on a separately configured and licensed host
 
+See [Installation and setup](INSTALLATION.md) for the complete Linux workstation procedure, verification commands, DEVSIM setup, Bedrock configuration, and troubleshooting.
+
 ## Installation
 
 Clone the repository and create the project environment:
@@ -257,7 +291,7 @@ git clone https://github.com/NovAtom-Labs/Quiloo.git
 cd Quiloo
 
 /usr/local/bin/python3.13 -m venv .venv
-.venv/bin/python -m pip install -r requirements.lock
+.venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m pip install . --no-deps
 ```
 
@@ -275,6 +309,15 @@ Create the ignored local configuration:
 
 ```bash
 cp .env.example .env
+chmod 600 .env
+```
+
+Load it before using the Linux CLI:
+
+```bash
+set -a
+source .env
+set +a
 ```
 
 Supported settings:
@@ -338,9 +381,20 @@ Create the reproducible repository-agent evaluation workspace with:
 
 It is written to `test-workspaces/pn-junction-research`, which is ignored by Git. The committed acceptance test uses an isolated temporary copy and a deterministic OpenHands test model:
 
+Add `--include-external-fixture` when testing the approval boundary. This creates a sibling calibration file outside the selected repository so an attempted read must stop for an explicit decision.
+
 ```bash
 OPENHANDS_SUPPRESS_BANNER=1 .venv/bin/pytest tests/e2e/test_agentic_repl.py -q
 ```
+
+After a live repository-agent run, grade the actual workspace independently:
+
+```bash
+.venv/bin/python evaluations/repl/grade_workspace.py \
+  --workspace test-workspaces/pn-junction-research
+```
+
+The expected score is 100. The grader checks scientific corrections, generated artifacts, provenance, passing checks, and preservation of researcher-owned files.
 
 To run the same acceptance path against the configured Bedrock model, explicitly opt in:
 
@@ -535,8 +589,7 @@ tests/                            unit, integration, and end-to-end verification
 
 ### Before the pilot
 
-1. Connect OpenHands file, search, terminal, Git diff, checkpoint, and approval tools to the
-   persisted workspace and conversation contracts.
+1. Complete Linux workstation soak testing of the repository agent, approval boundary, recovery behavior, and long-running terminal sessions.
 2. Connect the licensed Sentaurus machine and record the exact release and executable identity.
 3. Complete the reviewed structure or mesh generation and native-result extraction procedures.
 4. Run expert-reviewed golden cases through the signed remote runner.
@@ -555,6 +608,7 @@ tests/                            unit, integration, and end-to-end verification
 
 ## Documentation
 
+- [Installation and setup](INSTALLATION.md)
 - [Technical architecture](docs/architecture.md)
 - [Concise product and technical brief](docs/tcad_agent_brief.md)
 - [Local web application](docs/operations/local-web-app.md)

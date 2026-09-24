@@ -2,7 +2,7 @@ from pathlib import Path
 
 import yaml
 
-from tcad_agent.agent.tools import build_tools
+from tcad_agent.agent.tools import TcadDomainAction, TcadDomainExecutor, build_tools
 
 ROOT = Path(__file__).parents[3]
 
@@ -25,3 +25,16 @@ def test_sentaurus_compiles_without_configured_remote(tmp_path: Path) -> None:
     assert response.status == "ok"
     assert response.code == "compiled"
     assert response.data["job"]["backend"] == "sentaurus"
+
+
+def test_tcad_executor_returns_llm_visible_refusal_for_missing_payload(
+    tmp_path: Path,
+) -> None:
+    observation = TcadDomainExecutor(tmp_path)(
+        TcadDomainAction(operation="validate_spec")
+    )
+
+    assert observation.status == "refused"
+    assert observation.code == "invalid_spec"
+    assert observation.content
+    assert '"code": "invalid_spec"' in observation.text
