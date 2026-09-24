@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260925-1">
+    <link rel="stylesheet" href="/static/ide.css?v=20260925-2">
   </head>
   <body>
     <div class="ide-shell">
@@ -96,12 +96,12 @@
       <div id="agent-resizer" class="pane-resizer agent-resizer" role="separator" aria-label="Resize agent pane" aria-orientation="vertical" aria-valuemin="320" aria-valuemax="520" aria-valuenow="356" tabindex="0"></div>
 
       <aside id="agent-panel" class="agent-panel" aria-label="Agent conversation">
-        <nav id="agent-tabs" class="agent-tabs" aria-label="Agent views">
-          <button class="is-active" type="button" data-agent-view="chat" aria-selected="true">Chat</button>
-          <button type="button" data-agent-view="activity" aria-selected="false">Activity</button>
-          <button type="button" data-agent-view="changes" aria-selected="false">Changes <span id="changes-count">0</span></button>
+        <nav id="agent-tabs" class="agent-tabs" aria-label="Agent views" role="tablist">
+          <button id="agent-tab-chat" class="is-active" type="button" role="tab" data-agent-view="chat" aria-controls="agent-view-chat" aria-selected="true" tabindex="0">Chat</button>
+          <button id="agent-tab-activity" type="button" role="tab" data-agent-view="activity" aria-controls="agent-view-activity" aria-selected="false" tabindex="-1">Activity</button>
+          <button id="agent-tab-changes" type="button" role="tab" data-agent-view="changes" aria-controls="agent-view-changes" aria-selected="false" tabindex="-1">Changes <span id="changes-count">0</span></button>
         </nav>
-        <section id="agent-view-chat" class="agent-view agent-chat is-active" data-agent-panel="chat">
+        <section id="agent-view-chat" class="agent-view agent-chat is-active" data-agent-panel="chat" role="tabpanel" aria-labelledby="agent-tab-chat">
           <div class="agent-heading">
             <div><span>SESSION · <b id="run-state">IDLE</b></span><strong id="conversation-title">No conversation</strong></div>
             <div class="agent-heading-actions">
@@ -130,14 +130,14 @@
           </form>
         </section>
 
-        <section id="agent-view-activity" class="agent-view activity-section" data-agent-panel="activity" hidden>
+        <section id="agent-view-activity" class="agent-view activity-section" data-agent-panel="activity" role="tabpanel" aria-labelledby="agent-tab-activity" hidden>
           <div class="activity-heading"><span>ACTIVITY</span><span id="stream-state">OFFLINE</span></div>
           <div id="agent-run-summary" class="agent-run-summary"></div>
           <div id="agent-reasoning" class="agent-reasoning"></div>
           <div id="agent-activity" class="agent-activity" aria-live="polite"></div>
         </section>
 
-        <section id="agent-view-changes" class="agent-view changes-section" data-agent-panel="changes" hidden>
+        <section id="agent-view-changes" class="agent-view changes-section" data-agent-panel="changes" role="tabpanel" aria-labelledby="agent-tab-changes" hidden>
           <div class="activity-heading"><span>RUN CHANGES</span><span id="changes-state">NO RUN</span></div>
           <div id="agent-changes" class="agent-changes"></div>
         </section>
@@ -159,10 +159,10 @@
     <script src="/static/ide-state.js?v=20260924-4" defer></script>
     <script src="/static/file-viewer.js?v=20260924-1" defer></script>
     <script src="/static/ide-markdown.js?v=20260925-1" defer></script>
-    <script src="/static/ide-events.js?v=20260925-1" defer></script>
-    <script src="/static/ide-layout.js?v=20260925-1" defer></script>
-    <script src="/static/ide-agent.js?v=20260925-1" defer></script>
-    <script src="/static/ide-changes.js?v=20260925-1" defer></script>
-    <script src="/static/ide.js?v=20260925-1" defer></script>
+    <script src="/static/ide-events.js?v=20260925-2" defer></script>
+    <script src="/static/ide-layout.js?v=20260925-2" defer></script>
+    <script src="/static/ide-agent.js?v=20260925-2" defer></script>
+    <script src="/static/ide-changes.js?v=20260925-2" defer></script>
+    <script src="/static/ide.js?v=20260925-2" defer></script>
   </body>
 </html>

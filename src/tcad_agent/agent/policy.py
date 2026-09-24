@@ -19,6 +19,7 @@ from pydantic import Field
 
 from tcad_agent.agent.tools import TcadDomainAction
 from tcad_agent.ide.models import PermissionCategory, is_run_grantable
+from tcad_agent.security.paths import is_credential_path
 
 _SAFE_COMMANDS = {
     "basename",
@@ -79,17 +80,6 @@ _DANGEROUS_COMMANDS = {
     "wget",
     "yum",
 }
-_CREDENTIAL_COMPONENTS = {
-    ".aws",
-    ".env",
-    ".gnupg",
-    ".netrc",
-    ".ssh",
-    "credentials",
-    "id_ed25519",
-    "id_rsa",
-    "secrets",
-}
 _KNOWN_TOOL_NAMES = {
     "file_editor",
     "finish",
@@ -114,11 +104,6 @@ def _inside_workspace(workspace: Path, candidate: Path) -> bool:
         resolved = root / resolved
     resolved = resolved.resolve(strict=False)
     return resolved == root or root in resolved.parents
-
-
-def _credential_path(path: Path) -> bool:
-    lowered = {part.lower() for part in path.parts}
-    return bool(lowered & _CREDENTIAL_COMPONENTS)
 
 
 def _workspace_wrapped_command(workspace: Path, command: str) -> str | None:
@@ -177,7 +162,7 @@ def _terminal_risk(workspace: Path, action: TerminalAction) -> SecurityRisk:
         expanded = candidate.expanduser()
         if not _inside_workspace(workspace, expanded):
             return SecurityRisk.HIGH
-        if _credential_path(candidate):
+        if is_credential_path(candidate):
             return SecurityRisk.HIGH
     return SecurityRisk.LOW
 
@@ -190,7 +175,7 @@ def classify_action(workspace: Path, event: ActionEvent) -> SecurityRisk:
         return SecurityRisk.LOW
     if isinstance(action, FileEditorAction):
         target = Path(action.path)
-        if not _inside_workspace(workspace, target) or _credential_path(target):
+        if not _inside_workspace(workspace, target) or is_credential_path(target):
             return SecurityRisk.HIGH
         return SecurityRisk.LOW
     if isinstance(action, TerminalAction):
@@ -245,7 +230,7 @@ def _terminal_permission_category(
         if token.startswith("-"):
             continue
         candidate = Path(token)
-        if _credential_path(candidate):
+        if is_credential_path(candidate):
             categories.add(PermissionCategory.SENSITIVE_FILE_ACCESS)
         if ".." in candidate.parts or not _inside_workspace(workspace, candidate):
             categories.add(PermissionCategory.EXTERNAL_FILE_ACCESS)
@@ -260,7 +245,7 @@ def permission_category(workspace: Path, event: ActionEvent) -> PermissionCatego
     action = event.action
     if isinstance(action, FileEditorAction):
         target = Path(action.path)
-        sensitive = _credential_path(target)
+        sensitive = is_credential_path(target)
         external = not _inside_workspace(workspace, target)
         if sensitive and external:
             return PermissionCategory.UNRECOGNIZED_ACTION

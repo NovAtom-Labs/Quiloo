@@ -64,6 +64,9 @@ def test_workspace_conversation_route_restores_persisted_activity(
     assert 'data-agent-view="chat"' in restored_page.text
     assert 'data-agent-view="activity"' in restored_page.text
     assert 'data-agent-view="changes"' in restored_page.text
+    assert 'role="tablist"' in restored_page.text
+    assert restored_page.text.count('role="tab"') == 3
+    assert restored_page.text.count('role="tabpanel"') == 3
     assert 'id="agent-view-chat"' in restored_page.text
     assert 'id="agent-view-activity"' in restored_page.text
     assert 'id="agent-view-changes"' in restored_page.text

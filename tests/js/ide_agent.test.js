@@ -24,6 +24,7 @@ assertEqual(rows.length, 1, "lifecycle noise is absent from default activity");
 assertEqual(rows[0].owner, "science-checker", "subagent ownership stays with the step");
 assertEqual(rows[0].duration, "2.0s", "step duration is derived from event timestamps");
 assertEqual(rows[0].command, "pytest tests/test_science.py -q", "technical command remains inspectable");
+assertEqual(rows[0].phase, "Validate", "test execution is classified as validation evidence");
 
 const completed = agent.outcomeSummary(
   {runState: "completed", steps: rows, currentOperation: "Run completed"},
@@ -33,6 +34,10 @@ assertEqual(completed.tone, "success", "completed run uses success treatment");
 assertEqual(completed.title, "Run completed", "completion title is explicit");
 assertEqual(completed.changedFiles, 2, "completion includes changed file count");
 assertEqual(completed.completedSteps, 1, "completion includes finished steps");
+assertEqual(completed.changedPaths.join(","), "src/physics.py,report.md", "completion names changed files");
+assertEqual(completed.validationEvidence.length, 1, "successful validation action becomes evidence");
+assertEqual(completed.commands[0], "pytest tests/test_science.py -q", "completion retains executed commands");
+assertEqual(completed.nextActions.length, 1, "completed runs provide a grounded next action");
 
 const failed = agent.outcomeSummary(
   {
@@ -59,6 +64,14 @@ const permission = agent.permissionView({
 assertEqual(permission.explanation.includes("outside this repository"), true, "plain explanation is primary");
 assertEqual(permission.target, "cat /shared/reference.dat", "exact technical target is retained");
 assertEqual(permission.canApproveCategory, true, "narrow category can be approved for the run");
+assertEqual(permission.technicalArguments.includes("cat /shared/reference.dat"), true, "all sanitized arguments remain inspectable");
+assertEqual(permission.reversibility.includes("Read-only"), true, "read-only permission explains reversibility");
+const redacted = agent.permissionView({
+  payload: {command: "curl example.test", api_key: "never-show-this"},
+  permission_category: "network_access",
+});
+assertEqual(redacted.technicalArguments.includes("never-show-this"), false, "sensitive argument values are redacted");
+assertEqual(redacted.technicalArguments.includes("[redacted]"), true, "redaction is explicit");
 assertEqual(
   agent.permissionView({...permission, permission_category: "complex_shell"}).canApproveCategory,
   false,

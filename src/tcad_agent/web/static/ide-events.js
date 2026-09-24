@@ -9,40 +9,47 @@
     run_paused: "paused",
     run_recovered_paused: "paused",
   };
+  const ignoredKinds = new Set([
+    "conversation_created",
+    "message_created",
+    "thinking_started",
+    "thinking_delta",
+    "thinking_aborted",
+  ]);
+
+  function emptyRun(runId = null) {
+    return {
+      runId,
+      runState: "idle",
+      currentOperation: "Idle",
+      steps: [],
+      stepsByKey: new Map(),
+      pendingApprovals: new Map(),
+      approvalHistory: [],
+      approvalsById: new Map(),
+      technicalEvents: [],
+    };
+  }
 
   function createRunPresentation() {
     const seen = new Set();
-    const steps = [];
-    const stepsByKey = new Map();
-    const reasoning = [];
-    const reasoningById = new Map();
-    const pendingApprovals = new Map();
-    const approvalHistory = [];
-    const approvalsById = new Map();
-    const technicalEvents = [];
+    const runs = new Map();
+    let selectedRunId = null;
     let lastEventId = 0;
-    let runId = null;
-    let runState = "idle";
-    let currentOperation = "Idle";
 
-    function eventKey(event) {
-      return String(event.id);
+    function stateFor(runId) {
+      if (!runs.has(runId)) runs.set(runId, emptyRun(runId));
+      return runs.get(runId);
     }
 
     function actionKey(payload, event) {
       return String(payload.action_id || payload.tool_call_id || `event-${event.id}`);
     }
 
-    function closeLiveReasoning() {
-      reasoning.forEach((entry) => {
-        if (entry.status === "live") entry.status = "complete";
-      });
-    }
-
-    function startTool(event) {
+    function startTool(state, event) {
       const payload = event.payload || {};
       const key = actionKey(payload, event);
-      let step = stepsByKey.get(key);
+      let step = state.stepsByKey.get(key);
       if (!step) {
         step = {
           id: key,
@@ -59,18 +66,18 @@
           subagent: payload.subagent || null,
           taskStatus: null,
         };
-        stepsByKey.set(key, step);
-        steps.push(step);
+        state.stepsByKey.set(key, step);
+        state.steps.push(step);
       }
-      currentOperation = step.summary;
+      state.currentOperation = step.summary;
     }
 
-    function completeTool(event) {
+    function completeTool(state, event) {
       const payload = event.payload || {};
       const key = actionKey(payload, event);
-      let step = stepsByKey.get(key);
+      let step = state.stepsByKey.get(key);
       if (!step && payload.tool_call_id) {
-        step = steps.find((item) => item.toolCallId === payload.tool_call_id);
+        step = state.steps.find((item) => item.toolCallId === payload.tool_call_id);
       }
       if (!step) {
         step = {
@@ -88,8 +95,8 @@
           subagent: null,
           taskStatus: null,
         };
-        stepsByKey.set(key, step);
-        steps.push(step);
+        state.stepsByKey.set(key, step);
+        state.steps.push(step);
       }
       step.completedAt = event.created_at || null;
       step.output = payload.output || "";
@@ -97,46 +104,19 @@
       step.status = step.isError ? "failed" : "completed";
       step.subagent = payload.subagent || step.subagent;
       step.taskStatus = payload.task_status || null;
-      currentOperation = step.isError ? `${step.summary} failed` : step.summary;
+      state.currentOperation = step.isError ? `${step.summary} failed` : step.summary;
     }
 
-    function beginReasoning(event) {
-      const payload = event.payload || {};
-      const itemId = String(payload.item_id || `reason-${event.id}`);
-      if (reasoningById.has(itemId)) return;
-      const entry = {id: itemId, content: "", status: "live", reason: null};
-      reasoningById.set(itemId, entry);
-      reasoning.push(entry);
-      currentOperation = "Reviewing evidence";
-    }
-
-    function appendReasoning(event) {
-      const payload = event.payload || {};
-      const itemId = String(payload.item_id || `reason-${event.id}`);
-      if (!reasoningById.has(itemId)) beginReasoning(event);
-      const entry = reasoningById.get(itemId);
-      entry.content = `${entry.content}${String(payload.content || "")}`.slice(-4_000);
-    }
-
-    function abortReasoning(event) {
-      const payload = event.payload || {};
-      const itemId = String(payload.item_id || `reason-${event.id}`);
-      const entry = reasoningById.get(itemId);
-      if (!entry) return;
-      entry.status = "interrupted";
-      entry.reason = payload.reason || null;
-    }
-
-    function updateRunState(event) {
+    function updateRunState(state, event) {
       const payload = event.payload || {};
       if (event.kind === "run_state_changed" && payload.state) {
-        runState = String(payload.state);
+        state.runState = String(payload.state);
       } else if (terminalStates[event.kind]) {
-        runState = terminalStates[event.kind];
+        state.runState = terminalStates[event.kind];
       } else if (event.kind === "run_started") {
-        runState = "running";
+        state.runState = "running";
       } else if (event.kind === "approval_requested") {
-        runState = "waiting_for_approval";
+        state.runState = "waiting_for_approval";
       }
       const labels = {
         completed: "Run completed",
@@ -147,23 +127,23 @@
         waiting_for_approval: "Waiting for approval",
         waiting_for_user: "Waiting for input",
       };
-      if (labels[runState]) currentOperation = labels[runState];
+      if (labels[state.runState]) state.currentOperation = labels[state.runState];
     }
 
     function accept(event) {
-      if (!event || event.id === undefined || seen.has(eventKey(event))) return false;
-      seen.add(eventKey(event));
+      if (!event || event.id === undefined || seen.has(String(event.id))) return false;
+      seen.add(String(event.id));
       const numericId = Number(event.id);
       if (Number.isFinite(numericId)) lastEventId = Math.max(lastEventId, numericId);
-      if (event.payload?.run_id) runId = String(event.payload.run_id);
-      if (!["thinking_started", "thinking_delta", "thinking_aborted"].includes(event.kind)) {
-        closeLiveReasoning();
+      const runId = event.payload?.run_id ? String(event.payload.run_id) : null;
+      if (!runId || ignoredKinds.has(event.kind)) return true;
+
+      const state = stateFor(runId);
+      if (!selectedRunId || ["run_created", "run_started"].includes(event.kind)) {
+        selectedRunId = runId;
       }
-      if (event.kind === "tool_call_started") startTool(event);
-      else if (event.kind === "tool_call_completed") completeTool(event);
-      else if (event.kind === "thinking_started") beginReasoning(event);
-      else if (event.kind === "thinking_delta") appendReasoning(event);
-      else if (event.kind === "thinking_aborted") abortReasoning(event);
+      if (event.kind === "tool_call_started") startTool(state, event);
+      else if (event.kind === "tool_call_completed") completeTool(state, event);
       else if (event.kind === "approval_requested") {
         const payload = event.payload || {};
         const approvalId = String(payload.approval_id || event.id);
@@ -175,14 +155,14 @@
           requestedAt: event.created_at || null,
           resolvedAt: null,
         };
-        pendingApprovals.set(approvalId, payload);
-        approvalsById.set(approvalId, entry);
-        approvalHistory.push(entry);
+        state.pendingApprovals.set(approvalId, payload);
+        state.approvalsById.set(approvalId, entry);
+        state.approvalHistory.push(entry);
       } else if (event.kind === "approval_resolved") {
         const payload = event.payload || {};
         const approvalId = String(payload.approval_id || "");
-        pendingApprovals.delete(approvalId);
-        const entry = approvalsById.get(approvalId);
+        state.pendingApprovals.delete(approvalId);
+        const entry = state.approvalsById.get(approvalId);
         if (entry) {
           entry.decision = payload.decision || "resolved";
           entry.resolvedAt = event.created_at || null;
@@ -190,43 +170,47 @@
       } else if (![
         "run_created", "run_started", "run_state_changed", "run_completed", "run_failed",
         "run_blocked", "run_cancelled", "run_paused", "run_recovered_paused",
-        "message_created", "permission_grant_created", "permission_grant_used",
-        "agent_error", "change_baseline_warning",
+        "permission_grant_created", "permission_grant_used",
       ].includes(event.kind)) {
-        technicalEvents.push(event);
+        state.technicalEvents.push(event);
       }
-      updateRunState(event);
+      updateRunState(state, event);
       return true;
     }
 
-    function snapshot() {
+    function snapshot(requestedRunId = selectedRunId) {
+      const state = requestedRunId ? runs.get(String(requestedRunId)) : null;
+      if (!state) {
+        return {
+          lastEventId,
+          runId: requestedRunId || null,
+          runState: "idle",
+          currentOperation: "Idle",
+          steps: [],
+          reasoning: [],
+          pendingApprovals: [],
+          approvalHistory: [],
+          technicalEvents: [],
+        };
+      }
       return JSON.parse(JSON.stringify({
         lastEventId,
-        runId,
-        runState,
-        currentOperation,
-        steps,
-        reasoning,
-        pendingApprovals: Array.from(pendingApprovals.values()),
-        approvalHistory,
-        technicalEvents,
+        runId: state.runId,
+        runState: state.runState,
+        currentOperation: state.currentOperation,
+        steps: state.steps,
+        reasoning: [],
+        pendingApprovals: Array.from(state.pendingApprovals.values()),
+        approvalHistory: state.approvalHistory,
+        technicalEvents: state.technicalEvents,
       }));
     }
 
     function reset() {
       seen.clear();
-      steps.splice(0);
-      stepsByKey.clear();
-      reasoning.splice(0);
-      reasoningById.clear();
-      pendingApprovals.clear();
-      approvalHistory.splice(0);
-      approvalsById.clear();
-      technicalEvents.splice(0);
+      runs.clear();
+      selectedRunId = null;
       lastEventId = 0;
-      runId = null;
-      runState = "idle";
-      currentOperation = "Idle";
     }
 
     return {accept, reset, snapshot};

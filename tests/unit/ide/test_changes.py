@@ -97,3 +97,38 @@ def test_change_tracker_marks_baseline_truncated_at_file_limit(tmp_path: Path) -
 
     assert baseline.truncated is True
     assert len(baseline.files) == 1
+
+
+def test_change_tracker_never_captures_credential_like_paths(tmp_path: Path) -> None:
+    secret = "credential-content-must-not-persist"
+    for relative in (
+        ".env",
+        ".netrc",
+        ".gnupg/private.key",
+        ".ssh/config",
+        ".aws/credentials",
+        "secrets/token.txt",
+    ):
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(secret)
+    (tmp_path / "model.py").write_text("safe = True\n")
+
+    baseline = WorkspaceChangeTracker().capture(tmp_path)
+
+    assert set(baseline.files) == {"model.py"}
+    assert secret not in baseline.model_dump_json()
+
+
+def test_truncated_comparison_does_not_invent_create_delete_or_rename(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "b.txt").write_text("b\n")
+    tracker = WorkspaceChangeTracker(file_limit=1)
+    baseline = tracker.capture(tmp_path)
+
+    (tmp_path / "a.txt").write_text("a\n")
+    changes = tracker.compare(tmp_path, baseline)
+
+    assert changes.baseline_truncated is True
+    assert changes.files == ()

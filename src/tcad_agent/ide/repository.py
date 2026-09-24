@@ -7,7 +7,6 @@ import subprocess
 import tempfile
 from hashlib import sha256
 from pathlib import Path
-from typing import ClassVar
 
 from tcad_agent.ide.models import (
     GitSnapshot,
@@ -22,21 +21,12 @@ from tcad_agent.ide.paths import (
     canonical_directory,
     resolve_workspace_path,
 )
+from tcad_agent.security.paths import is_credential_path
 
 
 class RepositoryInspector:
     preview_limit = 1024 * 1024
     edit_limit = 1024 * 1024
-
-    _protected_edit_names: ClassVar[set[str]] = {
-        ".env",
-        ".git",
-        ".ssh",
-        ".aws",
-        "credentials",
-        "id_ed25519",
-        "id_rsa",
-    }
 
     def inspect(self, root: Path) -> RepositorySnapshot:
         canonical_root = canonical_directory(root)
@@ -219,10 +209,13 @@ class RepositoryInspector:
     def _editable_target(self, root: Path, relative: str) -> tuple[Path, Path]:
         canonical_root = canonical_directory(root)
         relative_path = Path(relative)
-        if any(
-            part.casefold() in self._protected_edit_names
-            or part.casefold().endswith((".key", ".pem"))
-            for part in relative_path.parts
+        if (
+            is_credential_path(relative_path)
+            or ".git" in {part.casefold() for part in relative_path.parts}
+            or any(
+                part.casefold().endswith((".key", ".pem"))
+                for part in relative_path.parts
+            )
         ):
             raise WorkspacePathError("protected workspace file cannot be edited")
         cursor = canonical_root

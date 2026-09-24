@@ -23,3 +23,5 @@ assertEqual(rows[3].detail, "Renamed from docs/draft.md", "rename keeps the prev
 assertEqual(rows[4].delta, "Binary or metadata change", "uncertain binary change is explicit");
 assertEqual(changes.toRows({files: []}).length, 0, "empty change set stays empty");
 assertEqual(changes.toRows(null).length, 0, "unavailable change set is safe");
+assertEqual(changes.isIncomplete({baseline_truncated: true}), true, "truncated comparison is visibly incomplete");
+assertEqual(changes.isIncomplete({baseline_truncated: false}), false, "complete comparison stays exact");

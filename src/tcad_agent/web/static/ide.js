@@ -147,7 +147,7 @@ function setViewerNotice(message = "") {
 
 function fileCanBeEdited(preview) {
   const editableKinds = new Set(["text", "markdown", "json", "csv", "tsv"]);
-  const protectedPath = /(^|\/)(\.env|\.git|\.ssh|\.aws|credentials|id_rsa|id_ed25519)(\/|$)/i;
+  const protectedPath = /(^|\/)(\.env|\.git|\.ssh|\.aws|\.gnupg|\.netrc|credentials|id_rsa|id_ed25519|secrets)(\/|$)/i;
   const protectedSuffix = /\.(key|pem)$/i;
   return editableKinds.has(preview.kind)
     && !preview.truncated
@@ -241,33 +241,7 @@ function renderSource(content) {
 function renderMarkdown(content) {
   const article = document.createElement("article");
   article.className = "markdown-preview";
-  window.QuilooFileViewer.markdownBlocks(content || "").forEach((block) => {
-    let element;
-    if (block.type === "heading") {
-      element = document.createElement(`h${block.level}`);
-      element.textContent = block.text;
-    } else if (block.type === "code") {
-      element = document.createElement("pre");
-      const code = document.createElement("code");
-      code.textContent = block.text;
-      if (block.language) code.dataset.language = block.language;
-      element.append(code);
-    } else if (block.type === "list") {
-      element = document.createElement("ul");
-      block.items.forEach((item) => {
-        const row = document.createElement("li");
-        row.textContent = item;
-        element.append(row);
-      });
-    } else if (block.type === "quote") {
-      element = document.createElement("blockquote");
-      element.textContent = block.text;
-    } else {
-      element = document.createElement("p");
-      element.textContent = block.text;
-    }
-    article.append(element);
-  });
+  window.QuilooMarkdown.render(article, content || "");
   fileViewerBody.append(article);
 }
 
@@ -651,11 +625,13 @@ function setRun(run) {
   renderRunIndicator();
 }
 
-function activateAgentView(name) {
+function activateAgentView(name, {focus = false} = {}) {
   agentTabs.forEach((button) => {
     const active = button.dataset.agentView === name;
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
+    button.tabIndex = active ? 0 : -1;
+    if (active && focus) button.focus();
   });
   agentViews.forEach((view) => {
     const active = view.dataset.agentPanel === name;
@@ -677,22 +653,49 @@ function renderRunSummary(snapshot) {
     ? `${summary.failedStep}${summary.failureOutput ? `: ${String(summary.failureOutput).slice(0, 180)}` : ""}`
     : `${summary.completedSteps} actions completed · ${summary.changedFiles} files changed`;
   agentRunSummary.append(title, detail);
+  const evidence = [
+    ["Phases", summary.phases?.join(" → ")],
+    ["Changed files", summary.changedPaths?.join("\n")],
+    ["Commands", summary.commands?.join("\n")],
+    ["Validation", summary.validationEvidence?.map((item) => `${item.label}${item.output ? `: ${item.output}` : ""}`).join("\n")],
+    ["Artifacts", summary.artifacts?.join("\n")],
+    ["Warnings", summary.warnings?.join("\n")],
+    ["Next", summary.nextActions?.join("\n")],
+  ].filter(([, value]) => value);
+  if (evidence.length) {
+    const details = document.createElement("details");
+    const label = document.createElement("summary");
+    const list = document.createElement("dl");
+    label.textContent = "Run evidence";
+    evidence.forEach(([term, value]) => {
+      const row = document.createElement("div");
+      const dt = document.createElement("dt");
+      const dd = document.createElement("dd");
+      dt.textContent = term;
+      dd.textContent = value;
+      row.append(dt, dd);
+      list.append(row);
+    });
+    details.append(label, list);
+    agentRunSummary.append(details);
+  }
 }
 
 function renderReasoning(snapshot) {
   clearNode(agentReasoning);
-  const entries = (snapshot.reasoning || []).filter((entry) => entry.content.trim());
-  agentReasoning.hidden = entries.length === 0;
-  entries.forEach((entry) => {
-    const details = document.createElement("details");
-    const heading = document.createElement("summary");
-    const content = document.createElement("pre");
-    details.className = `reasoning-entry is-${entry.status}`;
-    heading.textContent = entry.status === "live" ? "Operational reasoning in progress" : "Operational reasoning";
-    content.textContent = entry.content;
-    details.append(heading, content);
-    agentReasoning.append(details);
-  });
+  const rows = window.QuilooAgentView.activityRows(snapshot);
+  const current = rows.filter((row) => row.status === "running").at(-1);
+  const active = !["idle", "completed", "failed", "blocked", "cancelled"].includes(snapshot.runState);
+  agentReasoning.hidden = !active || !current;
+  if (!active || !current) return;
+  const details = document.createElement("details");
+  const heading = document.createElement("summary");
+  const content = document.createElement("pre");
+  details.className = "reasoning-entry is-live";
+  heading.textContent = `Current phase: ${current.phase}`;
+  content.textContent = current.label;
+  details.append(heading, content);
+  agentReasoning.append(details);
 }
 
 function renderActivity(snapshot) {
@@ -712,7 +715,7 @@ function renderActivity(snapshot) {
     status.className = "execution-status";
     status.textContent = row.status === "running" ? "●" : row.status === "failed" ? "×" : "✓";
     label.textContent = row.label;
-    metadata.textContent = [row.owner, row.duration].filter(Boolean).join(" · ");
+    metadata.textContent = [row.phase, row.owner, row.duration].filter(Boolean).join(" · ");
     summary.append(status, label, metadata);
     technical.className = "execution-technical";
     if (row.command) {
@@ -722,7 +725,7 @@ function renderActivity(snapshot) {
     }
     if (row.output) {
       const output = document.createElement("pre");
-      output.textContent = String(row.output).slice(0, 12_000);
+      output.textContent = String(row.output);
       technical.append(output);
     }
     if (row.path) {
@@ -771,9 +774,16 @@ function renderAgentPresentation() {
 function renderChanges(changeSet) {
   activeChangeSet = changeSet;
   const rows = window.QuilooChanges.toRows(changeSet);
+  const incomplete = window.QuilooChanges.isIncomplete(changeSet);
   clearNode(agentChanges);
   changesCount.textContent = String(rows.length);
-  changesState.textContent = rows.length ? `${rows.length} CHANGED` : "NO CHANGES";
+  changesState.textContent = incomplete ? "PARTIAL SCAN" : rows.length ? `${rows.length} CHANGED` : "NO CHANGES";
+  if (incomplete) {
+    const warning = document.createElement("p");
+    warning.className = "change-scan-warning";
+    warning.textContent = "The workspace scan reached its safety limit. Modified files shown here are exact, but create, delete, and rename attribution may be incomplete.";
+    agentChanges.append(warning);
+  }
   if (!rows.length) {
     agentChanges.append(emptyCopy("No workspace changes are attributed to this run."));
     renderRunSummary(runPresentation.snapshot());
@@ -876,7 +886,8 @@ function renderApprovals(approvals) {
     const toolDetail = document.createElement("span");
     const categoryDetail = document.createElement("span");
     const riskDetail = document.createElement("span");
-    const target = document.createElement("code");
+    const reversibility = document.createElement("span");
+    const argumentsDetail = document.createElement("code");
     const actions = document.createElement("div");
     const deny = document.createElement("button");
     const approve = document.createElement("button");
@@ -891,8 +902,9 @@ function renderApprovals(approvals) {
     toolDetail.textContent = `Tool: ${view.toolName}`;
     categoryDetail.textContent = `Permission type: ${permissionCategoryLabel(view.permissionCategory)}`;
     riskDetail.textContent = `Risk level: ${view.risk}`;
-    target.textContent = view.target;
-    technicalBody.append(toolDetail, categoryDetail, riskDetail, target);
+    reversibility.textContent = `Reversibility: ${view.reversibility}`;
+    argumentsDetail.textContent = view.technicalArguments;
+    technicalBody.append(toolDetail, categoryDetail, riskDetail, reversibility, argumentsDetail);
     technical.append(technicalLabel, technicalBody);
     deny.type = "button";
     deny.className = "is-deny";
@@ -1169,6 +1181,17 @@ stopRun.addEventListener("click", () => void controlRun("stop"));
 refreshConversation.addEventListener("click", () => void requestConversationRefresh());
 agentTabs.forEach((button) => {
   button.addEventListener("click", () => activateAgentView(button.dataset.agentView));
+  button.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    const index = agentTabs.indexOf(button);
+    let next = index;
+    if (event.key === "ArrowLeft") next = (index - 1 + agentTabs.length) % agentTabs.length;
+    if (event.key === "ArrowRight") next = (index + 1) % agentTabs.length;
+    if (event.key === "Home") next = 0;
+    if (event.key === "End") next = agentTabs.length - 1;
+    activateAgentView(agentTabs[next].dataset.agentView, {focus: true});
+    event.preventDefault();
+  });
 });
 toggleAgentPanel.addEventListener("click", () => {
   setAgentPanelOpen(!agentPanel.classList.contains("is-open"));

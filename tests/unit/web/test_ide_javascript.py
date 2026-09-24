@@ -170,8 +170,13 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         "Approve all like this",
         "Technical details",
         "permission_category",
+        "technicalArguments",
+        "Reversibility:",
     ):
         assert required in source or required in permission_source
+
+    assert ".slice(0, 12_000)" not in source
+    assert 'addEventListener("keydown"' in source
 
 
 def test_responsive_styles_keep_agent_panel_available_as_a_drawer() -> None:

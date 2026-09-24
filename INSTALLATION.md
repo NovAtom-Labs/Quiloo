@@ -199,7 +199,7 @@ Read AGENTS.md and RESEARCH_TASK.md, then complete the research task end to end.
 
 4. Confirm the three-pane layout. At desktop width, resize both dividers and double-click each one to restore its default. At tablet width, open Repository as a drawer. At narrow width, open Agent as a drawer.
 5. Use Chat for the conversation and approval decisions. Inspect the plain-language explanation before opening Technical details. Approve all like this applies only to the displayed permission category and expires when the run ends.
-6. Use Activity to inspect one expandable row per tool action, including delegated ownership, duration, commands, and output. Operational reasoning is collapsed by default.
+6. Use Activity to inspect one expandable row per tool action, including phase, delegated ownership, duration, commands, and output. Current-operation summaries are derived from tool events. Raw provider reasoning is never stored or displayed.
 7. Use Changes to confirm that only the files attributable to this run appear. Select a changed text file and verify that its unified diff opens in the central workspace.
 8. Open a safe text file, select Edit, make a disposable change, and save it. Restore that manual edit before grading so it is not confused with agent work.
 9. Wait for the final response, then run the deterministic grader:

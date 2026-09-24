@@ -512,6 +512,12 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .agent-run-summary[hidden] { display: none; }
 .agent-run-summary strong { color: var(--text-strong); font-size: 0.69rem; }
 .agent-run-summary span { color: var(--muted); font: 0.59rem/1.45 var(--font-mono); }
+.agent-run-summary details { margin-top: 4px; color: var(--muted); font: 0.58rem/1.45 var(--font-mono); }
+.agent-run-summary details summary { cursor: pointer; color: #aab4be; }
+.agent-run-summary dl { display: grid; gap: 7px; margin: 8px 0 0; }
+.agent-run-summary dl > div { display: grid; gap: 2px; }
+.agent-run-summary dt { color: var(--muted-dim); text-transform: uppercase; letter-spacing: 0.04em; }
+.agent-run-summary dd { margin: 0; color: #aeb8c2; white-space: pre-wrap; overflow-wrap: anywhere; }
 .agent-run-summary.is-success { border-left-color: #5f8378; }
 .agent-run-summary.is-danger { border-left-color: var(--red); }
 .agent-run-summary.is-warning { border-left-color: var(--amber); }
@@ -541,6 +547,7 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .technical-events summary { cursor: pointer; color: var(--muted); font: 0.57rem var(--font-mono); }
 .technical-events pre { max-height: 180px; margin: 7px 0 0; overflow: auto; color: var(--muted-dim); font: 0.54rem/1.45 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 .agent-changes { padding: 0 9px 9px; }
+.change-scan-warning { margin: 9px 0; padding: 8px 9px; color: #c9ad7c; border-left: 2px solid var(--amber); background: rgba(202, 160, 92, 0.06); font-size: 0.62rem; line-height: 1.45; }
 .change-row { display: grid; width: 100%; gap: 5px; padding: 9px 2px 9px 8px; color: inherit; border: 0; border-bottom: 1px solid var(--border); border-left: 2px solid var(--border-strong); background: transparent; text-align: left; }
 .change-row:hover { background: var(--surface-hover); }
 .change-row > span { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; }
@@ -585,7 +592,7 @@ dialog input { margin-bottom: 20px; }
 dialog button { padding: 7px 12px; }
 #cancel-conversation { color: #b8c0c9; border: 1px solid var(--border-strong); background: transparent; }
 
-@media (max-width: 1000px) {
+@media (max-width: 995px) {
   .ide-shell {
     grid-template-columns: minmax(480px, 1fr) var(--agent-width);
     grid-template-rows: 42px minmax(0, 1fr);
@@ -615,7 +622,7 @@ dialog button { padding: 7px 12px; }
   .agent-resizer { right: var(--agent-width); }
 }
 
-@media (max-width: 719px) {
+@media (max-width: 799px) {
   .ide-shell { grid-template-columns: minmax(0, 1fr); }
   .ide-header { grid-template-columns: auto minmax(0, 1fr) auto; }
   .brand-wordmark { width: 82px; }

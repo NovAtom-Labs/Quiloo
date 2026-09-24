@@ -32,5 +32,9 @@
     }));
   }
 
-  globalThis.QuilooChanges = {toRows};
+  function isIncomplete(changeSet) {
+    return Boolean(changeSet?.baseline_truncated);
+  }
+
+  globalThis.QuilooChanges = {isIncomplete, toRows};
 })();

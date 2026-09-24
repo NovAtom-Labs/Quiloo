@@ -128,7 +128,7 @@ def test_event_bridge_skips_approval_for_a_granted_run_category(
     assert grant_events[0].payload["permission_category"] == "git_mutation"
 
 
-def test_on_stream_shows_live_reasoning_but_still_redacts_secrets(
+def test_on_stream_never_persists_private_model_reasoning(
     tmp_path: Path, monkeypatch
 ) -> None:
     store, events, conversations, conversation, run = _services(tmp_path)
@@ -150,11 +150,14 @@ def test_on_stream_shows_live_reasoning_but_still_redacts_secrets(
     )
 
     activity = events.list_after(conversation.id, 0)
-    kinds = [event.kind for event in activity]
-    assert kinds[-3:] == ["thinking_started", "thinking_delta", "thinking_aborted"]
-    delta_payload = activity[-2].payload
-    assert "thinking about it" in str(delta_payload["content"])
-    assert "secret-value" not in str(delta_payload["content"])
+    serialized = " ".join(str(event.payload) for event in activity)
+    assert "thinking about it" not in serialized
+    assert "secret-value" not in serialized
+    assert not {
+        "thinking_started",
+        "thinking_delta",
+        "thinking_aborted",
+    } & {event.kind for event in activity}
 
 
 def test_bridge_accepts_uuid_identifiers(tmp_path: Path) -> None:

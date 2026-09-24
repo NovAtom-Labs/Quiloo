@@ -365,8 +365,8 @@ the activity timeline to its bottom.
 
 - [x] **Step 5: Replace raw activity appends with presentation rendering**
 
-Feed restored and live events through one reducer. Render grouped steps, operational reasoning,
-subagents, durations, affected files, collapsed commands, output, and technical events. Keep
+Feed restored and live events through one reducer. Render grouped steps, derived operational
+status, subagents, durations, affected files, collapsed commands, output, and technical events. Never persist or render raw provider reasoning. Keep
 pause, resume, stop, reconnection, and refresh behavior intact.
 
 - [x] **Step 6: Implement Chat, Activity, and Changes tabs**

@@ -16,6 +16,7 @@ from tcad_agent.ide.models import (
     WorkspaceChange,
     WorkspaceChangeSet,
 )
+from tcad_agent.security.paths import is_credential_path
 
 
 class WorkspaceChangeTracker:
@@ -34,15 +35,6 @@ class WorkspaceChangeTracker:
         "node_modules",
         "venv",
     }
-    _protected_names: ClassVar[set[str]] = {
-        ".env",
-        ".ssh",
-        ".aws",
-        "credentials",
-        "id_ed25519",
-        "id_rsa",
-    }
-
     def __init__(
         self,
         *,
@@ -117,6 +109,14 @@ class WorkspaceChangeTracker:
         created = after_paths - before_paths
         changes: list[WorkspaceChange] = []
 
+        comparison_incomplete = baseline.truncated or current.truncated
+        if comparison_incomplete:
+            # A bounded scan can shift its cutoff when a path is inserted or removed.
+            # Common paths remain comparable, but one-sided paths cannot be claimed as
+            # exact creates, deletes, or renames.
+            created.clear()
+            deleted.clear()
+
         renamed: list[tuple[str, str]] = []
         created_by_hash: dict[str, list[str]] = {}
         for path in sorted(created):
@@ -158,7 +158,7 @@ class WorkspaceChangeTracker:
         return WorkspaceChangeSet(
             baseline_captured_at=baseline.captured_at,
             generated_at=datetime.now(UTC),
-            baseline_truncated=baseline.truncated or current.truncated,
+            baseline_truncated=comparison_incomplete,
             files=tuple(sorted(changes, key=lambda row: row.path)),
         )
 
@@ -223,17 +223,17 @@ class WorkspaceChangeTracker:
                 name
                 for name in directory_names
                 if name not in self._ignored_directories
-                and name.casefold() not in self._protected_names
+                and not is_credential_path(Path(current_root).relative_to(root) / name)
                 and not (Path(current_root) / name).is_symlink()
             )
             for name in sorted(file_names):
                 lowered = name.casefold()
+                target = Path(current_root) / name
                 if (
-                    lowered in self._protected_names
+                    is_credential_path(target.relative_to(root))
                     or lowered.endswith((".key", ".pem"))
                 ):
                     continue
-                target = Path(current_root) / name
                 if not target.is_symlink() and target.is_file():
                     yield target
 

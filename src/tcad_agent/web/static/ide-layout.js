@@ -9,7 +9,7 @@
     agentMax: 520,
     centerMin: 480,
     desktopMin: 996,
-    narrowMax: 719,
+    narrowMax: 799,
     keyboardStep: 12,
   };
 

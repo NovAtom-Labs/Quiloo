@@ -20,6 +20,11 @@ assertEqual(
   "narrow",
   "narrow widths use drawers",
 );
+assertEqual(layout.clampLayout({viewport: 720, explorer: 218, agent: 356}).mode, "narrow", "720px uses drawers");
+assertEqual(layout.clampLayout({viewport: 799, explorer: 218, agent: 356}).mode, "narrow", "799px uses drawers");
+assertEqual(layout.clampLayout({viewport: 800, explorer: 218, agent: 356}).mode, "tablet", "800px preserves the 480px center minimum");
+assertEqual(layout.clampLayout({viewport: 995, explorer: 218, agent: 356}).mode, "tablet", "995px remains tablet");
+assertEqual(layout.clampLayout({viewport: 996, explorer: 218, agent: 356}).mode, "desktop", "996px enters the three-pane layout");
 assertEqual(
   layout.clampLayout({viewport: 900, explorer: 218, agent: 356}).mode,
   "tablet",
