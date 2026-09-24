@@ -27,6 +27,19 @@ assertEqual(rows[0].owner, "science-checker", "subagent ownership stays with the
 assertEqual(rows[0].duration, "2.0s", "step duration is derived from event timestamps");
 assertEqual(rows[0].command, "pytest tests/test_science.py -q", "technical command remains inspectable");
 assertEqual(rows[0].phase, "Validate", "test execution is classified as validation evidence");
+assertEqual(
+  agent.affectedFilePaths(
+    {path: "/repo/src/physics.py", affectedPaths: ["src/physics.py"]},
+    "/repo",
+  ).join(","),
+  "src/physics.py",
+  "completion evidence replaces duplicate absolute action paths",
+);
+assertEqual(
+  agent.affectedFilePaths({path: "/repo/src/mesh.py", affectedPaths: []}, "/repo")[0],
+  "src/mesh.py",
+  "absolute action paths are normalized to the repository",
+);
 
 const completed = agent.outcomeSummary(
   {runState: "completed", steps: rows, currentOperation: "Run completed"},

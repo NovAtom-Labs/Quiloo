@@ -56,6 +56,17 @@
     return Array.from(new Set(values.filter(Boolean)));
   }
 
+  function affectedFilePaths(row, workspaceRoot) {
+    const evidencePaths = Array.isArray(row?.affectedPaths) && row.affectedPaths.length
+      ? row.affectedPaths
+      : [row?.path];
+    const root = String(workspaceRoot || "").replaceAll("\\", "/").replace(/\/$/, "");
+    return unique(evidencePaths.map((value) => {
+      const path = String(value || "").replaceAll("\\", "/");
+      return root && path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path;
+    }));
+  }
+
   function outcomeSummary(snapshot, changeSet) {
     const steps = activityRows(snapshot);
     const failed = steps.find((step) => step.status === "failed");
@@ -173,6 +184,7 @@
   }
 
   globalThis.QuilooAgentView = {
+    affectedFilePaths,
     activityRows,
     durationText,
     outcomeSummary,

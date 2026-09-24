@@ -738,7 +738,7 @@ function renderActivity(snapshot) {
       output.textContent = String(row.output);
       technical.append(output);
     }
-    const affectedPaths = Array.from(new Set([row.path, ...row.affectedPaths].filter(Boolean)));
+    const affectedPaths = window.QuilooAgentView.affectedFilePaths(row, activeWorkspace?.root);
     affectedPaths.forEach((affectedPath) => {
       const open = document.createElement("button");
       open.type = "button";
@@ -849,6 +849,7 @@ function renderChanges(changeSet) {
           if (!target) return;
           target.open = true;
           target.scrollIntoView({block: "center"});
+          target.querySelector("summary")?.focus();
         });
         validations.append(validation);
       });
