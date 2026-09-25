@@ -1,9 +1,11 @@
+import sys
 from pathlib import Path
 
 import pytest
 
 from tcad_agent.adapters.registry import BackendAdapterUnavailable, get_backend
 from tcad_agent.desktop.devsim_runner import DevsimSidecarRunner
+from tcad_agent.runners.local import LocalRunner
 
 
 def test_devsim_backend_binding_owns_adapter_and_runner() -> None:
@@ -23,6 +25,19 @@ def test_devsim_backend_uses_packaged_sidecar_when_configured(
 
     assert isinstance(binding.runner, DevsimSidecarRunner)
     assert binding.runner.executable == runner.resolve()
+
+
+def test_devsim_backend_defaults_to_active_python_without_machine_local_paths(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("AGENT_KRONIG_DEVSIM_RUNNER", raising=False)
+    monkeypatch.delenv("TCAD_DEVSIM_PYTHON", raising=False)
+    monkeypatch.chdir(tmp_path)
+
+    binding = get_backend("devsim")
+
+    assert isinstance(binding.runner, LocalRunner)
+    assert binding.runner.devsim_python == Path(sys.executable).absolute()
 
 
 def test_sentaurus_binding_is_installed_but_execution_is_unconfigured(

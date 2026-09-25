@@ -1,22 +1,12 @@
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
+from tcad_agent.adapters.registry import resolve_devsim_python
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-
-
-def resolve_devsim_python(project_root: Path) -> Path:
-    configured = os.getenv("TCAD_DEVSIM_PYTHON")
-    if configured:
-        return Path(configured)
-    candidates = (
-        project_root.parent / "devsim" / ".venv" / "bin" / "python",
-        project_root.parent / "devsim" / ".venv" / "Scripts" / "python.exe",
-    )
-    return next((path for path in candidates if path.is_file()), Path(sys.executable))
 
 
 def test_devsim_resolution_falls_back_to_the_active_python(
@@ -25,7 +15,7 @@ def test_devsim_resolution_falls_back_to_the_active_python(
 ) -> None:
     monkeypatch.delenv("TCAD_DEVSIM_PYTHON", raising=False)
 
-    assert resolve_devsim_python(tmp_path) == Path(sys.executable)
+    assert resolve_devsim_python(tmp_path) == Path(sys.executable).absolute()
 
 
 def test_devsim_sibling_install_imports_and_reports_version() -> None:

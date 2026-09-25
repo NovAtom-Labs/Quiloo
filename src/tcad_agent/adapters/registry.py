@@ -29,6 +29,25 @@ class BackendBinding:
     runner: Runner
 
 
+def resolve_devsim_python(project_root: Path | None = None) -> Path:
+    """Resolve a development DEVSIM interpreter without machine-specific defaults."""
+
+    configured = os.getenv("TCAD_DEVSIM_PYTHON")
+    if configured:
+        return Path(configured).expanduser().absolute()
+
+    root = (project_root or Path.cwd()).resolve()
+    sibling_environment = root.parent / "devsim" / ".venv"
+    candidates = (
+        sibling_environment / "Scripts" / "python.exe",
+        sibling_environment / "bin" / "python",
+    )
+    return next(
+        (candidate.absolute() for candidate in candidates if candidate.is_file()),
+        Path(sys.executable).absolute(),
+    )
+
+
 def get_backend(backend: str) -> BackendBinding:
     """Return the installed backend binding or refuse at one explicit seam."""
     if backend == "devsim":
@@ -38,18 +57,9 @@ def get_backend(backend: str) -> BackendBinding:
                 adapter=DevsimAdapter.from_defaults(),
                 runner=DevsimSidecarRunner(Path(packaged_runner)),
             )
-        devsim_venv = Path.cwd().parent / "devsim" / ".venv"
-        default_devsim_python = (
-            devsim_venv / "Scripts" / "python.exe"
-            if sys.platform == "win32"
-            else devsim_venv / "bin" / "python"
-        )
-        devsim_python = Path(
-            os.getenv("TCAD_DEVSIM_PYTHON") or str(default_devsim_python)
-        )
         return BackendBinding(
             adapter=DevsimAdapter.from_defaults(),
-            runner=LocalRunner(devsim_python),
+            runner=LocalRunner(resolve_devsim_python()),
         )
     if backend == "sentaurus":
         return BackendBinding(

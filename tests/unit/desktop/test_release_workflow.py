@@ -56,8 +56,8 @@ def test_release_workflow_limits_write_permission_and_publishes_a_prerelease() -
     )
     assert "--prerelease" in commands
     assert "--verify-tag" in commands
-    assert 'Agent Kronig 0.1.0 Alpha 4' in commands
-    assert "docs/releases/v0.1.0-alpha.4.md" in commands
+    assert 'Agent Kronig 0.1.0 Alpha 5' in commands
+    assert "docs/releases/v0.1.0-alpha.5.md" in commands
     assert release["steps"][-1]["env"] == {"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}
 
 
@@ -93,3 +93,60 @@ def test_native_build_fetches_the_exact_public_devsim_knowledge_revision() -> No
     assert "https://github.com/devsim/devsim.git" in fetch["run"]
     assert "43b41ca845184c47e22b72d144db7e7db8509377" in fetch["run"]
     assert "--depth 1" in fetch["run"]
+
+
+def test_native_build_configures_a_portable_devsim_runtime_before_tests() -> None:
+    workflow = load_workflow()
+    steps = workflow["jobs"]["build"]["steps"]
+    names = [step.get("name") for step in steps]
+
+    configure = steps[names.index("Configure simulator runtime")]
+    verify = names.index("Verify Python application")
+
+    assert names.index("Configure simulator runtime") < verify
+    assert configure["run"] == "python scripts/configure_ci_environment.py"
+
+
+def test_linux_build_installs_the_devsim_math_runtime_before_importing() -> None:
+    workflow = load_workflow()
+    steps = workflow["jobs"]["build"]["steps"]
+    names = [step.get("name") for step in steps]
+
+    install = steps[names.index("Install Linux DEVSIM math runtime")]
+
+    assert install["if"] == "matrix.platform == 'linux'"
+    assert "libopenblas-dev" in install["run"]
+    assert names.index("Install Linux DEVSIM math runtime") < names.index(
+        "Verify Python application"
+    )
+
+
+def test_windows_build_installs_the_official_devsim_math_runtime() -> None:
+    workflow = load_workflow()
+    steps = workflow["jobs"]["build"]["steps"]
+    names = [step.get("name") for step in steps]
+
+    install = steps[names.index("Install Windows DEVSIM math runtime")]
+
+    assert install["if"] == "matrix.platform == 'win'"
+    assert 'mkl==2023.2.2' in install["run"]
+    assert names.index("Install Windows DEVSIM math runtime") < names.index(
+        "Verify Python application"
+    )
+
+
+def test_native_build_executes_the_frozen_devsim_sidecar_before_packaging() -> None:
+    workflow = load_workflow()
+    steps = workflow["jobs"]["build"]["steps"]
+    names = [step.get("name") for step in steps]
+
+    smoke = steps[names.index("Smoke test frozen DEVSIM sidecar")]
+
+    assert "scripts/smoke_desktop_sidecars.py" in smoke["run"]
+    assert "desktop/resources" in smoke["run"]
+    assert names.index("Build target-native Python sidecars") < names.index(
+        "Smoke test frozen DEVSIM sidecar"
+    )
+    assert names.index("Smoke test frozen DEVSIM sidecar") < names.index(
+        "Build native installers"
+    )

@@ -4,13 +4,14 @@ import pytest
 import yaml
 
 from tcad_agent.adapters.devsim.compiler import DevsimAdapter
+from tcad_agent.adapters.registry import resolve_devsim_python
 from tcad_agent.domain.models import ExperimentSpec, Observable
 from tcad_agent.runners.local import LocalRunner
 from tcad_agent.runners.models import RunBudget
 
 ROOT = Path(__file__).parents[2]
 EXAMPLES = ROOT / "examples"
-DEVSIM_PYTHON = Path("/Users/satyagni/Documents/NovAtom Labs/devsim/.venv/bin/python")
+DEVSIM_PYTHON = resolve_devsim_python(ROOT)
 
 
 @pytest.mark.integration
