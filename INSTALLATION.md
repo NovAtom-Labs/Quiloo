@@ -8,7 +8,18 @@ Sentaurus is not installed by these steps. It must remain on a separately licens
 
 Release artifacts are produced for Linux AppImage, Debian or Ubuntu `.deb`, Windows NSIS and portable `.zip`, Intel Mac `.dmg` and `.zip`, and Apple Silicon `.dmg` and `.zip`. The native application includes its private backend and reviewed DEVSIM runner. End users do not install Python, Node.js, DEVSIM, Electron, or a browser.
 
-Download the artifact for the machine's operating system and architecture from the approved release. Install or open it using the normal operating system workflow, open `Settings` to configure Bedrock access, then choose `Open folder` to select a local repository. Agent Kronig changes the selected files directly on that computer. The API key uses operating-system protected storage. On Linux without a secret service, it remains in memory only for that application session.
+### Download Alpha 1
+
+| System | Recommended package | Alternative |
+| --- | --- | --- |
+| Linux x86-64 | [AppImage](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-linux-x64.AppImage) | [Debian package](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-linux-x64.deb) |
+| Windows x86-64 | [NSIS installer](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-win-x64.exe) | [Portable ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-win-x64.zip) |
+| Intel Mac | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-mac-x64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-mac-x64.zip) |
+| Apple Silicon | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-mac-arm64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-mac-arm64.zip) |
+
+Alpha 1 packages are unsigned and updates are manual. Windows SmartScreen or macOS Gatekeeper may warn before opening them. Download only from the official `v0.1.0-alpha.1` release and verify the package against its `SHA256SUMS.txt` entry.
+
+Install or open the correct package using the normal operating system workflow, open `Settings` to configure Bedrock access, then choose `Open folder` to select a local repository. Agent Kronig changes the selected files directly on that computer. The API key uses operating-system protected storage. On Linux without a secret service, it remains in memory only for that application session.
 
 Detailed platform instructions, application-data locations, update behavior, recovery, release building, and uninstall behavior are in [the desktop application operations guide](docs/operations/desktop-application.md).
 

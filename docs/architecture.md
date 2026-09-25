@@ -21,12 +21,13 @@ research request
 
 Retrieval supports specification and explanation, but it cannot override the schema, capability manifest, approval gate, compiler, or validators.
 
-## Linux-local repository IDE
+## Native repository IDE
 
-The primary application shell is a local browser IDE backed by a loopback-only FastAPI service.
-The browser is the interface, while repository paths, Git inspection, conversations, event
-history, simulator execution, knowledge, and credentials remain on the researcher's Linux
-machine.
+The primary application shell is an Electron desktop application for Linux, Windows, and macOS.
+Electron owns a private authenticated FastAPI service on an operating-system-selected loopback
+port and renders the interface inside the native window. There is no supported standalone browser
+launcher. Repository paths, Git inspection, conversations, event history, simulator execution,
+knowledge, and credentials remain on the researcher's machine.
 
 The repository IDE establishes these contracts:
 
@@ -36,7 +37,7 @@ repository path
   -> persistent ConversationRecord
   -> ordered ConversationMessage and IDEEvent records
   -> HTTP resources and resumable Server-Sent Events
-  -> three-panel browser workspace
+  -> three-panel native workspace
 ```
 
 `WorkspaceManager` accepts Git and non-Git directories. It canonicalizes each path before using it
@@ -49,9 +50,9 @@ IDE events. Conversation pages use stable URLs. An SSE client resumes strictly a
 event identifier, so browser reconnection does not duplicate earlier activity. State is persisted
 before it is streamed.
 
-The root route serves the repository IDE. Legacy `/simulate` and request-stage browser URLs redirect
-to that single product surface. The underlying typed request and simulator APIs remain available to
-the agent, CLI, and integrations.
+The authenticated root route serves only the Electron-owned renderer. The underlying typed request
+and simulator APIs remain available to the agent, CLI, and approved integrations. They are not a
+public application service.
 
 The IDE exposes repository-confined OpenHands file operations, search, bounded terminal execution,
 typed TCAD tools, and delegated subagents. Eligible UTF-8 text files can also be edited directly in

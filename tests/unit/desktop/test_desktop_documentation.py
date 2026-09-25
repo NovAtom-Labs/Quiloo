@@ -74,3 +74,64 @@ def test_desktop_interface_exposes_update_controls() -> None:
     assert 'id="desktop-apply-update"' in template
     assert "checkForUpdates" in script
     assert "applyUpdateWhenSafe" in script
+
+
+def test_readme_leads_with_native_alpha_downloads() -> None:
+    readme = (ROOT / "README.md").read_text()
+    source_setup = readme.index("Develop from source")
+
+    assert readme.lstrip().startswith("<p align=\"center\">")
+    for phrase in (
+        "Agent Kronig",
+        "Alpha software",
+        "Native desktop application",
+        "DEVSIM",
+        "Sentaurus",
+        "v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-linux-x64.AppImage",
+        "v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-win-x64.exe",
+        "v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-mac-x64.dmg",
+        "v0.1.0-alpha.1/Agent-Kronig-0.1.0-alpha.1-mac-arm64.dmg",
+    ):
+        assert phrase in readme
+        if "v0.1.0-alpha.1/" in phrase:
+            assert readme.index(phrase) < source_setup
+
+
+def test_alpha_release_and_community_documents_are_complete() -> None:
+    release_notes = (ROOT / "docs" / "releases" / "v0.1.0-alpha.1.md").read_text()
+    security = (ROOT / "SECURITY.md").read_text()
+    required_files = (
+        ROOT / "CONTRIBUTING.md",
+        ROOT / "SECURITY.md",
+        ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md",
+        ROOT / ".github" / "ISSUE_TEMPLATE" / "bug-report.yml",
+        ROOT / ".github" / "ISSUE_TEMPLATE" / "config.yml",
+    )
+
+    for path in required_files:
+        assert path.exists()
+    for phrase in (
+        "Unsigned alpha",
+        "Manual updates",
+        "Current capabilities",
+        "Known limitations",
+    ):
+        assert phrase in release_notes
+    assert "Do not open a public issue" in security
+    assert "credentials" in security
+    assert "vulnerabilities" in security
+
+
+def test_new_public_documents_do_not_use_em_dashes() -> None:
+    paths = (
+        ROOT / "README.md",
+        ROOT / "INSTALLATION.md",
+        ROOT / "CONTRIBUTING.md",
+        ROOT / "SECURITY.md",
+        ROOT / "docs" / "releases" / "v0.1.0-alpha.1.md",
+        ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md",
+        ROOT / ".github" / "ISSUE_TEMPLATE" / "bug-report.yml",
+        ROOT / ".github" / "ISSUE_TEMPLATE" / "config.yml",
+    )
+    for path in paths:
+        assert "—" not in path.read_text()
