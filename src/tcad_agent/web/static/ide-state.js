@@ -1,6 +1,17 @@
 "use strict";
 
 (() => {
+  function workspaceContext(workspace) {
+    const root = String(workspace?.root || "");
+    const normalizedRoot = root.replace(/[\\/]+$/, "");
+    const name = normalizedRoot.split(/[\\/]/).filter(Boolean).at(-1) || "Repository";
+    const git = workspace?.git || {};
+    const state = git.available
+      ? `${git.branch || "detached"} · ${git.dirty ? "modified" : "clean"}`
+      : "no git";
+    return {name, root, state};
+  }
+
   function createNavigationGuard() {
     let routeGeneration = 0;
 
@@ -203,5 +214,6 @@
     isActiveState,
     shouldAutoFollowChat,
     shouldRefreshRepository,
+    workspaceContext,
   };
 })();

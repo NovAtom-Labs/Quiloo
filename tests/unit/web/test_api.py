@@ -66,7 +66,9 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert parser.elements["workspace-browser"] == "aside"
     assert parser.elements["repository-tree"] == "div"
     assert parser.elements["workspace-main"] == "main"
-    assert parser.elements["workspace-tabs"] == "nav"
+    assert "workspace-tabs" not in parser.elements
+    assert parser.elements["workspace-context-name"] == "strong"
+    assert parser.elements["workspace-context-state"] == "span"
     assert parser.elements["file-viewer"] == "section"
     assert parser.elements["file-viewer-body"] == "div"
     assert parser.elements["file-editor"] == "textarea"
@@ -88,6 +90,7 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert parser.elements["file-viewer-save"] == "button"
     assert parser.elements["file-viewer-cancel"] == "button"
     assert 'href="/simulate"' not in page.text
+    assert "No workspace open" not in page.text
 
 
 def test_workspace_header_separates_product_and_company_branding(tmp_path: Path) -> None:

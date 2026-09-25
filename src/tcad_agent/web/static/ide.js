@@ -4,6 +4,8 @@ const workspaceForm = document.querySelector("#workspace-form");
 const workspacePath = document.querySelector("#workspace-path");
 const browseWorkspace = document.querySelector("#browse-workspace");
 const workspaceStatus = document.querySelector("#workspace-status");
+const workspaceContextName = document.querySelector("#workspace-context-name");
+const workspaceContextState = document.querySelector("#workspace-context-state");
 const gitState = document.querySelector("#git-state");
 const repositoryTree = document.querySelector("#repository-tree");
 const conversationSelect = document.querySelector("#conversation-select");
@@ -124,7 +126,12 @@ function renderWorkspace(workspace) {
   const changedWorkspace = activeWorkspace?.id !== workspace.id;
   activeWorkspace = workspace;
   workspacePath.value = workspace.root;
-  workspaceStatus.textContent = workspace.root;
+  const context = window.AgentKronigIDEState.workspaceContext(workspace);
+  workspaceContextName.textContent = context.name;
+  workspaceContextState.textContent = context.state;
+  workspaceStatus.title = context.root;
+  workspaceStatus.setAttribute("aria-label", `Repository ${context.name}, ${context.state}`);
+  workspaceStatus.hidden = false;
   gitState.textContent = workspace.git.available
     ? `${workspace.git.branch || "DETACHED"}${workspace.git.dirty ? " · MODIFIED" : " · CLEAN"}`
     : "NO GIT";

@@ -4,6 +4,29 @@ function assertEqual(actual, expected, message) {
   if (actual !== expected) throw new Error(message);
 }
 
+const cleanContext = globalThis.AgentKronigIDEState.workspaceContext({
+  root: "/home/research/pn-junction",
+  git: {available: true, branch: "main", dirty: false},
+});
+assertEqual(cleanContext.name, "pn-junction", "the title bar should show the repository folder name");
+assertEqual(cleanContext.state, "main · clean", "the title bar should show clean branch state");
+assertEqual(cleanContext.root, "/home/research/pn-junction", "the complete path remains available");
+
+const modifiedWindowsContext = globalThis.AgentKronigIDEState.workspaceContext({
+  root: "C:\\Users\\research\\device-study\\",
+  git: {available: true, branch: null, dirty: true},
+});
+assertEqual(
+  modifiedWindowsContext.name,
+  "device-study",
+  "the repository label should support Windows paths",
+);
+assertEqual(
+  modifiedWindowsContext.state,
+  "detached · modified",
+  "detached modified repositories should remain explicit",
+);
+
 const guard = globalThis.AgentKronigIDEState.createNavigationGuard();
 const firstRoute = guard.beginRoute();
 const pendingMessage = guard.captureMessage(firstRoute, "conversation-a", "inspect the deck");

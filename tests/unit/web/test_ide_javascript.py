@@ -232,3 +232,16 @@ def test_file_viewer_toolbar_stays_compact_across_widths() -> None:
         re.DOTALL,
     )
     assert ".file-viewer-actions { flex-wrap: wrap; }" not in source
+
+
+def test_company_lockup_stays_at_far_right_without_header_divider() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide.css").read_text()
+
+    brand = re.search(r"(?m)^\.brand\s*\{([^}]*)\}", source, re.DOTALL)
+    header_actions = re.search(r"(?m)^\.header-actions\s*\{([^}]*)\}", source, re.DOTALL)
+
+    assert brand is not None
+    assert "border-right" not in brand.group(1)
+    assert header_actions is not None
+    assert "grid-column: 3" in header_actions.group(1)
