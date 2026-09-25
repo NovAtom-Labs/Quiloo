@@ -6,7 +6,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import re
+import zipfile
 from pathlib import Path
+from typing import BinaryIO
 
 SECRET_PATTERNS = (
     re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -14,6 +16,37 @@ SECRET_PATTERNS = (
     re.compile(rb"ABSKQmVkcm9ja0FQSUtleS"),
     re.compile(rb"AWS_SECRET_ACCESS_KEY\s*[:=]"),
 )
+
+
+def _application_owned(relative: str) -> bool:
+    normalized = f"/{relative}"
+    if "/_internal/tcad_agent/" in normalized:
+        return True
+    return "/_internal/" not in normalized and "/Frameworks/" not in normalized
+
+
+def _scan_stream(handle: BinaryIO, label: str) -> None:
+    overlap = b""
+    while chunk := handle.read(1024 * 1024):
+        inspected = overlap + chunk
+        if any(pattern.search(inspected) for pattern in SECRET_PATTERNS):
+            raise ValueError(f"credential pattern found in artifact: {label}")
+        overlap = inspected[-256:]
+
+
+def _scan_zip(path: Path, relative: str) -> None:
+    if not zipfile.is_zipfile(path):
+        return
+    with zipfile.ZipFile(path) as archive:
+        for member in archive.infolist():
+            if member.is_dir():
+                continue
+            name = member.filename.replace("\\", "/")
+            if Path(name).name == ".env" or Path(name).name.startswith(".env."):
+                raise ValueError(f"environment file found in artifact: {relative}:{name}")
+            if _application_owned(name):
+                with archive.open(member) as handle:
+                    _scan_stream(handle, f"{relative}:{name}")
 
 
 def inspect_artifacts(root: Path) -> tuple[tuple[str, int, str], ...]:
@@ -27,17 +60,13 @@ def inspect_artifacts(root: Path) -> tuple[tuple[str, int, str], ...]:
         if path.name == ".env" or path.name.startswith(".env."):
             raise ValueError(f"environment file found in artifact output: {relative}")
         digest = hashlib.sha256()
-        overlap = b""
-        scan_content = "/_internal/" not in f"/{relative}" and "/Frameworks/" not in f"/{relative}"
         with path.open("rb") as handle:
             while chunk := handle.read(1024 * 1024):
                 digest.update(chunk)
-                inspected = overlap + chunk
-                if scan_content and any(
-                    pattern.search(inspected) for pattern in SECRET_PATTERNS
-                ):
-                    raise ValueError(f"credential pattern found in artifact: {relative}")
-                overlap = inspected[-256:]
+        _scan_zip(path, relative)
+        if _application_owned(relative):
+            with path.open("rb") as handle:
+                _scan_stream(handle, relative)
         inventory.append((relative, path.stat().st_size, digest.hexdigest()))
     return tuple(inventory)
 

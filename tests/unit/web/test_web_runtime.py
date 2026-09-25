@@ -1,5 +1,9 @@
 import socket
+from pathlib import Path
 
+import pytest
+
+from tcad_agent.desktop.lock import DataDirectoryLock, DesktopDataLockError
 from tcad_agent.web import launcher
 from tcad_agent.web.launcher import DEFAULT_HOST, _select_port
 from tcad_agent.web.runtime import runtime_fingerprint
@@ -53,3 +57,16 @@ def test_run_server_can_launch_without_opening_browser(monkeypatch) -> None:
     assert calls["host"] == "127.0.0.1"
     assert calls["port"] == port
     assert "browser_opened" not in calls
+
+
+def test_browser_server_refuses_a_data_directory_owned_by_desktop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = tmp_path / "runtime"
+    monkeypatch.setenv("TCAD_WORKSPACE", str(runtime))
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = int(probe.getsockname()[1])
+    with DataDirectoryLock(runtime):
+        with pytest.raises(DesktopDataLockError):
+            launcher.run_server("127.0.0.1", port, open_browser=False)

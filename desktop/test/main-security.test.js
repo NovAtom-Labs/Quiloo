@@ -82,3 +82,21 @@ test("application quit waits for backend shutdown", async () => {
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(quitCalls, 1);
 });
+
+test("application quit remains open when backend work is active", async () => {
+  let handler;
+  let quitCalls = 0;
+  let blockedCalls = 0;
+  installGracefulQuit(
+    {
+      on(_event, callback) { handler = callback; },
+      quit() { quitCalls += 1; },
+    },
+    async () => { throw new Error("active work"); },
+    async () => { blockedCalls += 1; },
+  );
+  handler({preventDefault() {}});
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(quitCalls, 0);
+  assert.equal(blockedCalls, 1);
+});

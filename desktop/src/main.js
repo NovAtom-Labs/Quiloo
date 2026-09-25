@@ -6,6 +6,7 @@ const path = require("node:path");
 
 const {BackendSupervisor} = require("./backend-supervisor");
 const {DesktopSettingsStore} = require("./settings-store");
+const {createLinuxUpdateVerifier} = require("./linux-update-verifier");
 const {UpdateController} = require("./update-controller");
 
 function createLaunchToken() {
@@ -34,7 +35,7 @@ function installPermissionPolicy(electronSession) {
   electronSession.setPermissionCheckHandler(() => false);
 }
 
-function installGracefulQuit(app, stopBackend) {
+function installGracefulQuit(app, stopBackend, onBlocked = async () => {}) {
   let shutdownComplete = false;
   let shutdownStarted = false;
   app.on("before-quit", (event) => {
@@ -42,10 +43,16 @@ function installGracefulQuit(app, stopBackend) {
     event.preventDefault();
     if (shutdownStarted) return;
     shutdownStarted = true;
-    void Promise.resolve(stopBackend()).finally(() => {
-      shutdownComplete = true;
-      app.quit();
-    });
+    void Promise.resolve()
+      .then(stopBackend)
+      .then(() => {
+        shutdownComplete = true;
+        app.quit();
+      })
+      .catch(async (error) => {
+        shutdownStarted = false;
+        await onBlocked(error);
+      });
   });
 }
 
@@ -57,18 +64,21 @@ function createApplication(
   let mainWindow = null;
   let supervisor = null;
   let settingsStore = null;
+  const updateFeedUrl = process.env.AGENT_KRONIG_UPDATE_URL || "";
+  let verifyDownload = async () => {};
+  if (process.platform === "linux" && updateFeedUrl) {
+    const publicKeyPath = path.join(__dirname, "linux-update-public-key.pem");
+    verifyDownload = createLinuxUpdateVerifier({
+      feedUrl: updateFeedUrl,
+      publicKey: fs.readFileSync(publicKeyPath, "utf8"),
+    });
+  }
   const updateController = new UpdateController({
     updater,
-    feedUrl: process.env.AGENT_KRONIG_UPDATE_URL || "",
+    feedUrl: updateFeedUrl,
     channel: process.env.AGENT_KRONIG_UPDATE_CHANNEL || "stable",
-    statusClient: async () => {
-      if (!supervisor?.readiness) return {active: true};
-      const response = await fetch(`${supervisor.readiness.url}/api/desktop/status`, {
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error("Desktop activity status is unavailable");
-      return response.json();
-    },
+    statusClient: backendActivity,
+    verifyDownload,
   });
 
   const desktopInfo = () => Object.freeze({
@@ -142,22 +152,66 @@ function createApplication(
     return window;
   }
 
-  async function launchWorkspace() {
-    supervisor = new BackendSupervisor(backendOptions());
+  async function backendActivity() {
+    if (!supervisor?.readiness) return {active: true};
+    const response = await fetch(`${supervisor.readiness.url}/api/desktop/status`, {
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error("Desktop activity status is unavailable");
+    return response.json();
+  }
+
+  async function assertBackendIdle() {
+    const status = await backendActivity();
+    if (!status || status.active !== false) {
+      throw new Error("Finish or stop active work before closing or restarting Agent Kronig.");
+    }
+  }
+
+  async function prepareBackendShutdown() {
+    if (!supervisor?.readiness) return;
+    const response = await fetch(
+      `${supervisor.readiness.url}/api/desktop/prepare-shutdown`,
+      {
+        method: "POST",
+        cache: "no-store",
+        headers: {Authorization: `Bearer ${supervisor.readiness.launchToken}`},
+      },
+    );
+    if (response.ok) return;
+    let message = "Agent Kronig could not prepare the local service for shutdown.";
     try {
-      const ready = await supervisor.start();
+      const payload = await response.json();
+      if (payload?.message) message = payload.message;
+    } catch {
+      // Keep the sanitized fallback message.
+    }
+    throw new Error(message);
+  }
+
+  async function launchWorkspace(previousWindow = null) {
+    const candidate = new BackendSupervisor(backendOptions());
+    supervisor = candidate;
+    candidate.once("unexpected-exit", (event) => {
+      if (supervisor !== candidate) return;
+      const suffix = event.code === null ? `signal ${event.signal}` : `code ${event.code}`;
+      void showStartupError(new Error(`Backend exited unexpectedly with ${suffix}`), mainWindow);
+    });
+    try {
+      const ready = await candidate.start();
       const window = createWindow();
       attachNavigationPolicy(window.webContents, ready.url);
       await window.loadURL(
         `${ready.url}/desktop/bootstrap?token=${encodeURIComponent(ready.launchToken)}`,
       );
       mainWindow = window;
+      if (previousWindow && previousWindow !== window) previousWindow.close();
     } catch (error) {
-      await showStartupError(error);
+      await showStartupError(error, previousWindow);
     }
   }
 
-  async function showStartupError(error) {
+  async function showStartupError(error, previousWindow = null) {
     const logDirectory = app.getPath("logs");
     fs.mkdirSync(logDirectory, {recursive: true});
     const logPath = path.join(logDirectory, "desktop-startup.log");
@@ -174,8 +228,7 @@ function createApplication(
       if (!destination.startsWith("agent-kronig-error://")) return;
       event.preventDefault();
       if (destination === "agent-kronig-error://retry") {
-        window.close();
-        void launchWorkspace();
+        void launchWorkspace(window);
       } else if (destination === "agent-kronig-error://quit") {
         app.quit();
       }
@@ -184,6 +237,7 @@ function createApplication(
       query: {category, logPath},
     });
     mainWindow = window;
+    if (previousWindow && previousWindow !== window) previousWindow.close();
   }
 
   function registerIpc() {
@@ -200,12 +254,19 @@ function createApplication(
     ipcMain.handle("desktop:get-info", () => desktopInfo());
     ipcMain.handle("desktop:get-settings", () => settingsStore.getPublicSettings());
     ipcMain.handle("desktop:save-settings", async (_event, payload) => {
+      await assertBackendIdle();
       const state = settingsStore.save(payload);
       setTimeout(async () => {
         const previousWindow = mainWindow;
-        await stopBackend();
-        await launchWorkspace();
-        if (previousWindow && previousWindow !== mainWindow) previousWindow.close();
+        try {
+          await stopBackendWhenIdle();
+          await launchWorkspace(previousWindow);
+        } catch (error) {
+          await dialog.showMessageBox(previousWindow, {
+            type: "warning",
+            message: error.message,
+          });
+        }
       }, 50);
       return Object.freeze({...state, restarting: true});
     });
@@ -221,6 +282,11 @@ function createApplication(
     await supervisor?.stop();
   }
 
+  async function stopBackendWhenIdle() {
+    await prepareBackendShutdown();
+    await stopBackend();
+  }
+
   async function run() {
     if (!app.requestSingleInstanceLock()) {
       app.quit();
@@ -232,7 +298,12 @@ function createApplication(
         mainWindow.focus();
       }
     });
-    installGracefulQuit(app, stopBackend);
+    installGracefulQuit(app, stopBackendWhenIdle, async (error) => {
+      await dialog.showMessageBox(mainWindow, {
+        type: "warning",
+        message: error.message,
+      });
+    });
     app.on("window-all-closed", () => app.quit());
     await app.whenReady();
     installPermissionPolicy(session.defaultSession);

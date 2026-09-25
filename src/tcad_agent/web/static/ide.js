@@ -72,6 +72,9 @@ const desktopSettingsStorage = document.querySelector("#desktop-settings-storage
 const desktopSettingsError = document.querySelector("#desktop-settings-error");
 const desktopSettingsCancel = document.querySelector("#desktop-settings-cancel");
 const desktopSettingsSave = document.querySelector("#desktop-settings-save");
+const desktopCheckUpdates = document.querySelector("#desktop-check-updates");
+const desktopApplyUpdate = document.querySelector("#desktop-apply-update");
+const desktopUpdateStatus = document.querySelector("#desktop-update-status");
 
 let activeWorkspace = null;
 let activeConversation = null;
@@ -109,6 +112,33 @@ function showError(message = "") {
   errorNotice.classList.toggle("hidden", !message);
 }
 
+function renderUpdateState(state) {
+  const labels = {
+    disabled: "Managed updates are not configured.",
+    idle: `Update channel: ${state.channel}.`,
+    checking: "Checking for updates…",
+    available: `Version ${state.version || "new"} is available.`,
+    downloading: `Downloading update${state.progressPercent === null ? "" : `: ${Math.round(state.progressPercent)}%`}…`,
+    verifying: "Verifying the update publisher…",
+    ready: `Version ${state.version || "new"} is ready to install.`,
+    blocked: state.message || "Finish or stop active work before updating.",
+    installing: "Restarting to install the update…",
+    "up-to-date": "Agent Kronig is up to date.",
+    error: state.message || "The update could not be verified.",
+  };
+  desktopUpdateStatus.textContent = labels[state.state] || "Update status is unavailable.";
+  desktopCheckUpdates.disabled = !state.enabled || ["checking", "downloading", "verifying", "installing"].includes(state.state);
+  desktopApplyUpdate.hidden = !["ready", "blocked"].includes(state.state);
+}
+
+async function refreshUpdateState() {
+  const state = await window.agentKronigDesktop.getUpdateState();
+  renderUpdateState(state);
+  if (desktopSettingsDialog.open && ["checking", "downloading", "verifying", "available"].includes(state.state)) {
+    setTimeout(() => void refreshUpdateState().catch(() => {}), 1000);
+  }
+}
+
 async function openDesktopSettings() {
   if (!window.agentKronigDesktop) return;
   desktopSettings.disabled = true;
@@ -129,6 +159,7 @@ async function openDesktopSettings() {
     const presence = settings.hasBedrockCredential ? "A key is configured." : "No key is configured.";
     desktopSettingsStorage.textContent = `${presence} ${protection}`;
     desktopSettingsDialog.showModal();
+    await refreshUpdateState();
   } catch (error) {
     showError(error.message);
   } finally {
@@ -1434,6 +1465,24 @@ if (window.agentKronigDesktop) desktopSettings.hidden = false;
 desktopSettings.addEventListener("click", () => void openDesktopSettings());
 desktopSettingsCancel.addEventListener("click", () => desktopSettingsDialog.close());
 desktopSettingsForm.addEventListener("submit", (event) => void saveDesktopSettings(event));
+desktopCheckUpdates.addEventListener("click", async () => {
+  desktopSettingsError.textContent = "";
+  try {
+    renderUpdateState(await window.agentKronigDesktop.checkForUpdates());
+    void refreshUpdateState();
+  } catch (error) {
+    desktopSettingsError.textContent = error.message;
+  }
+});
+desktopApplyUpdate.addEventListener("click", async () => {
+  desktopSettingsError.textContent = "";
+  try {
+    renderUpdateState(await window.agentKronigDesktop.applyUpdateWhenSafe());
+  } catch (error) {
+    desktopSettingsError.textContent = error.message;
+    await refreshUpdateState();
+  }
+});
 window.addEventListener("popstate", () => void restoreRoute());
 window.addEventListener("beforeunload", () => eventSource?.close());
 document.addEventListener("visibilitychange", () => {

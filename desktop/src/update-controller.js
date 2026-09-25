@@ -6,7 +6,7 @@ function normalizedVersion(value) {
 }
 
 class UpdateController {
-  constructor({updater, statusClient, feedUrl = "", channel = "stable"}) {
+  constructor({updater, statusClient, verifyDownload = async () => {}, feedUrl = "", channel = "stable"}) {
     if (!["stable", "pilot"].includes(channel)) {
       throw new Error("Update channel must be stable or pilot");
     }
@@ -18,6 +18,8 @@ class UpdateController {
     this.progressPercent = null;
     this.version = null;
     this.message = null;
+    this.downloadReady = false;
+    this.verifyDownload = verifyDownload;
 
     if (!this.enabled) return;
     const parsed = new URL(feedUrl);
@@ -48,9 +50,22 @@ class UpdateController {
         : null;
     });
     this.updater.on("update-downloaded", (info) => {
-      this.state = "ready";
-      this.version = normalizedVersion(info?.version) || this.version;
-      this.progressPercent = 100;
+      this.state = "verifying";
+      void Promise.resolve(this.verifyDownload(info?.downloadedFile, info))
+        .then(() => {
+          this.downloadReady = true;
+          this.state = "ready";
+          this.version = normalizedVersion(info?.version) || this.version;
+          this.progressPercent = 100;
+          this.message = null;
+        })
+        .catch(() => {
+          this.downloadReady = false;
+          this.state = "error";
+          this.progressPercent = null;
+          this.version = null;
+          this.message = "Update publisher verification failed.";
+        });
     });
     this.updater.on("error", () => {
       this.state = "error";
@@ -99,7 +114,7 @@ class UpdateController {
 
   async applyUpdateWhenSafe() {
     if (!this.enabled) return this.getState();
-    if (this.state !== "ready") {
+    if (!this.downloadReady) {
       throw new Error("No verified update is ready to install");
     }
     const status = await this.statusClient();

@@ -34,7 +34,12 @@ from tcad_agent.control.service import (
     PlanDigestMismatchError,
 )
 from tcad_agent.control.store import RequestNotFoundError, SqliteRequestStore
-from tcad_agent.desktop.auth import DesktopAuth, DesktopSessionMiddleware
+from tcad_agent.desktop.auth import (
+    DesktopAuth,
+    DesktopSessionMiddleware,
+    DesktopShutdownGate,
+    DesktopShutdownMiddleware,
+)
 from tcad_agent.events.models import RunEvent
 from tcad_agent.ide.conversations import ConversationInputError
 from tcad_agent.ide.models import RunState
@@ -117,7 +122,9 @@ def create_app(
     package_root = Path(__file__).parent
     templates = Jinja2Templates(directory=package_root / "templates")
     app = FastAPI(title="NovAtom TCAD Agent", docs_url=None, redoc_url=None)
+    shutdown_gate = DesktopShutdownGate()
     if desktop_auth is not None:
+        app.add_middleware(DesktopShutdownMiddleware, gate=shutdown_gate)
         app.add_middleware(DesktopSessionMiddleware, auth=desktop_auth)
     app.mount("/static", StaticFiles(directory=package_root / "static"), name="static")
     app.include_router(build_ide_router(ide_services, active_supervisor))
@@ -226,8 +233,7 @@ def create_app(
     def health() -> dict[str, str]:
         return {"status": "ok", "runtime_fingerprint": active_runtime_id}
 
-    @app.get("/api/desktop/status")
-    def desktop_status() -> dict[str, bool]:
+    def has_active_work() -> bool:
         active_states = {
             RunState.QUEUED,
             RunState.RUNNING,
@@ -235,10 +241,37 @@ def create_app(
             RunState.WAITING_FOR_USER,
             RunState.PAUSED,
         }
-        return {
-            "active": bool(ide_services.store.list_runs_in_states(active_states))
-            or bool(getattr(service, "has_active_work", lambda: False)())
-        }
+        return bool(ide_services.store.list_runs_in_states(active_states)) or bool(
+            getattr(service, "has_active_work", lambda: False)()
+        )
+
+    @app.get("/api/desktop/status")
+    def desktop_status() -> dict[str, bool]:
+        return {"active": has_active_work()}
+
+    @app.post("/api/desktop/prepare-shutdown")
+    def desktop_prepare_shutdown(request: Request) -> JSONResponse:
+        if desktop_auth is None:
+            raise HTTPException(status_code=404, detail="Desktop mode is unavailable.")
+        authorization = request.headers.get("authorization", "")
+        scheme, _, candidate = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not desktop_auth.is_control_token(candidate):
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "code": "desktop_control_required",
+                    "message": "Desktop lifecycle authentication failed.",
+                },
+            )
+        if not shutdown_gate.commit_if_idle(has_active_work):
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "code": "desktop_work_active",
+                    "message": "Finish or stop active work before closing Agent Kronig.",
+                },
+            )
+        return JSONResponse(content={"ready": True})
 
     @app.get("/desktop/bootstrap")
     def desktop_bootstrap(request: Request) -> Response:

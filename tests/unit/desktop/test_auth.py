@@ -52,3 +52,39 @@ def test_desktop_auth_rejects_empty_and_malformed_tokens(
 
     assert client.get("/desktop/bootstrap").status_code == 403
     assert client.get("/desktop/bootstrap?token=%00").status_code == 403
+
+
+def test_desktop_shutdown_handshake_closes_mutating_api(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("TCAD_WORKSPACE", str(tmp_path / "runtime"))
+    token = "desktop-token-" + "c" * 32
+    auth = DesktopAuth(token)
+    client = desktop_client(tmp_path, auth)
+    assert client.get(f"/desktop/bootstrap?token={token}").status_code == 303
+
+    prepared = client.post(
+        "/api/desktop/prepare-shutdown",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert prepared.status_code == 200
+    assert prepared.json() == {"ready": True}
+    blocked = client.post(
+        "/api/requests",
+        json={"prompt": "Create a new simulation", "backend": "devsim"},
+    )
+    assert blocked.status_code == 409
+    assert blocked.json()["code"] == "desktop_shutdown_committed"
+
+
+def test_desktop_shutdown_handshake_requires_control_token(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("TCAD_WORKSPACE", str(tmp_path / "runtime"))
+    token = "desktop-token-" + "d" * 32
+    client = desktop_client(tmp_path, DesktopAuth(token))
+
+    response = client.post("/api/desktop/prepare-shutdown")
+
+    assert response.status_code == 403

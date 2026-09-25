@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import secrets
 import threading
+from collections.abc import Callable
 
 from fastapi import Request
 from fastapi.responses import JSONResponse, Response
@@ -38,6 +39,13 @@ class DesktopAuth:
             candidate, self._session_token
         )
 
+    def is_control_token(self, candidate: str) -> bool:
+        """Authenticate a shell-only lifecycle request."""
+
+        return bool(candidate) and secrets.compare_digest(
+            candidate, self._launch_token
+        )
+
     def attach_session(self, response: Response) -> None:
         response.set_cookie(
             DESKTOP_SESSION_COOKIE,
@@ -65,6 +73,7 @@ class DesktopSessionMiddleware(BaseHTTPMiddleware):
             "/health",
             "/desktop/bootstrap",
             "/api/desktop/status",
+            "/api/desktop/prepare-shutdown",
         }:
             return await call_next(request)
         if not self.auth.is_authenticated(request):
@@ -76,3 +85,60 @@ class DesktopSessionMiddleware(BaseHTTPMiddleware):
                 },
             )
         return await call_next(request)
+
+
+class DesktopShutdownGate:
+    """Atomically reject new writes once desktop shutdown is committed."""
+
+    def __init__(self) -> None:
+        self._guard = threading.Lock()
+        self._writes_in_flight = 0
+        self._committed = False
+
+    def begin_write(self) -> bool:
+        with self._guard:
+            if self._committed:
+                return False
+            self._writes_in_flight += 1
+            return True
+
+    def end_write(self) -> None:
+        with self._guard:
+            self._writes_in_flight = max(0, self._writes_in_flight - 1)
+
+    def commit_if_idle(self, has_active_work: Callable[[], bool]) -> bool:
+        with self._guard:
+            if self._writes_in_flight or has_active_work():
+                return False
+            self._committed = True
+            return True
+
+
+class DesktopShutdownMiddleware(BaseHTTPMiddleware):
+    """Track mutating API work against the desktop shutdown gate."""
+
+    def __init__(self, app: object, gate: DesktopShutdownGate) -> None:
+        super().__init__(app)  # type: ignore[arg-type]
+        self.gate = gate
+
+    async def dispatch(
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
+    ) -> Response:
+        is_write = request.method in {"POST", "PUT", "PATCH", "DELETE"}
+        is_control = request.url.path == "/api/desktop/prepare-shutdown"
+        if not is_write or is_control:
+            return await call_next(request)
+        if not self.gate.begin_write():
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "code": "desktop_shutdown_committed",
+                    "message": "Agent Kronig is closing and cannot start new work.",
+                },
+            )
+        try:
+            return await call_next(request)
+        finally:
+            self.gate.end_write()

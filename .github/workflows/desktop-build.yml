@@ -38,6 +38,7 @@ jobs:
       OPENHANDS_SUPPRESS_BANNER: "1"
       CSC_LINK: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_LINK || secrets.DESKTOP_WINDOWS_CSC_LINK }}
       CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_KEY_PASSWORD || secrets.DESKTOP_WINDOWS_CSC_KEY_PASSWORD }}
+      DESKTOP_LINUX_SIGNING_PRIVATE_KEY: ${{ secrets.DESKTOP_LINUX_SIGNING_PRIVATE_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -76,8 +77,15 @@ jobs:
       - name: Build target-native Python sidecars
         run: python scripts/build_desktop_sidecars.py
 
+      - name: Scan unpacked sidecars for application credentials
+        run: python scripts/inspect_desktop_artifacts.py desktop/resources/${{ matrix.platform == 'win' && 'win' || matrix.platform }}-${{ matrix.arch }}
+
       - name: Build native installers
         run: pnpm --dir desktop exec electron-builder --config electron-builder.yml --${{ matrix.platform }} --${{ matrix.arch }}
+
+      - name: Sign Linux update artifact
+        if: matrix.platform == 'linux'
+        run: python scripts/sign_linux_updates.py desktop/dist
 
       - name: Inventory artifacts and reject embedded credentials
         run: python scripts/inspect_desktop_artifacts.py desktop/dist

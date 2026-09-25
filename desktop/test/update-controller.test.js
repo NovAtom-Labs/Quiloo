@@ -72,6 +72,7 @@ test("tracks checks, availability, progress, and verified download readiness", a
   updater.emit("download-progress", {percent: 42.25});
   assert.equal(controller.getState().progressPercent, 42.25);
   updater.emit("update-downloaded", {version: "0.2.0"});
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(controller.getState().state, "ready");
   assert.equal(controller.getState().version, "0.2.0");
 });
@@ -94,6 +95,7 @@ test("blocks installation while backend work is active", async () => {
     statusClient: async () => ({active: true}),
   });
   updater.emit("update-downloaded", {version: "0.2.0"});
+  await new Promise((resolve) => setImmediate(resolve));
   await assert.rejects(controller.applyUpdateWhenSafe(), /active/i);
   assert.equal(controller.getState().state, "blocked");
   assert.equal(updater.installCalls, 0);
@@ -108,8 +110,34 @@ test("rechecks backend status immediately before installation", async () => {
     },
   });
   updater.emit("update-downloaded", {version: "0.2.0"});
+  await new Promise((resolve) => setImmediate(resolve));
   const state = await controller.applyUpdateWhenSafe();
   assert.equal(statusCalls, 1);
   assert.equal(updater.installCalls, 1);
   assert.equal(state.state, "installing");
+});
+
+test("retries a downloaded update after active work finishes", async () => {
+  let active = true;
+  const {controller, updater} = configured({
+    statusClient: async () => ({active}),
+  });
+  updater.emit("update-downloaded", {version: "0.2.0"});
+  await new Promise((resolve) => setImmediate(resolve));
+  await assert.rejects(controller.applyUpdateWhenSafe(), /active/i);
+  active = false;
+  const state = await controller.applyUpdateWhenSafe();
+  assert.equal(state.state, "installing");
+  assert.equal(updater.installCalls, 1);
+});
+
+test("verifies a downloaded artifact before marking it ready", async () => {
+  let verifiedPath = null;
+  const {controller, updater} = configured({
+    verifyDownload: async (downloadedFile) => { verifiedPath = downloadedFile; },
+  });
+  updater.emit("update-downloaded", {version: "0.2.0", downloadedFile: "/tmp/update.AppImage"});
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(verifiedPath, "/tmp/update.AppImage");
+  assert.equal(controller.getState().state, "ready");
 });

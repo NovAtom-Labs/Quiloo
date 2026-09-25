@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from tcad_agent.control.models import RequestState, ResearchRequest
 from tcad_agent.control.service import ControlService
 from tcad_agent.control.store import SqliteRequestStore
+from tcad_agent.desktop.auth import DesktopAuth
 from tcad_agent.desktop.config import DesktopLaunchConfig
 from tcad_agent.desktop.server import bind_desktop_socket, readiness_record
 from tcad_agent.ide.conversations import ConversationService
@@ -100,3 +101,31 @@ def test_desktop_status_includes_active_simulation_request(tmp_path: Path) -> No
     response = TestClient(create_app(control=control)).get("/api/desktop/status")
 
     assert response.json() == {"active": True}
+
+
+def test_desktop_shutdown_refuses_active_agent_run(tmp_path: Path) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    events = EventFeed(store)
+    services = IDEServices(
+        workspaces=WorkspaceManager(store),
+        conversations=ConversationService(store, events),
+        events=events,
+    )
+    token = "desktop-token-" + "e" * 32
+    client = TestClient(
+        create_app(ide=services, desktop_auth=DesktopAuth(token)),
+        follow_redirects=False,
+    )
+    root = tmp_path / "repo"
+    root.mkdir()
+    workspace = services.workspaces.open(root)
+    conversation = services.conversations.create(workspace.id, "Active run")
+    store.create_run(conversation.id, uuid4())
+
+    response = client.post(
+        "/api/desktop/prepare-shutdown",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 409
+    assert response.json()["code"] == "desktop_work_active"

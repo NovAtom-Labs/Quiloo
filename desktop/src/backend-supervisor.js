@@ -1,6 +1,7 @@
 "use strict";
 
-const {spawn} = require("node:child_process");
+const {execFile, spawn} = require("node:child_process");
+const {EventEmitter} = require("node:events");
 const path = require("node:path");
 
 const {MAX_READINESS_BYTES, parseReadinessLine} = require("./readiness");
@@ -63,8 +64,9 @@ async function defaultHealthCheck(origin, deadline) {
   return false;
 }
 
-class BackendSupervisor {
+class BackendSupervisor extends EventEmitter {
   constructor(options = {}) {
+    super();
     const launch = options.command
       ? {command: options.command, args: options.args || []}
       : resolveBackendLaunch(options);
@@ -85,6 +87,7 @@ class BackendSupervisor {
     this.diagnostics = "";
     this.spawnArguments = [];
     this.spawnEnvironment = {};
+    this.stopping = false;
   }
 
   get running() {
@@ -110,15 +113,22 @@ class BackendSupervisor {
       env: environment,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      detached: process.platform !== "win32",
     });
     this.child = child;
+    child.once("exit", (code, signal) => {
+      if (this.child !== child || this.stopping || !this.readiness) return;
+      this.readiness = null;
+      this.child = null;
+      this.emit("unexpected-exit", Object.freeze({code, signal}));
+    });
 
     try {
       const readiness = await this.#waitForReadiness(child);
       const healthy = await this.healthCheck(readiness.url, Date.now() + this.startupTimeoutMs);
       if (!healthy) throw new Error("Backend health check timed out");
-      this.readiness = readiness;
-      return Object.freeze({...readiness, launchToken: token});
+      this.readiness = Object.freeze({...readiness, launchToken: token});
+      return this.readiness;
     } catch (error) {
       await this.stop();
       throw error;
@@ -173,14 +183,41 @@ class BackendSupervisor {
     const child = this.child;
     this.child = null;
     this.readiness = null;
-    if (!child || child.exitCode !== null || child.killed) return;
+    if (!child || child.exitCode !== null || child.signalCode !== null) return;
 
-    child.kill("SIGTERM");
+    this.stopping = true;
+    await this.#signalTree(child, "SIGTERM");
     await Promise.race([
       new Promise((resolve) => child.once("exit", resolve)),
       delay(750),
     ]);
-    if (child.exitCode === null) child.kill("SIGKILL");
+    if (child.exitCode === null && child.signalCode === null) {
+      await this.#signalTree(child, "SIGKILL");
+      await Promise.race([
+        new Promise((resolve) => child.once("exit", resolve)),
+        delay(750),
+      ]);
+    }
+    this.stopping = false;
+    if (child.exitCode === null && child.signalCode === null) {
+      throw new Error("Backend process tree did not terminate");
+    }
+  }
+
+  async #signalTree(child, signal) {
+    if (process.platform === "win32") {
+      const arguments_ = ["/PID", String(child.pid), "/T"];
+      if (signal === "SIGKILL") arguments_.push("/F");
+      await new Promise((resolve) => {
+        execFile("taskkill.exe", arguments_, {windowsHide: true}, () => resolve());
+      });
+      return;
+    }
+    try {
+      process.kill(-child.pid, signal);
+    } catch (error) {
+      if (error.code !== "ESRCH") throw error;
+    }
   }
 }
 

@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import json
+import os
 import socket
 import threading
 import time
 import urllib.error
 import urllib.request
 import webbrowser
+from pathlib import Path
 
 import uvicorn
 from dotenv import load_dotenv
 
+from tcad_agent.desktop.lock import DataDirectoryLock
 from tcad_agent.web.app import create_app
 from tcad_agent.web.runtime import runtime_fingerprint
 
@@ -86,18 +89,22 @@ def run_server(
         if open_browser:
             webbrowser.open(url)
         return
-    if open_browser:
-        threading.Thread(
-            target=_open_when_ready,
-            args=(url, fingerprint),
-            daemon=True,
-        ).start()
-    uvicorn.run(
-        create_app(runtime_id=fingerprint),
-        host=host,
-        port=selected_port,
-        log_level="info",
-    )
+    runtime_root = Path(
+        os.getenv("TCAD_WORKSPACE", str(Path.cwd() / ".tcad-agent"))
+    ).resolve()
+    with DataDirectoryLock(runtime_root):
+        if open_browser:
+            threading.Thread(
+                target=_open_when_ready,
+                args=(url, fingerprint),
+                daemon=True,
+            ).start()
+        uvicorn.run(
+            create_app(runtime_id=fingerprint),
+            host=host,
+            port=selected_port,
+            log_level="info",
+        )
 
 
 def main() -> None:

@@ -632,6 +632,11 @@ dialog button { padding: 7px 12px; }
 .settings-check input { width: auto; height: auto; margin: 0; }
 .settings-check span { color: var(--muted); font-size: 0.68rem; }
 .settings-error { min-height: 1rem; margin: 0 0 12px; color: var(--red); font-size: 0.67rem; }
+.settings-updates { margin: 0 0 18px; padding: 12px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.settings-updates h3 { margin: 0 0 6px; font-size: 0.78rem; font-weight: 600; }
+.settings-updates p { margin: 0 0 10px; color: var(--muted); font-size: 0.67rem; line-height: 1.45; }
+.settings-updates > div { display: flex; gap: 8px; }
+.settings-updates button { color: #c6ced7; border: 1px solid var(--border-strong); background: transparent; }
 
 @media (max-width: 995px) {
   .ide-shell {
