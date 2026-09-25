@@ -34,8 +34,10 @@ from tcad_agent.control.service import (
     PlanDigestMismatchError,
 )
 from tcad_agent.control.store import RequestNotFoundError, SqliteRequestStore
+from tcad_agent.desktop.auth import DesktopAuth, DesktopSessionMiddleware
 from tcad_agent.events.models import RunEvent
 from tcad_agent.ide.conversations import ConversationInputError
+from tcad_agent.ide.models import RunState
 from tcad_agent.ide.paths import WorkspacePathError
 from tcad_agent.ide.store import ConversationNotFoundError, WorkspaceNotFoundError
 from tcad_agent.model_gateway.base import AgentContextPacket, AgentProposal, ModelGateway
@@ -104,6 +106,7 @@ def create_app(
     runtime_id: str | None = None,
     ide: IDEServices | None = None,
     agent_supervisor: AgentSupervisor | None = None,
+    desktop_auth: DesktopAuth | None = None,
 ) -> FastAPI:
     service = control or build_default_control()
     ide_services = ide or build_default_ide_services()
@@ -114,6 +117,8 @@ def create_app(
     package_root = Path(__file__).parent
     templates = Jinja2Templates(directory=package_root / "templates")
     app = FastAPI(title="NovAtom TCAD Agent", docs_url=None, redoc_url=None)
+    if desktop_auth is not None:
+        app.add_middleware(DesktopSessionMiddleware, auth=desktop_auth)
     app.mount("/static", StaticFiles(directory=package_root / "static"), name="static")
     app.include_router(build_ide_router(ide_services, active_supervisor))
 
@@ -220,6 +225,30 @@ def create_app(
     @app.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok", "runtime_fingerprint": active_runtime_id}
+
+    @app.get("/api/desktop/status")
+    def desktop_status() -> dict[str, bool]:
+        active_states = {
+            RunState.QUEUED,
+            RunState.RUNNING,
+            RunState.WAITING_FOR_APPROVAL,
+            RunState.WAITING_FOR_USER,
+            RunState.PAUSED,
+        }
+        return {
+            "active": bool(ide_services.store.list_runs_in_states(active_states))
+        }
+
+    @app.get("/desktop/bootstrap")
+    def desktop_bootstrap(request: Request) -> Response:
+        if desktop_auth is None:
+            raise HTTPException(status_code=404, detail="Desktop mode is unavailable.")
+        token = request.query_params.get("token", "")
+        if not desktop_auth.consume_launch_token(token):
+            raise HTTPException(status_code=403, detail="Invalid desktop launch token.")
+        response = RedirectResponse("/", status_code=303)
+        desktop_auth.attach_session(response)
+        return response
 
     @app.get("/")
     def index(request: Request) -> Response:

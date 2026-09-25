@@ -1,0 +1,63 @@
+from pathlib import Path
+
+import pytest
+
+from tcad_agent.desktop.config import DesktopLaunchConfig, default_data_dir
+
+
+def test_default_data_dir_uses_platform_conventions() -> None:
+    home = Path("/users/researcher")
+
+    assert default_data_dir("Linux", home, {}) == (
+        home / ".local" / "share" / "Agent Kronig"
+    )
+    assert default_data_dir(
+        "Linux", home, {"XDG_DATA_HOME": "/mnt/research-data"}
+    ) == Path("/mnt/research-data/Agent Kronig")
+    assert default_data_dir("Darwin", home, {}) == (
+        home / "Library" / "Application Support" / "Agent Kronig"
+    )
+    assert default_data_dir(
+        "Windows", Path("C:/Users/researcher"), {"APPDATA": "C:/Users/researcher/AppData/Roaming"}
+    ) == Path("C:/Users/researcher/AppData/Roaming/Agent Kronig")
+
+
+def test_desktop_launch_config_reads_valid_environment() -> None:
+    token = "a" * 43
+    config = DesktopLaunchConfig.from_environment(
+        {
+            "AGENT_KRONIG_DESKTOP_TOKEN": token,
+            "AGENT_KRONIG_DESKTOP_HOST": "127.0.0.1",
+            "AGENT_KRONIG_DESKTOP_PORT": "0",
+            "AGENT_KRONIG_DATA_DIR": "/tmp/agent-kronig-data",
+            "AGENT_KRONIG_DEVSIM_RUNNER": "/opt/agent-kronig/devsim-runner",
+        }
+    )
+
+    assert config.host == "127.0.0.1"
+    assert config.port == 0
+    assert config.launch_token == token
+    assert config.data_dir == Path("/tmp/agent-kronig-data").resolve()
+    assert config.protocol_version == 1
+    assert config.devsim_runner == Path("/opt/agent-kronig/devsim-runner")
+
+
+@pytest.mark.parametrize(
+    ("environment", "message"),
+    [
+        ({}, "launch token"),
+        ({"AGENT_KRONIG_DESKTOP_TOKEN": "short"}, "at least 32 bytes"),
+        (
+            {
+                "AGENT_KRONIG_DESKTOP_TOKEN": "a" * 43,
+                "AGENT_KRONIG_DESKTOP_HOST": "0.0.0.0",
+            },
+            "127.0.0.1",
+        ),
+    ],
+)
+def test_desktop_launch_config_rejects_unsafe_environment(
+    environment: dict[str, str], message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        DesktopLaunchConfig.from_environment(environment)

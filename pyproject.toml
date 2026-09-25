@@ -41,6 +41,7 @@ dev = [
 [project.scripts]
 tcad-agent = "tcad_agent.cli:app"
 tcad-agent-web = "tcad_agent.web.launcher:main"
+agent-kronig-desktop-backend = "tcad_agent.desktop.server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
