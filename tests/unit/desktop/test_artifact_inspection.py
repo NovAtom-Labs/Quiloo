@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import struct
 import sys
 import zipfile
 from pathlib import Path
@@ -66,3 +67,19 @@ def test_command_reports_a_sanitized_github_annotation(
     assert output.startswith("::error title=Desktop artifact inspection failed::")
     assert "credential pattern found in artifact" in output
     assert "planted" not in output
+
+
+def test_scanner_does_not_parse_embedded_executable_archives_as_release_zips(
+    tmp_path: Path,
+) -> None:
+    executable = tmp_path / "backend" / "agent-kronig-backend"
+    executable.parent.mkdir(parents=True)
+    executable.write_bytes(
+        b"MZfrozen-executable"
+        + struct.pack("<4s4H2LH", b"PK\x05\x06", 0, 0, 1, 1, 46, 4096, 0)
+    )
+    assert zipfile.is_zipfile(executable)
+
+    inventory = inspect_artifacts(tmp_path)
+
+    assert inventory[0][0] == "backend/agent-kronig-backend"

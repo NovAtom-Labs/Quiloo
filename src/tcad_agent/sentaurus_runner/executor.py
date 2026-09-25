@@ -2,16 +2,30 @@
 
 from __future__ import annotations
 
+import importlib
 import math
 import os
-import resource
 import signal
 import subprocess
 import time
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Protocol, cast
 
 from tcad_agent.domain.models import StrictModel
+
+
+class _ResourceModule(Protocol):
+    RLIMIT_CPU: int
+    RLIMIT_AS: int
+
+    def setrlimit(self, resource: int, limits: tuple[int, int]) -> None: ...
+
+
+resource_module = (
+    cast(_ResourceModule, importlib.import_module("resource"))
+    if os.name == "posix"
+    else None
+)
 
 
 class ExecutorResult(StrictModel):
@@ -29,6 +43,8 @@ class SentaurusExecutor:
     def execute(self, job_dir: Path, *, timeout_seconds: float) -> ExecutorResult:
         if not self.executable.is_file() or not os.access(self.executable, os.X_OK):
             raise RuntimeError("the configured Sentaurus executable is unavailable")
+        if resource_module is None:
+            raise RuntimeError("Sentaurus execution requires a POSIX execution host")
         command_file = (job_dir / "sdevice.cmd").resolve()
         if not command_file.is_file() or not command_file.is_relative_to(job_dir.resolve()):
             raise ValueError("the allowlisted command file is unavailable")
@@ -39,8 +55,14 @@ class SentaurusExecutor:
 
         def apply_limits() -> None:
             cpu_seconds = max(1, math.ceil(timeout_seconds))
-            resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds + 1))
-            resource.setrlimit(resource.RLIMIT_AS, (self.memory_bytes, self.memory_bytes))
+            resource_module.setrlimit(
+                resource_module.RLIMIT_CPU,
+                (cpu_seconds, cpu_seconds + 1),
+            )
+            resource_module.setrlimit(
+                resource_module.RLIMIT_AS,
+                (self.memory_bytes, self.memory_bytes),
+            )
 
         with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
             process = subprocess.Popen(

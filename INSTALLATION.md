@@ -8,16 +8,16 @@ Sentaurus is not installed by these steps. It must remain on a separately licens
 
 Release artifacts are produced for Linux AppImage, Debian or Ubuntu `.deb`, Windows NSIS and portable `.zip`, Intel Mac `.dmg` and `.zip`, and Apple Silicon `.dmg` and `.zip`. The native application includes its private backend and reviewed DEVSIM runner. End users do not install Python, Node.js, DEVSIM, Electron, or a browser.
 
-### Download Alpha 6
+### Download Alpha 7
 
 | System | Recommended package | Alternative |
 | --- | --- | --- |
-| Linux x86-64 | [AppImage](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.6/Agent-Kronig-0.1.0-alpha.6-linux-x64.AppImage) | [Debian package](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.6/Agent-Kronig-0.1.0-alpha.6-linux-x64.deb) |
-| Windows x86-64 | [NSIS installer](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.6/Agent-Kronig-0.1.0-alpha.6-win-x64.exe) | [Portable ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.6/Agent-Kronig-0.1.0-alpha.6-win-x64.zip) |
-| Intel Mac | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.6/Agent-Kronig-0.1.0-alpha.6-mac-x64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.6/Agent-Kronig-0.1.0-alpha.6-mac-x64.zip) |
-| Apple Silicon | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.6/Agent-Kronig-0.1.0-alpha.6-mac-arm64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.6/Agent-Kronig-0.1.0-alpha.6-mac-arm64.zip) |
+| Linux x86-64 | [AppImage](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.7/Agent-Kronig-0.1.0-alpha.7-linux-x64.AppImage) | [Debian package](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.7/Agent-Kronig-0.1.0-alpha.7-linux-x64.deb) |
+| Windows x86-64 | [NSIS installer](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.7/Agent-Kronig-0.1.0-alpha.7-win-x64.exe) | [Portable ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.7/Agent-Kronig-0.1.0-alpha.7-win-x64.zip) |
+| Intel Mac | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.7/Agent-Kronig-0.1.0-alpha.7-mac-x64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.7/Agent-Kronig-0.1.0-alpha.7-mac-x64.zip) |
+| Apple Silicon | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.7/Agent-Kronig-0.1.0-alpha.7-mac-arm64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.7/Agent-Kronig-0.1.0-alpha.7-mac-arm64.zip) |
 
-Alpha 6 packages are unsigned and updates are manual. Windows SmartScreen or macOS Gatekeeper may warn before opening them. Download only from the official `v0.1.0-alpha.6` release and verify the package against its `SHA256SUMS.txt` entry.
+Alpha 7 packages are unsigned and updates are manual. Windows SmartScreen or macOS Gatekeeper may warn before opening them. Download only from the official `v0.1.0-alpha.7` release and verify the package against its `SHA256SUMS.txt` entry.
 
 Install or open the correct package using the normal operating system workflow, open `Settings` to configure Bedrock access, then choose `Open folder` to select a local repository. Agent Kronig changes the selected files directly on that computer. The API key uses operating-system protected storage. On Linux without a secret service, it remains in memory only for that application session.
 

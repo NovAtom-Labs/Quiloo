@@ -35,7 +35,7 @@ def _scan_stream(handle: IO[bytes], label: str) -> None:
 
 
 def _scan_zip(path: Path, relative: str) -> None:
-    if not zipfile.is_zipfile(path):
+    if path.suffix.lower() != ".zip" or not zipfile.is_zipfile(path):
         return
     with zipfile.ZipFile(path) as archive:
         for member in archive.infolist():
