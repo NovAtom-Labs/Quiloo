@@ -25,10 +25,10 @@ The first complete desktop release must:
 4. Package an isolated DEVSIM runner so the pilot simulator works without a separate installation.
 5. Keep Sentaurus external and connect through the existing licensed-runner boundary.
 6. Select repositories through the operating system's native directory dialog.
-7. Preserve the browser launcher for development, headless operation, debugging, and recovery.
+7. Use the native application for source development, debugging, and recovery with no standalone
+   browser launcher.
 8. Store application data in the operating system's standard per-user data directory.
-9. Prevent simultaneous desktop and browser backends from mutating the same application-data
-   directory.
+9. Prevent multiple native backends from mutating the same application-data directory.
 10. Check for signed pilot or stable updates and install them only when no agent, simulation, or
     future hardware run is active.
 11. Produce installable Linux, Windows, and macOS artifacts from native continuous-integration
@@ -253,15 +253,13 @@ AppImage is the primary Linux package because it runs without root installation 
 Chromium runtime. DEB supports managed Ubuntu and Debian workstations. RPM packaging may be added
 after a supported customer distribution is identified.
 
-## 13. Browser Workflow Preservation
+## 13. Native Development Workflow
 
-`tcad-agent serve` and `tcad-agent serve --no-browser` remain supported. They continue to use the
-current loopback web application and are covered by the existing test suite. Desktop work must not
-move core behavior into Electron.
-
-The source-development desktop command starts Electron against the source Python backend. Browser
-and desktop development commands use distinct default data directories so they can be tested
-without corrupting or sharing mutable state.
+The source-development command starts Electron against the source Python backend. The private
+loopback service and HTML renderer remain implementation details owned by Electron. The project
+does not expose a standalone browser command, public application URL, or browser-based recovery
+path. Core scientific behavior remains outside Electron so it can be tested independently and
+used by the deterministic CLI.
 
 ## 14. Autonomous Hardware Boundary
 

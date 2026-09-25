@@ -9,7 +9,21 @@ if [[ ! -x "$REPOSITORY_ROOT/.venv/bin/python" ]]; then
   exit 1
 fi
 
-if [[ ! -x "$REPOSITORY_ROOT/desktop/node_modules/.bin/electron" ]]; then
+ELECTRON_DISTRIBUTION="$REPOSITORY_ROOT/desktop/node_modules/electron/dist"
+case "$(uname -s)" in
+  Darwin)
+    ELECTRON_EXECUTABLE="$ELECTRON_DISTRIBUTION/Electron.app/Contents/MacOS/Electron"
+    ;;
+  Linux)
+    ELECTRON_EXECUTABLE="$ELECTRON_DISTRIBUTION/electron"
+    ;;
+  *)
+    echo "This launcher supports macOS and Linux. On Windows, run pnpm --dir desktop start." >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! -x "$ELECTRON_EXECUTABLE" ]]; then
   echo "Desktop dependencies are missing. Run: pnpm --dir desktop install --frozen-lockfile" >&2
   exit 1
 fi
@@ -24,5 +38,5 @@ fi
 export TCAD_WORKSPACE="${TCAD_WORKSPACE:-$REPOSITORY_ROOT/.tcad-agent-desktop}"
 export OPENHANDS_SUPPRESS_BANNER="1"
 
-cd "$REPOSITORY_ROOT"
-exec pnpm --dir "$REPOSITORY_ROOT/desktop" start
+cd "$REPOSITORY_ROOT/desktop"
+exec "$ELECTRON_EXECUTABLE" .

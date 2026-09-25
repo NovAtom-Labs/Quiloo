@@ -8,7 +8,6 @@ from tcad_agent.control.service import ControlService
 from tcad_agent.control.store import SqliteRequestStore
 from tcad_agent.model_gateway.base import ScriptedModelGateway
 from tcad_agent.web.app import create_app
-from tcad_agent.web.launcher import DEFAULT_HOST
 
 
 class ButtonTextParser(HTMLParser):
@@ -49,7 +48,6 @@ def client(tmp_path: Path) -> TestClient:
 
 def test_root_and_health_are_local_researcher_entrypoints(tmp_path: Path) -> None:
     web = client(tmp_path)
-    assert DEFAULT_HOST == "127.0.0.1"
     health = web.get("/health").json()
     assert health["status"] == "ok"
     assert len(health["runtime_fingerprint"]) == 16

@@ -17,6 +17,15 @@ function shouldAutoStart(processLike) {
   return processLike.type === "browser";
 }
 
+function developmentIconPath(isPackaged, applicationRoot = path.resolve(__dirname, "..")) {
+  if (isPackaged) return undefined;
+  return path.join(applicationRoot, "assets", "icon.png");
+}
+
+function configureApplicationIdentity(app) {
+  app.setName("Agent Kronig");
+}
+
 function attachNavigationPolicy(webContents, allowedOrigin) {
   webContents.setWindowOpenHandler(() => ({action: "deny"}));
   webContents.on("will-navigate", (event, destination) => {
@@ -61,9 +70,11 @@ function createApplication(
   updater = require("electron-updater").autoUpdater,
 ) {
   const {app, BrowserWindow, dialog, ipcMain, safeStorage, session} = electron;
+  configureApplicationIdentity(app);
   let mainWindow = null;
   let supervisor = null;
   let settingsStore = null;
+  const windowIcon = developmentIconPath(app.isPackaged);
   const updateFeedUrl = process.env.AGENT_KRONIG_UPDATE_URL || "";
   let verifyDownload = async () => {};
   if (process.platform === "linux" && updateFeedUrl) {
@@ -136,6 +147,7 @@ function createApplication(
       backgroundColor: "#0b0f14",
       show: false,
       title: "Agent Kronig",
+      icon: windowIcon,
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
         contextIsolation: true,
@@ -306,6 +318,7 @@ function createApplication(
     });
     app.on("window-all-closed", () => app.quit());
     await app.whenReady();
+    if (windowIcon && app.dock?.setIcon) app.dock.setIcon(windowIcon);
     installPermissionPolicy(session.defaultSession);
     settingsStore = new DesktopSettingsStore({
       dataDir: app.getPath("userData"),
@@ -325,8 +338,10 @@ if (shouldAutoStart(process)) {
 
 module.exports = {
   attachNavigationPolicy,
+  configureApplicationIdentity,
   createApplication,
   createLaunchToken,
+  developmentIconPath,
   installGracefulQuit,
   installPermissionPolicy,
   shouldAutoStart,

@@ -12,9 +12,11 @@ def test_desktop_launcher_is_executable_and_uses_the_supported_entrypoint() -> N
     assert launcher.exists()
     assert os.access(launcher, os.X_OK)
     source = launcher.read_text()
-    assert "desktop/node_modules/.bin/electron" in source
+    assert 'ELECTRON_DISTRIBUTION="$REPOSITORY_ROOT/desktop/node_modules/electron/dist"' in source
+    assert "Electron.app/Contents/MacOS/Electron" in source
+    assert 'ELECTRON_EXECUTABLE="$ELECTRON_DISTRIBUTION/electron"' in source
+    assert 'exec "$ELECTRON_EXECUTABLE" .' in source
     assert "TCAD_WORKSPACE" in source
-    assert "pnpm --dir" in source
     assert "source \"$REPOSITORY_ROOT/.env\"" in source
 
 
@@ -47,6 +49,21 @@ def test_primary_docs_route_users_to_the_native_installation_guide() -> None:
     assert "docs/operations/desktop-application.md" in readme
     assert "Self-contained native installation" in installation
     assert "docs/operations/desktop-application.md" in installation
+
+
+def test_repository_exposes_no_standalone_browser_launcher() -> None:
+    readme = (ROOT / "README.md").read_text()
+    installation = (ROOT / "INSTALLATION.md").read_text()
+    operations = (ROOT / "docs" / "operations" / "desktop-application.md").read_text()
+    project = (ROOT / "pyproject.toml").read_text()
+
+    assert not (ROOT / "src" / "tcad_agent" / "web" / "launcher.py").exists()
+    assert not (ROOT / "launch_tcad_agent.command").exists()
+    assert not (ROOT / "docs" / "operations" / "local-web-app.md").exists()
+    for source in (readme, installation, operations, project):
+        assert "tcad-agent serve" not in source
+        assert "tcad-agent-web" not in source
+        assert "--no-browser" not in source
 
 
 def test_desktop_interface_exposes_update_controls() -> None:

@@ -50,9 +50,9 @@ Natural-language research request
  Evidence bundle, report, hashes, and audit ledger
 ```
 
-The local application now opens into a Linux-first repository IDE. A researcher can open a local
+The native application opens into a Linux-first repository IDE. A researcher can open a local
 Git or non-Git repository, inspect its directory tree and Git state, create a persistent
-conversation, and return to the same conversation URL after a browser or service restart.
+conversation, and return to the same conversation after an application or backend restart.
 
 ### Workbench layout
 
@@ -79,7 +79,7 @@ inserted into the page.
 7. Open Changes to inspect the run-scoped file list, exact line counts, rename metadata, action attribution, linked validation IDs, uncertainty labels for non-text changes, and unified diffs. Terminal run manifests are persisted before completion so later runs cannot rewrite historical evidence.
 8. The researcher can approve one action, approve future actions in the same permission category for the current run, deny, pause, resume, stop, refresh, or return later. Category approval expires when that run ends. Conversations, messages, run state, approvals, run-scoped grants, and normalized events are persisted locally.
 
-The selected repository is the default authority boundary. A parent agent and every delegated subagent use the same canonical workspace and policy. A subagent cannot widen access. High-risk child actions are denied, and the primary agent must request the equivalent action itself if a browser approval decision is required.
+The selected repository is the default authority boundary. A parent agent and every delegated subagent use the same canonical workspace and policy. A subagent cannot widen access. High-risk child actions are denied, and the primary agent must request the equivalent action itself when a researcher approval decision is required.
 
 Available agent tools are:
 
@@ -206,15 +206,15 @@ Selecting a repository file opens it in the central workspace. Text and code use
 source view and eligible UTF-8 text files can be edited with explicit Save and Cancel controls.
 Markdown is rendered through a restricted DOM renderer with a source toggle, JSON has a collapsible
 tree, and CSV or TSV data opens as a bounded scrollable table. PNG, JPEG, WebP, and GIF files support
-zoom and dimension inspection, while PDFs use the browser viewer. Unknown binary formats show
+zoom and dimension inspection, while PDFs use the embedded viewer. Unknown binary formats show
 metadata and a download action.
 
 Preview and edit paths are resolved against the canonical repository root. Writes are atomic and
 use a content hash to prevent overwriting a file that changed after it was opened. Traversal,
 symlinks, binaries, oversized files, credential files, private keys, `.git`, `.ssh`, and `.aws`
-content are refused for in-browser editing. Executable HTML is never rendered, unknown binaries
+content are refused for interactive editing. Executable HTML is never rendered, unknown binaries
 cannot be served inline, responses disable MIME sniffing, and text previews are capped at 1 MiB.
-Large tables and unusually long source files are bounded again in the browser to keep the local
+Large tables and unusually long source files are bounded again in the renderer to keep the native
 application responsive.
 
 ## Deliberate pilot limits
@@ -259,7 +259,7 @@ The stable product is the experiment and evidence workflow. DEVSIM and Sentaurus
 | `bundles` | Atomic evidence packaging, reports, manifests, and artifact hashes |
 | `agent` | OpenHands runtime, repository policy, normalized events, typed TCAD tools, and bounded subagents |
 | `ide` | Canonical local workspaces, persistent conversations, runs, approvals, messages, and ordered activity events |
-| `web` | Browser repository IDE, safe text editor, local HTTP API, and recoverable Server-Sent Events |
+| `web` | Native renderer assets, safe text editor, private local API, and recoverable Server-Sent Events |
 
 Every backend implements the same conceptual boundary:
 
@@ -295,7 +295,7 @@ Public DEVSIM material can be indexed locally. Proprietary Sentaurus manuals and
 ## Requirements
 
 - Linux, Windows, or macOS for the self-contained native application
-- Linux for the supported source IDE and runner workflow
+- Linux, Windows, or macOS for the supported native development workflow
 - Python `3.13`
 - a DEVSIM Python environment for real local simulations
 - an Amazon Bedrock API key for the natural-language model gateway
@@ -305,9 +305,9 @@ See [Installation and setup](INSTALLATION.md) for release and source installatio
 
 ## Native desktop application
 
-Agent Kronig is available as a self-contained native application for Linux, Windows, Intel Mac, and Apple Silicon. The application embeds its private backend and reviewed DEVSIM runtime, opens the same workbench shown in browser mode, uses the operating system folder picker, and operates directly on selected local repositories. No separate Python, Node.js, DEVSIM, Electron, or browser installation is required for an end user. Desktop settings store the Bedrock credential with operating-system protection, or keep it in memory when a Linux secret service is unavailable.
+Agent Kronig is available as a self-contained native application for Linux, Windows, Intel Mac, and Apple Silicon. The application embeds its private backend and reviewed DEVSIM runtime, uses the operating system folder picker, and operates directly on selected local repositories. No separate Python, Node.js, DEVSIM, Electron, or browser installation is required for an end user. Desktop settings store the Bedrock credential with operating-system protection, or keep it in memory when a Linux secret service is unavailable.
 
-Linux is the primary deployment target. CI also produces Windows and macOS artifacts from native runners. Sentaurus is never bundled and remains behind the separately licensed runner boundary. The existing local web application remains supported for source development and headless workflows.
+Linux is the primary deployment target. CI also produces Windows and macOS artifacts from native runners. Sentaurus is never bundled and remains behind the separately licensed runner boundary. Researchers and developers use the native application exclusively; the loopback service and HTML renderer are private implementation details supervised by Electron.
 
 ## Installation
 
@@ -374,29 +374,20 @@ The pilot template currently selects the global Claude Sonnet 4.6 Bedrock infere
 
 Never commit `.env`, API keys, signing keys, proprietary manuals, licensed examples, or generated local workspaces. Revoke and rotate any credential disclosed in a prompt, chat, log, report, or commit.
 
-## Run the Linux-local application
+## Run the native development application
 
-Start the supported Linux entrypoint from the repository:
-
-```bash
-.venv/bin/tcad-agent serve
-```
-
-Use `--no-browser` on a headless Linux session and open the printed loopback address manually:
+Install the desktop dependencies once, then start the supported development entrypoint:
 
 ```bash
-.venv/bin/tcad-agent serve --no-browser
+pnpm --dir desktop install --frozen-lockfile
+scripts/run_desktop_dev.sh
 ```
 
-The application binds only to `127.0.0.1`, normally at
-[http://127.0.0.1:8765](http://127.0.0.1:8765). The launcher reuses an existing instance only when
-its source and non-secret model configuration match the current checkout. If an older instance
-owns that port, the updated application starts on the next available loopback port. The legacy
-`tcad-agent-web` entrypoint remains available for compatibility.
+Electron starts and authenticates a private backend on an operating-system-selected loopback port. There is no supported standalone browser launcher or public application URL. A graphical desktop session is required for the product interface; headless systems retain the simulation and validation CLI but do not host the Agent Kronig workspace UI.
 
 ### Open and resume a repository workspace
 
-1. Select `Open folder` to use the native desktop picker. On headless Linux, enter an absolute repository path instead.
+1. Select `Open folder` to use the native operating-system folder picker.
 2. Select `Open path` to register the canonical path and inspect its top-level entries.
 3. Select `New conversation`, provide a title, and send the first prompt.
 4. Use Chat for the conversation and pending approvals. Permission cards lead with a plain-language explanation and keep the exact tool, category, risk, command, or path under Technical details.
@@ -404,7 +395,7 @@ owns that port, the updated application starts on the next available loopback po
 6. Use Activity for the safe operational timeline and one row per agent action. Expand an action for its exact command or output. The timeline reports what phase the run is in without exposing hidden reasoning. Raw provider reasoning and private task notes are never stored or displayed.
 7. Use Changes for the files attributable to this run. Select a text change to open its unified diff in the central workspace. Binary or size-limited comparisons are labeled explicitly instead of being guessed.
 8. Pause, resume, or stop the active run when needed. Resize both desktop dividers by pointer or keyboard, or double-click a divider to restore its default width.
-9. Bookmark or reload the resulting `/workspaces/<id>/conversations/<id>` URL to restore the workspace, conversation, messages, run state, approvals, and event-derived activity.
+9. Reopen Agent Kronig and select the saved conversation to restore the workspace, messages, run state, approvals, and event-derived activity.
 10. Ask for TCAD work in the same conversation. The agent uses typed domain operations and writes evidence back into the selected repository.
 
 Workspace metadata, conversations, messages, and IDE events are stored in
@@ -662,7 +653,6 @@ tests/                            unit, integration, and end-to-end verification
 - [Native desktop application](docs/operations/desktop-application.md)
 - [Technical architecture](docs/architecture.md)
 - [Concise product and technical brief](docs/tcad_agent_brief.md)
-- [Local web application](docs/operations/local-web-app.md)
 - [DEVSIM operations](docs/operations/devsim.md)
 - [Sentaurus integration](docs/operations/sentaurus-integration.md)
 - [Pilot acceptance](docs/testing/pilot-acceptance.md)

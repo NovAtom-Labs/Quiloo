@@ -3,7 +3,9 @@ const test = require("node:test");
 
 const {
   attachNavigationPolicy,
+  configureApplicationIdentity,
   createLaunchToken,
+  developmentIconPath,
   shouldAutoStart,
   installGracefulQuit,
   installPermissionPolicy,
@@ -55,6 +57,22 @@ test("desktop entrypoint auto-starts only in Electron's browser process", () => 
   assert.equal(shouldAutoStart({type: "browser"}), true);
   assert.equal(shouldAutoStart({type: "renderer"}), false);
   assert.equal(shouldAutoStart({}), false);
+});
+
+test("development windows use the tracked Agent Kronig icon", () => {
+  const path = require("node:path");
+  const icon = developmentIconPath(false, path.resolve(__dirname, ".."));
+
+  assert.equal(icon, path.resolve(__dirname, "../assets/icon.png"));
+  assert.equal(developmentIconPath(true, path.resolve(__dirname, "..")), undefined);
+});
+
+test("development runtime identifies itself as Agent Kronig", () => {
+  const names = [];
+
+  configureApplicationIdentity({setName(name) { names.push(name); }});
+
+  assert.deepEqual(names, ["Agent Kronig"]);
 });
 
 test("application quit waits for backend shutdown", async () => {

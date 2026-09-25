@@ -25,8 +25,8 @@ Authentication failures must remain generic and must never print the credential.
 
 ## Manual local acceptance
 
-1. Double-click `launch_tcad_agent.command`.
-2. Confirm the browser opens only at `http://127.0.0.1:8765`.
+1. Start Agent Kronig from the operating-system application launcher.
+2. Confirm the native workspace opens without launching a browser.
 3. Paste `examples/prompts/al-pn-al-equilibrium.md` and select DEVSIM.
 4. Confirm the app asks for p-region thickness, n-region thickness, and contact treatment instead of inventing them.
 5. Enter `1 um`, `1 um`, and choose the explicit DEVSIM ohmic approximation for local testing.
@@ -58,4 +58,3 @@ Authentication failures must remain generic and must never print the credential.
 ## Exit evidence
 
 Retain the local DEVSIM bundle, the signed Sentaurus bundle, exact dependency lock, commit identity, conformance report, domain-lead tolerance approval, model identifier, prompt or skill versions, and the completed checklist. Any known warning stays visible in the pilot report.
-

@@ -41,22 +41,6 @@ DEFAULT_KNOWLEDGE_INDEX = Path("knowledge-sources/index/knowledge.sqlite3")
 DEFAULT_AGENT_EVALUATIONS = Path("evaluations/agent/cases.yaml")
 
 
-@app.command("serve")
-def serve_command(
-    host: Annotated[str, typer.Option("--host")] = "127.0.0.1",
-    port: Annotated[int, typer.Option("--port", min=1, max=65535)] = 8765,
-    no_browser: Annotated[bool, typer.Option("--no-browser")] = False,
-) -> None:
-    """Start the Linux-local Agent Kronig IDE and TCAD workflow."""
-    from tcad_agent.web.launcher import run_server
-
-    try:
-        run_server(host, port, open_browser=not no_browser)
-    except ValueError as exc:
-        typer.echo(str(exc), err=True)
-        raise typer.Exit(2) from exc
-
-
 def _load_spec(path: Path) -> ExperimentSpec:
     try:
         payload = yaml.safe_load(path.read_text())

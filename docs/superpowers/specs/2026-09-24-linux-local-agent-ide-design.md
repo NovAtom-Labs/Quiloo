@@ -1,5 +1,9 @@
 # Linux-Local Agent IDE Design
 
+> Status: Superseded by the native desktop distribution. This document records the original
+> browser-based prototype and is retained only as design history. It is not an installation or
+> operation guide.
+
 ## 1. Objective
 
 Agent Kronig will become a Linux-first repository-operating TCAD agent. A researcher selects a

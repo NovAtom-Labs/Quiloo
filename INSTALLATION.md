@@ -1,6 +1,6 @@
 # Agent Kronig Installation and Setup
 
-This guide covers both the self-contained native application and a complete source installation. Most researchers should use the native application. Developers and operators who need the CLI, browser mode, or a modifiable checkout should use the Linux source procedure.
+This guide covers both the self-contained native application and a complete source installation. Most researchers should use a release installer. Developers and operators who need the scientific CLI or a modifiable checkout should use the source procedure and run the native development application.
 
 Sentaurus is not installed by these steps. It must remain on a separately licensed host and is connected through Agent Kronig's restricted remote-runner protocol.
 
@@ -12,20 +12,21 @@ Download the artifact for the machine's operating system and architecture from t
 
 Detailed platform instructions, application-data locations, update behavior, recovery, release building, and uninstall behavior are in [the desktop application operations guide](docs/operations/desktop-application.md).
 
-## Linux source installation
+## Native source installation
 
 ## 1. Supported installation profile
 
 | Component | Supported pilot configuration |
 | --- | --- |
-| Operating system | Linux workstation with a desktop session, or headless Linux with browser access on the same machine |
+| Operating system | Linux, Windows, or macOS workstation with a graphical desktop session |
 | Python | CPython 3.13 |
+| Desktop runtime | Node.js 24 and pnpm 11.19 |
 | Source control | Git |
 | Agent model | Amazon Bedrock model available to the configured account and region |
 | Local simulator | DEVSIM 2.9.1 in a separate Python environment |
 | Licensed simulator | Sentaurus on a separately configured licensed Linux host |
 
-The application binds only to `127.0.0.1`. It is not a multi-user network service and should not be exposed directly to another machine.
+Electron owns an authenticated private backend on `127.0.0.1`. There is no supported standalone browser launcher or public application URL.
 
 ## 2. System prerequisites
 
@@ -33,6 +34,7 @@ Install these packages using the workstation's package manager:
 
 - Git
 - CPython 3.13, including `venv` support
+- Node.js 24 and pnpm 11.19
 - a C and C++ build toolchain for packages that do not have a compatible wheel
 - `tmux`, recommended for stable long-running agent terminal sessions
 - `zenity` or `kdialog`, optional but required for the native desktop folder picker
@@ -146,7 +148,7 @@ The model identifier must be available to the configured Bedrock account and reg
 
 Never commit `.env`, credentials, private signing keys, proprietary Sentaurus documents, or licensed examples. Rotate any credential that appears in a prompt, terminal transcript, report, or commit.
 
-The Linux CLI does not implicitly parse `.env`. Load it into the process environment before launching:
+The scientific CLI does not implicitly parse `.env`. Load it into the process environment before invoking model-dependent commands:
 
 ```bash
 set -a
@@ -181,23 +183,16 @@ Verify the DEVSIM execution path:
 
 The run must produce a completed evidence bundle whose validation status is `passed`.
 
-## 8. Start the local application
+## 8. Start the native development application
 
-Desktop Linux:
-
-```bash
-.venv/bin/tcad-agent serve
-```
-
-Headless Linux:
+Install the desktop dependencies once and launch Electron from the repository:
 
 ```bash
-.venv/bin/tcad-agent serve --no-browser
+pnpm --dir desktop install --frozen-lockfile
+scripts/run_desktop_dev.sh
 ```
 
-Open the loopback URL printed by the server. The default is `http://127.0.0.1:8765`. If an older process owns that port, Agent Kronig chooses the next available loopback port and prints it.
-
-The server stores local state under `TCAD_WORKSPACE`, which defaults to `.tcad-agent`. This includes SQLite databases, OpenHands conversation state, event records, compiled jobs, and result bundles. Stop the service before copying this directory for backup.
+The launcher loads the ignored `.env`, starts Electron, and lets Electron supervise the authenticated private backend. It never opens or prints a browser URL. The application stores SQLite databases, OpenHands conversation state, event records, compiled jobs, and result bundles in its local application-data directory. Close Agent Kronig before copying that directory for backup.
 
 ## 9. Verify the repository agent
 
@@ -270,11 +265,7 @@ Agent Kronig must continue to refuse licensed execution until that integration i
 
 ### Native folder picker does not open
 
-Install `zenity` or `kdialog`. On headless Linux, enter the absolute repository path in the workspace screen.
-
-### The server starts on another port
-
-An older or different build owns the requested port. Use the exact URL printed by the new process, or stop the old process before restarting.
+Install `zenity` or `kdialog`, then restart the native development application.
 
 ### The model is unavailable
 
@@ -298,7 +289,7 @@ This is the safe default. Compilation can be inspected locally, but execution re
 
 ## 14. Upgrade procedure
 
-Before upgrading, stop the local server and back up `.env` and `TCAD_WORKSPACE` outside the repository. Then:
+Before upgrading, close Agent Kronig and back up `.env` and the application-data directory outside the repository. Then:
 
 ```bash
 git pull --ff-only
@@ -308,4 +299,4 @@ git pull --ff-only
 OPENHANDS_SUPPRESS_BANNER=1 .venv/bin/pytest -q
 ```
 
-Restart the service only after the verification suite passes. Do not weaken dependency pins or validation checks to force an upgrade through.
+Restart the native application only after the verification suite passes. Do not weaken dependency pins or validation checks to force an upgrade through.
