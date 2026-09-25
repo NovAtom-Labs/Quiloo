@@ -50,12 +50,12 @@ const resizedAgent = layout.resizeByKey(
 assertEqual(resizedAgent.agent, 368, "moving the right divider left widens the agent pane");
 assertDeepEqual(
   layout.resetSide({viewport: 1200, explorer: 300, agent: 470}, "agent"),
-  {mode: "desktop", explorer: 300, agent: 356, center: 544},
+  {mode: "desktop", explorer: 300, agent: 420, center: 480},
   "double-click reset restores the agent default",
 );
 assertDeepEqual(
   layout.parseStoredLayout("not-json"),
-  {explorer: 218, agent: 356},
+  {explorer: 218, agent: 420},
   "invalid persisted JSON is ignored",
 );
 assertDeepEqual(
@@ -106,7 +106,9 @@ const controller = layout.createController({
 });
 assertEqual(shell.dataset.layoutMode, "desktop", "controller applies desktop mode");
 assertEqual(shell.properties["--explorer-width"], "218px", "controller applies explorer width");
+assertEqual(shell.properties["--agent-width"], "420px", "controller applies the readable agent default");
 assertEqual(explorerHandle.attributes["aria-valuenow"], "218", "separator reports its width");
+assertEqual(agentHandle.attributes["aria-valuenow"], "420", "agent separator reports its width");
 assertEqual(typeof controller.destroy, "function", "controller exposes lifecycle cleanup");
 controller.destroy();
 assertEqual(windowListeners.pointermove, undefined, "destroy removes global pointer listener");

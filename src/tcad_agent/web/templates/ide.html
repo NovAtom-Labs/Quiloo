@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260925-6">
+    <link rel="stylesheet" href="/static/ide.css?v=20260925-7">
   </head>
   <body>
     <div class="ide-shell">
@@ -20,7 +20,13 @@
         <div class="header-actions">
           <button id="toggle-explorer-panel" class="toggle-explorer-panel" type="button" aria-controls="workspace-browser" aria-expanded="false">Repository</button>
           <button id="toggle-agent-panel" class="toggle-agent-panel" type="button" aria-controls="agent-panel" aria-expanded="false">Agent</button>
-          <img class="company-wordmark" src="/static/novatom-logo-horizontal-white.svg" alt="NovAtom Labs">
+          <span class="company-lockup" aria-label="NovAtom Labs">
+            <img class="company-atom" src="/static/novatom-atom-mark.svg" alt="" aria-hidden="true">
+            <span class="company-copy" aria-hidden="true">
+              <span class="company-name"><span class="company-nov">Nov</span><span class="company-atom-text">Atom</span></span>
+              <span class="company-labs">Labs</span>
+            </span>
+          </span>
         </div>
       </header>
 
@@ -91,7 +97,7 @@
         </section>
       </main>
 
-      <div id="agent-resizer" class="pane-resizer agent-resizer" role="separator" aria-label="Resize agent pane" aria-orientation="vertical" aria-valuemin="320" aria-valuemax="520" aria-valuenow="356" tabindex="0"></div>
+      <div id="agent-resizer" class="pane-resizer agent-resizer" role="separator" aria-label="Resize agent pane" aria-orientation="vertical" aria-valuemin="320" aria-valuemax="520" aria-valuenow="420" tabindex="0"></div>
 
       <aside id="agent-panel" class="agent-panel" aria-label="Agent conversation">
         <nav id="agent-tabs" class="agent-tabs" aria-label="Agent views" role="tablist">
@@ -166,7 +172,7 @@
     <script src="/static/file-viewer.js?v=20260924-1" defer></script>
     <script src="/static/ide-markdown.js?v=20260925-1" defer></script>
     <script src="/static/ide-events.js?v=20260925-4" defer></script>
-    <script src="/static/ide-layout.js?v=20260925-2" defer></script>
+    <script src="/static/ide-layout.js?v=20260925-3" defer></script>
     <script src="/static/ide-agent.js?v=20260925-5" defer></script>
     <script src="/static/ide-changes.js?v=20260925-3" defer></script>
     <script src="/static/ide.js?v=20260925-10" defer></script>

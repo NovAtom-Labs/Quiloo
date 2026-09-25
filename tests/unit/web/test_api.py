@@ -94,16 +94,22 @@ def test_workspace_header_separates_product_and_company_branding(tmp_path: Path)
     page = client(tmp_path).get("/").text
 
     quiloo = '<strong class="product-wordmark">Quiloo</strong>'
-    company = (
-        '<img class="company-wordmark" '
-        'src="/static/novatom-logo-horizontal-white.svg" alt="NovAtom Labs">'
+    company = '<span class="company-lockup" aria-label="NovAtom Labs">'
+    atom = (
+        '<img class="company-atom" '
+        'src="/static/novatom-atom-mark.svg" alt="" aria-hidden="true">'
     )
     assert quiloo in page
     assert company in page
+    assert atom in page
+    assert '<span class="company-nov">Nov</span>' in page
+    assert '<span class="company-atom-text">Atom</span>' in page
+    assert '<span class="company-labs">Labs</span>' in page
     assert page.index(quiloo) < page.index('id="workspace-status"') < page.index(company)
     assert "Research workspace" not in page
     assert "Local runtime" not in page
     assert 'id="run-controls" class="run-controls" hidden' in page
+    assert 'aria-valuenow="420"' in page
 
 
 def test_legacy_guided_pages_redirect_to_repository_workspace(tmp_path: Path) -> None:

@@ -2,7 +2,7 @@ body { overflow: hidden; background: var(--background); }
 
 .ide-shell {
   --explorer-width: 218px;
-  --agent-width: 356px;
+  --agent-width: 420px;
   position: relative;
   display: grid;
   grid-template-columns: var(--explorer-width) minmax(480px, 1fr) var(--agent-width);
@@ -42,7 +42,13 @@ body { overflow: hidden; background: var(--background); }
   white-space: nowrap;
 }
 .header-actions { display: flex; align-items: center; gap: 14px; padding: 0 14px; }
-.company-wordmark { display: block; width: 92px; height: 25px; object-fit: contain; object-position: right center; }
+.company-lockup { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 8px; height: 38px; }
+.company-atom { display: block; width: 34px; height: 34px; object-fit: contain; }
+.company-copy { display: grid; align-content: center; line-height: 1; }
+.company-name { color: var(--text-strong); font-family: var(--font-sans); font-size: 1.02rem; letter-spacing: -0.045em; white-space: nowrap; }
+.company-nov { font-weight: 500; }
+.company-atom-text { font-weight: 720; }
+.company-labs { margin-top: 3px; color: #9aa6c4; font: 600 0.43rem var(--font-mono); letter-spacing: 0.3em; text-transform: uppercase; }
 .guided-link, .toggle-agent-panel, .toggle-explorer-panel {
   padding: 6px 9px;
   color: #cbd2da;
@@ -624,7 +630,10 @@ dialog button { padding: 7px 12px; }
 @media (max-width: 799px) {
   .ide-shell { grid-template-columns: minmax(0, 1fr); }
   .ide-header { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .company-wordmark { width: 82px; }
+  .company-lockup { gap: 6px; }
+  .company-atom { width: 30px; height: 30px; }
+  .company-name { font-size: 0.9rem; }
+  .company-labs { font-size: 0.38rem; }
   .workspace-status { display: none; }
   .header-actions { gap: 6px; padding: 0 8px; }
   .toggle-agent-panel { display: inline-flex; align-items: center; }

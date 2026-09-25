@@ -55,7 +55,9 @@ def test_workspace_conversation_route_restores_persisted_activity(
     assert 'id="resume-run"' in restored_page.text
     assert 'id="stop-run"' in restored_page.text
     assert 'id="pending-approvals"' in restored_page.text
-    assert 'src="/static/novatom-logo-horizontal-white.svg"' in restored_page.text
+    assert 'src="/static/novatom-atom-mark.svg"' in restored_page.text
+    assert '<span class="company-nov">Nov</span>' in restored_page.text
+    assert '<span class="company-atom-text">Atom</span>' in restored_page.text
     assert 'id="explorer-resizer"' in restored_page.text
     assert 'id="agent-resizer"' in restored_page.text
     assert restored_page.text.count('role="separator"') == 2

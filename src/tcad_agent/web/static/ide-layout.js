@@ -1,7 +1,7 @@
 "use strict";
 
 (() => {
-  const DEFAULTS = {explorer: 218, agent: 356};
+  const DEFAULTS = {explorer: 218, agent: 420};
   const LIMITS = {
     explorerMin: 196,
     explorerMax: 360,
