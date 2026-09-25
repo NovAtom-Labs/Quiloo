@@ -90,6 +90,22 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert 'href="/simulate"' not in page.text
 
 
+def test_workspace_header_separates_product_and_company_branding(tmp_path: Path) -> None:
+    page = client(tmp_path).get("/").text
+
+    quiloo = '<strong class="product-wordmark">Quiloo</strong>'
+    company = (
+        '<img class="company-wordmark" '
+        'src="/static/novatom-logo-horizontal-white.svg" alt="NovAtom Labs">'
+    )
+    assert quiloo in page
+    assert company in page
+    assert page.index(quiloo) < page.index('id="workspace-status"') < page.index(company)
+    assert "Research workspace" not in page
+    assert "Local runtime" not in page
+    assert 'id="run-controls" class="run-controls" hidden' in page
+
+
 def test_legacy_guided_pages_redirect_to_repository_workspace(tmp_path: Path) -> None:
     web = client(tmp_path)
     simulation = web.get("/simulate", follow_redirects=False)

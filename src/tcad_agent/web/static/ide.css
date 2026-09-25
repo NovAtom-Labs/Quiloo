@@ -26,17 +26,13 @@ body { overflow: hidden; background: var(--background); }
 .brand {
   display: flex;
   align-items: center;
-  gap: 9px;
   height: 100%;
   min-width: 0;
   padding: 0 11px;
   border-right: 1px solid var(--border);
   text-decoration: none;
 }
-.brand-wordmark { display: block; width: 92px; height: 25px; object-fit: contain; object-position: left center; }
-.brand > span { display: grid; min-width: 0; padding-left: 9px; border-left: 1px solid var(--border-strong); line-height: 1; }
-.brand strong { color: var(--text-strong); font-size: 0.84rem; font-weight: 650; }
-.brand small { margin-top: 4px; color: var(--muted); font-size: 0.57rem; letter-spacing: 0.025em; }
+.product-wordmark { color: var(--text-strong); font-size: 0.92rem; font-weight: 680; letter-spacing: -0.018em; }
 .workspace-status {
   overflow: hidden;
   padding: 0 16px;
@@ -46,7 +42,7 @@ body { overflow: hidden; background: var(--background); }
   white-space: nowrap;
 }
 .header-actions { display: flex; align-items: center; gap: 14px; padding: 0 14px; }
-.runtime-state { color: var(--muted); font-size: 0.65rem; }
+.company-wordmark { display: block; width: 92px; height: 25px; object-fit: contain; object-position: right center; }
 .guided-link, .toggle-agent-panel, .toggle-explorer-panel {
   padding: 6px 9px;
   color: #cbd2da;
@@ -628,8 +624,8 @@ dialog button { padding: 7px 12px; }
 @media (max-width: 799px) {
   .ide-shell { grid-template-columns: minmax(0, 1fr); }
   .ide-header { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .brand-wordmark { width: 82px; }
-  .brand small, .workspace-status, .runtime-state { display: none; }
+  .company-wordmark { width: 82px; }
+  .workspace-status { display: none; }
   .header-actions { gap: 6px; padding: 0 8px; }
   .toggle-agent-panel { display: inline-flex; align-items: center; }
   .workspace-main { grid-column: 1; }

@@ -6,22 +6,21 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260925-5">
+    <link rel="stylesheet" href="/static/ide.css?v=20260925-6">
   </head>
   <body>
     <div class="ide-shell">
       <header class="ide-header">
         <a class="brand" href="/" aria-label="Quiloo workspace home">
-          <img class="brand-wordmark" src="/static/novatom-logo-horizontal-white.svg" alt="NovAtom Labs">
-          <span class="product-name"><strong>Quiloo</strong><small>Research workspace</small></span>
+          <strong class="product-wordmark">Quiloo</strong>
         </a>
         <div id="workspace-status" class="workspace-status" aria-live="polite">
           No workspace open
         </div>
         <div class="header-actions">
-          <span class="runtime-state">Local runtime</span>
           <button id="toggle-explorer-panel" class="toggle-explorer-panel" type="button" aria-controls="workspace-browser" aria-expanded="false">Repository</button>
           <button id="toggle-agent-panel" class="toggle-agent-panel" type="button" aria-controls="agent-panel" aria-expanded="false">Agent</button>
+          <img class="company-wordmark" src="/static/novatom-logo-horizontal-white.svg" alt="NovAtom Labs">
         </div>
       </header>
 
@@ -114,7 +113,7 @@
               <button id="close-agent-panel" type="button" aria-label="Close agent panel">Close</button>
             </div>
           </div>
-          <div id="run-controls" class="run-controls" aria-label="Agent run controls">
+          <div id="run-controls" class="run-controls" hidden aria-label="Agent run controls">
             <button id="pause-run" type="button" hidden>Pause</button>
             <button id="resume-run" type="button" hidden>Resume</button>
             <button id="stop-run" type="button" hidden>Stop</button>
