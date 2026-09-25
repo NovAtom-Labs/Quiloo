@@ -1,19 +1,39 @@
 import os
 import subprocess
+import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DEVSIM_PYTHON = Path(
-    os.getenv("TCAD_DEVSIM_PYTHON")
-    or PROJECT_ROOT.parent / "devsim" / ".venv" / "bin" / "python"
-)
+
+
+def resolve_devsim_python(project_root: Path) -> Path:
+    configured = os.getenv("TCAD_DEVSIM_PYTHON")
+    if configured:
+        return Path(configured)
+    candidates = (
+        project_root.parent / "devsim" / ".venv" / "bin" / "python",
+        project_root.parent / "devsim" / ".venv" / "Scripts" / "python.exe",
+    )
+    return next((path for path in candidates if path.is_file()), Path(sys.executable))
+
+
+def test_devsim_resolution_falls_back_to_the_active_python(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("TCAD_DEVSIM_PYTHON", raising=False)
+
+    assert resolve_devsim_python(tmp_path) == Path(sys.executable)
 
 
 def test_devsim_sibling_install_imports_and_reports_version() -> None:
-    assert DEVSIM_PYTHON.is_file()
+    devsim_python = resolve_devsim_python(PROJECT_ROOT)
+    assert devsim_python.is_file()
     completed = subprocess.run(
         [
-            str(DEVSIM_PYTHON),
+            str(devsim_python),
             "-c",
             "import devsim; print('DEVSIM_VERSION=' + devsim.__version__)",
         ],
