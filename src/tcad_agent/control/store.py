@@ -43,6 +43,8 @@ class RequestStore(Protocol):
         data: dict[str, JsonValue],
     ) -> RequestRecord: ...
 
+    def any_in_states(self, states: set[RequestState]) -> bool: ...
+
 
 LEGAL_TRANSITIONS: dict[RequestState, frozenset[RequestState]] = {
     RequestState.REQUESTED: frozenset(
@@ -173,6 +175,18 @@ class SqliteRequestStore:
         finally:
             connection.close()
         return self.get(request_id)
+
+    def any_in_states(self, states: set[RequestState]) -> bool:
+        if not states:
+            return False
+        values = tuple(state.value for state in states)
+        placeholders = ", ".join("?" for _ in values)
+        with self._connect() as connection:
+            row = connection.execute(
+                f"SELECT 1 FROM requests WHERE state IN ({placeholders}) LIMIT 1",
+                values,
+            ).fetchone()
+        return row is not None
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, timeout=10, isolation_level=None)

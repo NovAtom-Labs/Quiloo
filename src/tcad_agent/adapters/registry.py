@@ -9,6 +9,7 @@ from typing import Protocol
 from tcad_agent.adapters.base import Adapter
 from tcad_agent.adapters.devsim.compiler import DevsimAdapter
 from tcad_agent.adapters.sentaurus.compiler import SentaurusAdapter
+from tcad_agent.desktop.devsim_runner import DevsimSidecarRunner
 from tcad_agent.runners.local import LocalRunner
 from tcad_agent.runners.models import CompiledJob, NativeRunResult, RunBudget
 from tcad_agent.runners.remote import RemoteRunnerConfig, RemoteSentaurusRunner
@@ -31,6 +32,12 @@ class BackendBinding:
 def get_backend(backend: str) -> BackendBinding:
     """Return the installed backend binding or refuse at one explicit seam."""
     if backend == "devsim":
+        packaged_runner = os.getenv("AGENT_KRONIG_DEVSIM_RUNNER")
+        if packaged_runner:
+            return BackendBinding(
+                adapter=DevsimAdapter.from_defaults(),
+                runner=DevsimSidecarRunner(Path(packaged_runner)),
+            )
         devsim_venv = Path.cwd().parent / "devsim" / ".venv"
         default_devsim_python = (
             devsim_venv / "Scripts" / "python.exe"

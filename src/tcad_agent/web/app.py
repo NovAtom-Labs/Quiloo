@@ -237,6 +237,7 @@ def create_app(
         }
         return {
             "active": bool(ide_services.store.list_runs_in_states(active_states))
+            or bool(getattr(service, "has_active_work", lambda: False)())
         }
 
     @app.get("/desktop/bootstrap")

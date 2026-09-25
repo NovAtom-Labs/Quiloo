@@ -1,0 +1,40 @@
+appId: com.novatomlabs.agentkronig
+productName: Agent Kronig
+asar: true
+directories:
+  output: dist
+  buildResources: assets
+files:
+  - package.json
+  - src/**/*
+  - node_modules/**/*
+extraResources:
+  - from: resources/${os}-${arch}/backend
+    to: sidecars/backend
+  - from: resources/${os}-${arch}/devsim
+    to: sidecars/devsim
+  - from: ../skills
+    to: skills
+  - from: ../knowledge-sources
+    to: knowledge-sources
+artifactName: Agent-Kronig-${version}-${os}-${arch}.${ext}
+mac:
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  target:
+    - dmg
+    - zip
+win:
+  target:
+    - nsis
+    - zip
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+linux:
+  category: Science
+  target:
+    - AppImage
+    - deb

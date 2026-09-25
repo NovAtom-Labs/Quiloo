@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const {BackendSupervisor} = require("./backend-supervisor");
+const {UpdateController} = require("./update-controller");
 
 function createLaunchToken() {
   return crypto.randomBytes(32).toString("base64url");
@@ -40,10 +41,26 @@ function installGracefulQuit(app, stopBackend) {
   });
 }
 
-function createApplication(electron = require("electron")) {
+function createApplication(
+  electron = require("electron"),
+  updater = require("electron-updater").autoUpdater,
+) {
   const {app, BrowserWindow, dialog, ipcMain} = electron;
   let mainWindow = null;
   let supervisor = null;
+  const updateController = new UpdateController({
+    updater,
+    feedUrl: process.env.AGENT_KRONIG_UPDATE_URL || "",
+    channel: process.env.AGENT_KRONIG_UPDATE_CHANNEL || "stable",
+    statusClient: async () => {
+      if (!supervisor?.readiness) return {active: true};
+      const response = await fetch(`${supervisor.readiness.url}/api/desktop/status`, {
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Desktop activity status is unavailable");
+      return response.json();
+    },
+  });
 
   const desktopInfo = () => Object.freeze({
     application: "Agent Kronig",
@@ -58,12 +75,26 @@ function createApplication(electron = require("electron")) {
   }
 
   function backendOptions() {
+    const projectRoot = path.resolve(__dirname, "../..");
+    const resourceRoot = app.isPackaged ? process.resourcesPath : projectRoot;
     const options = {
       dataDir: app.getPath("userData"),
       tokenFactory: createLaunchToken,
+      startupTimeoutMs: app.isPackaged ? 120000 : 15000,
       isPackaged: app.isPackaged,
       resourcesPath: process.resourcesPath,
-      projectRoot: path.resolve(__dirname, "../.."),
+      projectRoot,
+      environment: {
+        ...process.env,
+        TCAD_KNOWLEDGE_INDEX: path.join(
+          resourceRoot,
+          "knowledge-sources",
+          "index",
+          "knowledge.sqlite3",
+        ),
+        TCAD_SKILLS_ROOT: path.join(resourceRoot, "skills"),
+        OPENHANDS_SUPPRESS_BANNER: "1",
+      },
     };
     if (app.isPackaged) {
       const suffix = process.platform === "win32" ? ".exe" : "";
@@ -156,9 +187,12 @@ function createApplication(electron = require("electron")) {
       });
     });
     ipcMain.handle("desktop:get-info", () => desktopInfo());
-    ipcMain.handle("desktop:get-update-state", () => ({state: "not-configured"}));
-    ipcMain.handle("desktop:check-for-updates", () => ({state: "not-configured"}));
-    ipcMain.handle("desktop:apply-update-when-safe", () => ({state: "not-configured"}));
+    ipcMain.handle("desktop:get-update-state", () => updateController.getState());
+    ipcMain.handle("desktop:check-for-updates", () => updateController.checkForUpdates());
+    ipcMain.handle(
+      "desktop:apply-update-when-safe",
+      () => updateController.applyUpdateWhenSafe(),
+    );
   }
 
   async function stopBackend() {

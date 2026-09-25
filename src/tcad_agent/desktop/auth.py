@@ -61,7 +61,11 @@ class DesktopSessionMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: RequestResponseEndpoint,
     ) -> Response:
-        if request.url.path in {"/health", "/desktop/bootstrap"}:
+        if request.url.path in {
+            "/health",
+            "/desktop/bootstrap",
+            "/api/desktop/status",
+        }:
             return await call_next(request)
         if not self.auth.is_authenticated(request):
             return JSONResponse(

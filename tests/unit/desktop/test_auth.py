@@ -23,6 +23,7 @@ def test_desktop_session_requires_one_use_bootstrap_token(
     client = desktop_client(tmp_path, auth)
 
     assert client.get("/health").status_code == 200
+    assert client.get("/api/desktop/status").json() == {"active": False}
     assert client.get("/").status_code == 401
     assert client.get("/static/ide.css").status_code == 401
 

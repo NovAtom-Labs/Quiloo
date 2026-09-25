@@ -114,6 +114,15 @@ class ControlService:
         self.clarifications = ClarificationGate()
         self.workspace.mkdir(parents=True, exist_ok=True)
 
+    def has_active_work(self) -> bool:
+        return self.store.any_in_states(
+            {
+                RequestState.COMPILED,
+                RequestState.RUNNING,
+                RequestState.VALIDATING,
+            }
+        )
+
     def submit(self, prompt: str, *, backend: str = "devsim") -> RequestView:
         record = self.store.create(ResearchRequest(prompt=prompt))
         ledger = self._ledger(record.id)

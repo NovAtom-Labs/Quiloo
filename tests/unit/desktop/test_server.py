@@ -4,6 +4,9 @@ from uuid import uuid4
 
 from fastapi.testclient import TestClient
 
+from tcad_agent.control.models import RequestState, ResearchRequest
+from tcad_agent.control.service import ControlService
+from tcad_agent.control.store import SqliteRequestStore
 from tcad_agent.desktop.config import DesktopLaunchConfig
 from tcad_agent.desktop.server import bind_desktop_socket, readiness_record
 from tcad_agent.ide.conversations import ConversationService
@@ -11,6 +14,7 @@ from tcad_agent.ide.events import EventFeed
 from tcad_agent.ide.models import RunState
 from tcad_agent.ide.store import SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
+from tcad_agent.model_gateway.base import ScriptedModelGateway
 from tcad_agent.web.app import create_app
 from tcad_agent.web.ide_routes import IDEServices
 
@@ -74,3 +78,25 @@ def test_desktop_status_reports_active_run_state(tmp_path: Path) -> None:
 
     store.transition_run(run.id, run.revision, RunState.COMPLETED)
     assert client.get("/api/desktop/status").json() == {"active": False}
+
+
+def test_desktop_status_includes_active_simulation_request(tmp_path: Path) -> None:
+    store = SqliteRequestStore(tmp_path / "requests.sqlite3")
+    record = store.create(ResearchRequest(prompt="Run the reviewed experiment"))
+    for state in (
+        RequestState.SPEC_DRAFTED,
+        RequestState.SPEC_VALIDATED,
+        RequestState.USER_CONFIRMATION_REQUIRED,
+        RequestState.COMPILED,
+        RequestState.RUNNING,
+    ):
+        record = store.transition(record.id, record.revision, state, {})
+    control = ControlService(
+        store=store,
+        gateway=ScriptedModelGateway(()),
+        workspace=tmp_path / "workspace",
+    )
+
+    response = TestClient(create_app(control=control)).get("/api/desktop/status")
+
+    assert response.json() == {"active": True}

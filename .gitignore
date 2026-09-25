@@ -10,6 +10,7 @@ build/
 dist/
 desktop/dist/
 desktop/node_modules/
+desktop/resources/
 .coverage
 htmlcov/
 .DS_Store

@@ -3,12 +3,26 @@ from pathlib import Path
 import pytest
 
 from tcad_agent.adapters.registry import BackendAdapterUnavailable, get_backend
+from tcad_agent.desktop.devsim_runner import DevsimSidecarRunner
 
 
 def test_devsim_backend_binding_owns_adapter_and_runner() -> None:
     binding = get_backend("devsim")
 
     assert binding.adapter.manifest.backend == "devsim"
+
+
+def test_devsim_backend_uses_packaged_sidecar_when_configured(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    runner = tmp_path / "agent-kronig-devsim"
+    runner.write_text("fixed sidecar")
+    monkeypatch.setenv("AGENT_KRONIG_DEVSIM_RUNNER", str(runner))
+
+    binding = get_backend("devsim")
+
+    assert isinstance(binding.runner, DevsimSidecarRunner)
+    assert binding.runner.executable == runner.resolve()
 
 
 def test_sentaurus_binding_is_installed_but_execution_is_unconfigured(

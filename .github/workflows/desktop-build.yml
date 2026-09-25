@@ -1,0 +1,89 @@
+name: Desktop installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "desktop-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            runner: ubuntu-latest
+            platform: linux
+            arch: x64
+          - name: Windows x64
+            runner: windows-latest
+            platform: win
+            arch: x64
+          - name: macOS Intel
+            runner: macos-15-intel
+            platform: mac
+            arch: x64
+          - name: macOS Apple Silicon
+            runner: macos-15
+            platform: mac
+            arch: arm64
+
+    runs-on: ${{ matrix.runner }}
+    env:
+      OPENHANDS_SUPPRESS_BANNER: "1"
+      CSC_LINK: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_LINK || secrets.DESKTOP_WINDOWS_CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_KEY_PASSWORD || secrets.DESKTOP_WINDOWS_CSC_KEY_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+          run_install: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: pnpm
+          cache-dependency-path: desktop/pnpm-lock.yaml
+
+      - name: Install Python application and build tools
+        run: python -m pip install --upgrade pip "pyinstaller==6.16.0" "devsim==2.9.1" -e ".[agent,knowledge,dev]"
+
+      - name: Build reviewed knowledge index
+        run: tcad-agent knowledge build --manifest knowledge-sources/manifests/sources.yaml --root . --index knowledge-sources/index/knowledge.sqlite3
+
+      - name: Verify Python application
+        run: pytest -q
+
+      - name: Install locked desktop dependencies
+        run: pnpm --dir desktop install --frozen-lockfile
+
+      - name: Verify desktop shell
+        run: pnpm --dir desktop test
+
+      - name: Build target-native Python sidecars
+        run: python scripts/build_desktop_sidecars.py
+
+      - name: Build native installers
+        run: pnpm --dir desktop exec electron-builder --config electron-builder.yml --${{ matrix.platform }} --${{ matrix.arch }}
+
+      - name: Inventory artifacts and reject embedded credentials
+        run: python scripts/inspect_desktop_artifacts.py desktop/dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-kronig-${{ matrix.platform }}-${{ matrix.arch }}
+          path: desktop/dist/*
+          if-no-files-found: error
