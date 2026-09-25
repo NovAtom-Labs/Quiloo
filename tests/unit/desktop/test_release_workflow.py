@@ -57,3 +57,24 @@ def test_release_workflow_limits_write_permission_and_publishes_a_prerelease() -
     assert "--prerelease" in commands
     assert "--verify-tag" in commands
     assert release["steps"][-1]["env"] == {"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}
+
+
+def test_signing_secrets_are_scoped_to_the_steps_and_platforms_that_need_them() -> None:
+    workflow = load_workflow()
+    build = workflow["jobs"]["build"]
+    assert build["env"] == {"OPENHANDS_SUPPRESS_BANNER": "1"}
+
+    steps = {step.get("name"): step for step in build["steps"] if "name" in step}
+    installer_env = steps["Build native installers"]["env"]
+    assert set(installer_env) == {
+        "CSC_LINK",
+        "CSC_KEY_PASSWORD",
+        "CSC_IDENTITY_AUTO_DISCOVERY",
+    }
+    assert "matrix.platform == 'mac'" in installer_env["CSC_LINK"]
+    assert "matrix.platform == 'win'" in installer_env["CSC_LINK"]
+    assert "matrix.platform == 'mac'" in installer_env["CSC_KEY_PASSWORD"]
+    assert "matrix.platform == 'win'" in installer_env["CSC_KEY_PASSWORD"]
+    assert steps["Sign Linux update artifact"]["env"] == {
+        "DESKTOP_LINUX_SIGNING_PRIVATE_KEY": "${{ secrets.DESKTOP_LINUX_SIGNING_PRIVATE_KEY }}"
+    }

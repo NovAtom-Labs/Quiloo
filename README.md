@@ -204,4 +204,4 @@ Live Bedrock and licensed Sentaurus tests are opt-in. Ordinary local verificatio
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE). Third-party simulators, models, services, data, and documentation retain their own licenses and access restrictions.
+This project is licensed under the [Apache License 2.0](LICENSE). Third-party simulators, models, services, data, and documentation retain their own licenses and access restrictions.

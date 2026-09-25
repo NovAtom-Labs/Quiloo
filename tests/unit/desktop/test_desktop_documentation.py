@@ -97,6 +97,14 @@ def test_readme_leads_with_native_alpha_downloads() -> None:
             assert readme.index(phrase) < source_setup
 
 
+def test_readme_reports_the_repository_license() -> None:
+    readme = (ROOT / "README.md").read_text()
+    license_text = (ROOT / "LICENSE").read_text()
+
+    assert "Apache License 2.0" in readme
+    assert "Apache License" in license_text
+
+
 def test_alpha_release_and_community_documents_are_complete() -> None:
     release_notes = (ROOT / "docs" / "releases" / "v0.1.0-alpha.1.md").read_text()
     security = (ROOT / "SECURITY.md").read_text()

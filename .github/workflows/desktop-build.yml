@@ -54,10 +54,6 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       OPENHANDS_SUPPRESS_BANNER: "1"
-      CSC_LINK: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_LINK || secrets.DESKTOP_WINDOWS_CSC_LINK }}
-      CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_KEY_PASSWORD || secrets.DESKTOP_WINDOWS_CSC_KEY_PASSWORD }}
-      CSC_IDENTITY_AUTO_DISCOVERY: ${{ ((matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_LINK != '') || (matrix.platform == 'win' && secrets.DESKTOP_WINDOWS_CSC_LINK != '')) && 'true' || 'false' }}
-      DESKTOP_LINUX_SIGNING_PRIVATE_KEY: ${{ secrets.DESKTOP_LINUX_SIGNING_PRIVATE_KEY }}
 
     steps:
       - uses: actions/checkout@v4
@@ -101,10 +97,16 @@ jobs:
 
       - name: Build native installers
         run: pnpm --dir desktop exec electron-builder --config electron-builder.yml --${{ matrix.platform }} --${{ matrix.arch }}
+        env:
+          CSC_LINK: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_LINK || matrix.platform == 'win' && secrets.DESKTOP_WINDOWS_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_KEY_PASSWORD || matrix.platform == 'win' && secrets.DESKTOP_WINDOWS_CSC_KEY_PASSWORD || '' }}
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ ((matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_LINK != '') || (matrix.platform == 'win' && secrets.DESKTOP_WINDOWS_CSC_LINK != '')) && 'true' || 'false' }}
 
       - name: Sign Linux update artifact
         if: matrix.platform == 'linux'
         run: python scripts/sign_linux_updates.py desktop/dist
+        env:
+          DESKTOP_LINUX_SIGNING_PRIVATE_KEY: ${{ secrets.DESKTOP_LINUX_SIGNING_PRIVATE_KEY }}
 
       - name: Inventory artifacts and reject embedded credentials
         run: python scripts/inspect_desktop_artifacts.py desktop/dist
