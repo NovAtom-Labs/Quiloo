@@ -37,7 +37,7 @@ body { overflow: hidden; background: var(--background); }
   align-items: baseline;
   gap: 0.38rem;
   color: var(--text-strong);
-  font-family: var(--font-sans, Inter, ui-sans-serif, system-ui, sans-serif);
+  font-family: var(--font-display);
   line-height: 1;
   white-space: nowrap;
 }

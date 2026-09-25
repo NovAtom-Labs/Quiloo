@@ -46,7 +46,13 @@ tcad-agent-web = "tcad_agent.web.launcher:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-tcad_agent = ["**/*.yaml", "**/*.j2", "web/templates/*.html", "web/static/*"]
+tcad_agent = [
+  "**/*.yaml",
+  "**/*.j2",
+  "web/templates/*.html",
+  "web/static/*",
+  "web/static/fonts/*",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -117,6 +117,27 @@ def test_workspace_header_separates_product_and_company_branding(tmp_path: Path)
     assert 'aria-valuenow="420"' in page
 
 
+def test_typography_assets_are_self_hosted_and_served(tmp_path: Path) -> None:
+    web = client(tmp_path)
+    theme = web.get("/static/theme.css")
+
+    assert theme.status_code == 200
+    assert '--font-sans: "IBM Plex Sans"' in theme.text
+    assert '--font-mono: "IBM Plex Mono"' in theme.text
+    assert "https://" not in theme.text
+
+    font_paths = (
+        "/static/fonts/ibm-plex-sans-roman.woff2",
+        "/static/fonts/ibm-plex-sans-italic.woff2",
+        "/static/fonts/ibm-plex-mono-roman.woff2",
+        "/static/fonts/ibm-plex-mono-italic.woff2",
+    )
+    for font_path in font_paths:
+        response = web.get(font_path)
+        assert response.status_code == 200
+        assert response.content.startswith(b"wOF2")
+
+
 def test_file_viewer_uses_one_compact_toolbar(tmp_path: Path) -> None:
     page = client(tmp_path).get("/").text
 
@@ -147,9 +168,9 @@ def test_legacy_guided_pages_redirect_to_repository_workspace(tmp_path: Path) ->
 def test_workspace_uses_scientific_theme(tmp_path: Path) -> None:
     web = client(tmp_path)
     workspace_page = web.get("/")
-    theme = web.get("/static/theme.css?v=20260924-1")
+    theme = web.get("/static/theme.css?v=20260925-1")
 
-    assert 'href="/static/theme.css?v=20260924-1"' in workspace_page.text
+    assert 'href="/static/theme.css?v=20260925-1"' in workspace_page.text
     assert theme.status_code == 200
     assert theme.headers["content-type"].startswith("text/css")
 
