@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-Quiloo will become a Linux-first repository-operating TCAD agent. A researcher selects a
+Agent Kronig will become a Linux-first repository-operating TCAD agent. A researcher selects a
 repository, gives the agent a task in natural language, and watches the agent inspect files,
 edit the repository, run commands, execute simulations, diagnose failures, and validate the
 result through an iterative OpenHands conversation.
@@ -20,7 +20,7 @@ results, and deterministic validation.
 
 The first complete version must let a researcher:
 
-1. Start Quiloo on a supported Linux machine and open it in a browser.
+1. Start Agent Kronig on a supported Linux machine and open it in a browser.
 2. Select an existing Git or non-Git repository as a workspace.
 3. Start, pause, resume, and reopen an agent conversation for that workspace.
 4. Ask the agent to inspect, create, edit, search, and validate repository files.
@@ -36,13 +36,13 @@ The first complete version must let a researcher:
 
 ## 3. Deployment Model
 
-Quiloo is a local service with a browser-based IDE shell.
+Agent Kronig is a local service with a browser-based IDE shell.
 
 ```text
 Browser at localhost
         |
         v
-Quiloo local service
+Agent Kronig local service
         |
         +-- Workspace manager
         +-- Permission broker
@@ -57,7 +57,7 @@ Quiloo local service
 ```
 
 The initial distribution uses Python, FastAPI, and the existing frontend stack. It exposes only
-the loopback interface by default. A command such as `quiloo serve` starts the service and
+the loopback interface by default. The `tcad-agent serve` command starts the service and
 opens the browser. The implementation must use POSIX behavior and must not depend on macOS
 launchers, AppleScript, or platform-specific file APIs.
 
@@ -264,7 +264,7 @@ workflow. They become views within the larger workspace instead of the primary n
 
 ### 5.9 Delegated subagents
 
-The primary OpenHands agent may delegate bounded work through the SDK task tool. Quiloo registers
+The primary OpenHands agent may delegate bounded work through the SDK task tool. Agent Kronig registers
 the SDK's code-explorer, command-runner, and general-purpose agent definitions, plus reviewed
 project agent definitions stored under `.agents/agents`. Delegated work inherits the parent
 workspace, model, persistence directory, budgets, and confirmation policy.
@@ -392,7 +392,7 @@ enterprise profile may use a dedicated worker user, namespaces, seccomp, and net
 
 ## 9. File Changes, Diff, and Checkpoints
 
-Agent file writes are atomic. Before the first write in a run, Quiloo records the baseline content
+Agent file writes are atomic. Before the first write in a run, Agent Kronig records the baseline content
 hash of affected files. After each write it emits a file-changed event and updates the visible
 diff.
 
@@ -400,7 +400,7 @@ Checkpoints store content-addressed patches and metadata rather than creating au
 commits. A researcher can restore one file or the complete checkpoint. Restoration itself is a
 visible workspace mutation and never discards unrelated changes silently.
 
-Quiloo distinguishes pre-existing user changes from agent changes. It must not overwrite,
+Agent Kronig distinguishes pre-existing user changes from agent changes. It must not overwrite,
 revert, stage, or commit unrelated user work. If an intended edit conflicts with a file that
 changed after the agent read it, the write fails with a stale-content observation and the agent
 must reread and reconcile the file.

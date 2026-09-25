@@ -33,7 +33,7 @@ function toolCompleted(id, actionId, toolName, output, subagent = null, runId = 
   });
 }
 
-const view = globalThis.QuilooIDEEvents.createRunPresentation();
+const view = globalThis.AgentKronigIDEEvents.createRunPresentation();
 view.accept(event(1, "conversation_created"));
 view.accept(event(2, "run_started", {run_id: "run-1"}));
 view.accept(toolStarted(11, "action-1", "terminal", "Run focused tests"));
@@ -91,7 +91,7 @@ assertEqual(snapshot.steps.length, 1, "latest run does not inherit earlier tool 
 assertEqual(snapshot.steps[0].output, "second run only", "latest run evidence is isolated");
 assertEqual(view.snapshot("run-1").steps.length, 2, "an earlier run remains independently retrievable");
 
-const restored = globalThis.QuilooIDEEvents.createRunPresentation();
+const restored = globalThis.AgentKronigIDEEvents.createRunPresentation();
 [
   event(1, "conversation_created"),
   event(2, "run_started", {run_id: "run-1"}),

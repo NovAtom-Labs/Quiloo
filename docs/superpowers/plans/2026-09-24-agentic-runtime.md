@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Connect the local Quiloo IDE to a persistent OpenHands runtime that can inspect and edit a selected repository, execute commands, invoke typed TCAD tools, delegate bounded tasks to subagents, request approval for risky actions, stream activity, and resume after browser or service restarts.
+**Goal:** Connect the local Agent Kronig IDE to a persistent OpenHands runtime that can inspect and edit a selected repository, execute commands, invoke typed TCAD tools, delegate bounded tasks to subagents, request approval for risky actions, stream activity, and resume after browser or service restarts.
 
-**Architecture:** Keep the existing SQLite workspace, conversation, and event contracts as the product record. Add a runtime supervisor that owns OpenHands conversations and maps SDK events into those contracts. OpenHands supplies the file editor, terminal, task tracker, and task delegation tools; Quiloo supplies the simulator-neutral TCAD tool, repository policy, state transitions, API, and browser presentation.
+**Architecture:** Keep the existing SQLite workspace, conversation, and event contracts as the product record. Add a runtime supervisor that owns OpenHands conversations and maps SDK events into those contracts. OpenHands supplies the file editor, terminal, task tracker, and task delegation tools; Agent Kronig supplies the simulator-neutral TCAD tool, repository policy, state transitions, API, and browser presentation.
 
 **Tech Stack:** Python 3.13, OpenHands SDK and Tools 1.49.4, Amazon Bedrock through LiteLLM, FastAPI, SQLite WAL, Server-Sent Events, vanilla JavaScript, pytest, Ruff, mypy
 
@@ -193,7 +193,7 @@ Run: `.venv/bin/pytest tests/unit/agent/test_events.py tests/unit/agent/test_sup
 
 - [ ] **Step 3: Build the production OpenHands agent**
 
-Construct `LLM` from the existing Bedrock environment contract. Register OpenHands `TerminalTool`, `FileEditorTool`, `TaskTrackerTool`, `TaskToolSet`, the built-in subagent definitions, project `.agents/agents` definitions, and `TcadDomainTool`. Use the default condenser, a bounded iteration count, a persistence directory beneath the Quiloo runtime root, `visualizer=None`, and `ConfirmRisky` with `WorkspaceSecurityAnalyzer`.
+Construct `LLM` from the existing Bedrock environment contract. Register OpenHands `TerminalTool`, `FileEditorTool`, `TaskTrackerTool`, `TaskToolSet`, the built-in subagent definitions, project `.agents/agents` definitions, and `TcadDomainTool`. Use the default condenser, a bounded iteration count, a persistence directory beneath the Agent Kronig runtime root, `visualizer=None`, and `ConfirmRisky` with `WorkspaceSecurityAnalyzer`.
 
 - [ ] **Step 4: Map SDK events into stable product events**
 
@@ -232,7 +232,7 @@ git commit -m "feat: connect persistent OpenHands runtime"
 
 - [ ] **Step 1: Write a deterministic OpenHands integration test**
 
-Use `TestLLM` tool-call messages to make the primary agent view a fixture file, edit it, run its tests, delegate a read-only review, and finish. Assert the repository content, command observation, task observation, final assistant message, and ordered Quiloo events. Use a temporary Git repository and no network.
+Use `TestLLM` tool-call messages to make the primary agent view a fixture file, edit it, run its tests, delegate a read-only review, and finish. Assert the repository content, command observation, task observation, final assistant message, and ordered Agent Kronig events. Use a temporary Git repository and no network.
 
 - [ ] **Step 2: Run the integration test and confirm missing runtime wiring**
 

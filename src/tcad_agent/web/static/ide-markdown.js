@@ -148,6 +148,6 @@
     return container;
   }
 
-  globalThis.QuilooMarkdown = {blocks, render, safeLink};
-  if (globalThis.QuilooFileViewer) globalThis.QuilooFileViewer.markdownBlocks = blocks;
+  globalThis.AgentKronigMarkdown = {blocks, render, safeLink};
+  if (globalThis.AgentKronigFileViewer) globalThis.AgentKronigFileViewer.markdownBlocks = blocks;
 })();

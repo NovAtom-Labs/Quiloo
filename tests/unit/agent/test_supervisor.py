@@ -260,7 +260,7 @@ def test_approve_category_grants_only_the_current_run(services) -> None:
         "action-1",
         "terminal",
         "HIGH",
-        "Quiloo wants to change Git history or send changes online.",
+        "Agent Kronig wants to change Git history or send changes online.",
         {"command": "git push"},
         permission_category="git_mutation",
     )

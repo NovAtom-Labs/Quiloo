@@ -260,34 +260,34 @@ def permission_category(workspace: Path, event: ActionEvent) -> PermissionCatego
 
 _APPROVAL_EXPLANATIONS = {
     PermissionCategory.EXTERNAL_FILE_ACCESS: (
-        "Quiloo wants to access a file outside the opened project."
+        "Agent Kronig wants to access a file outside the opened project."
     ),
     PermissionCategory.SENSITIVE_FILE_ACCESS: (
-        "Quiloo wants to access a file that may contain passwords or credentials."
+        "Agent Kronig wants to access a file that may contain passwords or credentials."
     ),
     PermissionCategory.PACKAGE_INSTALLATION: (
-        "Quiloo wants to install or update software on this computer."
+        "Agent Kronig wants to install or update software on this computer."
     ),
     PermissionCategory.NETWORK_ACCESS: (
-        "Quiloo wants to connect to the internet or transfer data."
+        "Agent Kronig wants to connect to the internet or transfer data."
     ),
     PermissionCategory.REMOTE_EXECUTION: (
-        "Quiloo wants to connect to another computer and run a remote operation."
+        "Agent Kronig wants to connect to another computer and run a remote operation."
     ),
     PermissionCategory.DESTRUCTIVE_COMMAND: (
-        "Quiloo wants to delete files or stop a running process."
+        "Agent Kronig wants to delete files or stop a running process."
     ),
     PermissionCategory.GIT_MUTATION: (
-        "Quiloo wants to change Git history or send changes to a remote repository."
+        "Agent Kronig wants to change Git history or send changes to a remote repository."
     ),
     PermissionCategory.SYSTEM_CHANGE: (
-        "Quiloo wants to change system settings, permissions, or managed services."
+        "Agent Kronig wants to change system settings, permissions, or managed services."
     ),
     PermissionCategory.COMPLEX_SHELL: (
-        "Quiloo wants to run a combined shell command that can perform several operations."
+        "Agent Kronig wants to run a combined shell command that can perform several operations."
     ),
     PermissionCategory.UNRECOGNIZED_ACTION: (
-        "Quiloo wants to perform a higher-risk action that it cannot classify more narrowly."
+        "Agent Kronig wants to perform a higher-risk action that it cannot classify more narrowly."
     ),
 }
 
@@ -336,7 +336,7 @@ def action_summary(event: ActionEvent) -> str:
 
 
 class WorkspaceSecurityAnalyzer(SecurityAnalyzerBase):
-    """Apply Quiloo's workspace policy to every OpenHands action."""
+    """Apply Agent Kronig's workspace policy to every OpenHands action."""
 
     workspace: Path
     permission_grants: set[PermissionCategory] = Field(default_factory=set)

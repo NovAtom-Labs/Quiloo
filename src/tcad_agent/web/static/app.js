@@ -121,7 +121,7 @@ function updatePageCopy(stage) {
   document.querySelector("#page-eyebrow").textContent = eyebrow;
   document.querySelector("#page-title").textContent = title;
   document.querySelector("#page-copy").textContent = copy;
-  document.title = `${formatLabel(stage)} · Quiloo TCAD`;
+  document.title = `${formatLabel(stage)} · Agent Kronig TCAD`;
 }
 
 function showPage(stage, historyMode = null) {

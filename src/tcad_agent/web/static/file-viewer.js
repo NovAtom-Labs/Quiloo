@@ -130,7 +130,7 @@
     return `${base}?path=${encodeURIComponent(path)}${download ? "&download=true" : ""}`;
   }
 
-  globalThis.QuilooFileViewer = {
+  globalThis.AgentKronigFileViewer = {
     fileUrl,
     formatBytes,
     limitTable,

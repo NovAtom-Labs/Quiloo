@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
-**Goal:** Turn Quiloo's existing repository UI into a responsive scientific agent workbench with structured activity, safe rendered chat, run-scoped changes, stable panes, and verifiable recovery behavior.
+**Goal:** Turn Agent Kronig's existing repository UI into a responsive scientific agent workbench with structured activity, safe rendered chat, run-scoped changes, stable panes, and verifiable recovery behavior.
 
 **Architecture:** Preserve the current OpenHands, SQLite, FastAPI, and SSE contracts. Add a bounded workspace-baseline service for honest run change attribution, pure JavaScript state helpers for deterministic UI behavior, and focused browser modules for layout and agent presentation. Keep the existing file viewer as the center-workspace foundation.
 
@@ -205,14 +205,14 @@ Commit: `feat: expose honest per run change sets`
 - Modify: `tests/unit/web/test_ide_javascript.py`
 
 **Interfaces:**
-- Produces: `QuilooIDEEvents.createRunPresentation()` with `accept(event)`, `snapshot()`, and `reset()`.
-- Produces: `QuilooMarkdown.render(container, source)` and `QuilooMarkdown.blocks(source)`.
+- Produces: `AgentKronigIDEEvents.createRunPresentation()` with `accept(event)`, `snapshot()`, and `reset()`.
+- Produces: `AgentKronigMarkdown.render(container, source)` and `AgentKronigMarkdown.blocks(source)`.
 - Consumes: current persisted and live `IDEEvent` objects without changing the SSE wire format.
 
 - [x] **Step 1: Write failing event-reducer tests**
 
 ```javascript
-const view = globalThis.QuilooIDEEvents.createRunPresentation();
+const view = globalThis.AgentKronigIDEEvents.createRunPresentation();
 view.accept(toolStarted(11, "call-1", "terminal", "Run focused tests"));
 view.accept(toolCompleted(12, "call-1", "terminal", "2 passed"));
 view.accept(toolCompleted(12, "call-1", "terminal", "2 passed"));
@@ -264,19 +264,19 @@ Commit: `feat: add deterministic agent presentation state`
 - Modify: `tests/e2e/test_ide_shell.py`
 
 **Interfaces:**
-- Produces: `QuilooLayout.clampLayout(input)` and `QuilooLayout.createController(options)`.
+- Produces: `AgentKronigLayout.clampLayout(input)` and `AgentKronigLayout.createController(options)`.
 - Consumes: workspace ID for preference keys and existing agent-panel open state.
 
 - [x] **Step 1: Write failing geometry and shell tests**
 
 ```javascript
 assertDeepEqual(
-  QuilooLayout.clampLayout({viewport: 1180, explorer: 410, agent: 610}),
+  AgentKronigLayout.clampLayout({viewport: 1180, explorer: 410, agent: 610}),
   {mode: "desktop", explorer: 360, agent: 320, center: 500},
   "stored widths are clamped while preserving the center minimum",
 );
 assertEqual(
-  QuilooLayout.clampLayout({viewport: 680, explorer: 218, agent: 356}).mode,
+  AgentKronigLayout.clampLayout({viewport: 680, explorer: 218, agent: 356}).mode,
   "narrow",
   "narrow widths use drawers",
 );
@@ -300,13 +300,13 @@ static package. Confirm the SVG contains no scripts, remote references, or crede
 
 Use CSS custom properties `--explorer-width` and `--agent-width`. Pointer and keyboard resize
 events update those values through `clampLayout`. Store valid desktop widths under
-`quiloo.layout.<workspace-id>`. Double-click restores 218 px and 356 px. Media changes switch to
+`agent-kronig.layout.<workspace-id>`. Double-click restores 218 px and 356 px. Media changes switch to
 tablet or narrow drawer state and never keep a center smaller than 480 px.
 
 - [x] **Step 5: Rebuild the page shell and visual system**
 
 Create a contiguous three-pane grid with one shared border, 31 px pane headers, 10 px and 12 px
-content tokens, compact NovAtom and Quiloo branding, restrained state colors, and no gradients,
+content tokens, compact NovAtom and Agent Kronig branding, restrained state colors, and no gradients,
 glow, floating primary cards, or decorative chat bubbles. Ensure pane-specific selectors do not
 inherit page container margins or padding.
 
@@ -330,7 +330,7 @@ Commit: `feat: build continuous resizable research workbench`
 - Modify: `tests/e2e/test_ide_shell.py`
 
 **Interfaces:**
-- Consumes: presentation snapshots from `QuilooIDEEvents`.
+- Consumes: presentation snapshots from `AgentKronigIDEEvents`.
 - Consumes: `GET /api/runs/{run_id}/changes`.
 - Produces: tab rendering, step expansion, file and diff navigation callbacks, completion focus,
   and plain-language permission cards.
@@ -345,7 +345,7 @@ risk, technical details, Deny, Approve, and Approve all like this for grantable 
 - [x] **Step 2: Write failing changes-view tests**
 
 ```javascript
-const rows = QuilooChanges.toRows(changeSet);
+const rows = AgentKronigChanges.toRows(changeSet);
 assertEqual(rows[0].label, "src/physics.py");
 assertEqual(rows[0].delta, "+8 −3");
 assertEqual(rows[0].uncertain, false);
@@ -359,7 +359,7 @@ Run: `pytest tests/unit/web/test_ide_javascript.py tests/e2e/test_ide_shell.py -
 
 - [x] **Step 4: Render assistant messages as safe technical notes**
 
-Replace plain `textContent` message bodies with `QuilooMarkdown.render`. Preserve authorship and
+Replace plain `textContent` message bodies with `AgentKronigMarkdown.render`. Preserve authorship and
 timestamps. When a final assistant message arrives, scroll its top into view without forcing
 the activity timeline to its bottom.
 
@@ -435,7 +435,7 @@ tests may skip only under their documented markers or missing external dependenc
 
 - [x] **Step 6: Exercise the live UI**
 
-Start Quiloo locally, open the realistic test repository, create a conversation, run a safe
+Start Agent Kronig locally, open the realistic test repository, create a conversation, run a safe
 read-only prompt, inspect Chat and Activity and Changes, test both dividers at desktop width,
 test tablet and narrow drawer modes, open and edit a file, and verify that completion begins at
 the top of its report. Capture console errors and fix every product-owned error.

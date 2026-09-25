@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a deterministic disposable repository for Quiloo REPL evaluation."""
+"""Create a deterministic disposable repository for Agent Kronig REPL evaluation."""
 
 from __future__ import annotations
 

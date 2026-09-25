@@ -26,7 +26,7 @@ function walk(node) {
   return [node, ...node.children.flatMap(walk)];
 }
 
-const markdown = globalThis.QuilooMarkdown;
+const markdown = globalThis.AgentKronigMarkdown;
 const blocks = markdown.blocks(
   "# Result\n\n- **Fermi** statistics\n- `SRH` recombination\n\n```python\nprint('safe')\n```",
 );

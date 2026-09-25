@@ -287,7 +287,7 @@ class AgentSupervisor:
         thread = threading.Thread(
             target=self._execute,
             args=(run.id, active_runtime, lock),
-            name=f"quiloo-agent-{run.id}",
+            name=f"agent-kronig-agent-{run.id}",
             daemon=True,
         )
         self._threads[run.id] = thread

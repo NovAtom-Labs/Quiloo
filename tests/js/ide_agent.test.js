@@ -4,7 +4,7 @@ function assertEqual(actual, expected, message) {
   if (actual !== expected) throw new Error(`${message}: ${actual}`);
 }
 
-const agent = globalThis.QuilooAgentView;
+const agent = globalThis.AgentKronigAgentView;
 const rows = agent.activityRows({
   steps: [{
     id: "action-1",
@@ -179,7 +179,7 @@ assertEqual(failed.failedStep, "Run validation", "failure keeps the failed step"
 assertEqual(failed.lastSuccessfulStep, "Inspect files", "failure keeps partial evidence");
 
 const permission = agent.permissionView({
-  summary: "Quiloo wants to access a path outside this repository.",
+  summary: "Agent Kronig wants to access a path outside this repository.",
   tool_name: "terminal",
   permission_category: "external_file_access",
   risk: "HIGH",

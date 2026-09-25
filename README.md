@@ -1,14 +1,14 @@
-# Quiloo
+# Agent Kronig
 
-Quiloo is NovAtom Labs' simulator-neutral TCAD research agent. It turns a researcher's natural-language device study into a strict experiment specification, asks only for consequential missing inputs, presents the exact normalized plan for approval, runs an allowed simulator workflow, validates the numerical output, and packages reproducible evidence.
+Agent Kronig is NovAtom Labs' simulator-neutral TCAD research agent. It turns a researcher's natural-language device study into a strict experiment specification, asks only for consequential missing inputs, presents the exact normalized plan for approval, runs an allowed simulator workflow, validates the numerical output, and packages reproducible evidence.
 
 The pilot runs DEVSIM locally. The same researcher workflow and portable `ExperimentSpec` are designed to target a licensed Sentaurus installation through a restricted remote runner. Simulator-specific syntax, execution, and normalization stay behind adapters, so devices are described as data instead of hardcoded product modes.
 
 > **Pilot status:** the local DEVSIM workflow is operational. Sentaurus compilation, signing, normalization, and conformance infrastructure are implemented, but licensed execution remains intentionally disabled until the licensed machine passes the integration checklist.
 
-## Why Quiloo
+## Why Agent Kronig
 
-General-purpose language models are useful for interpreting research intent and operating a repository, but they are not reliable authorities for TCAD syntax, physical support, units, or numerical validity. Quiloo separates those responsibilities:
+General-purpose language models are useful for interpreting research intent and operating a repository, but they are not reliable authorities for TCAD syntax, physical support, units, or numerical validity. Agent Kronig separates those responsibilities:
 
 - The model interprets the request, inspects repository evidence, edits files, runs bounded commands, and delegates review tasks.
 - A strict schema owns units, geometry, doping, contacts, physics, studies, and observables.
@@ -56,7 +56,7 @@ conversation, and return to the same conversation URL after a browser or service
 
 ### Workbench layout
 
-Quiloo uses one continuous three-pane workbench:
+Agent Kronig uses one continuous three-pane workbench:
 
 - The Repository pane opens a local folder, reports Git state, and browses files. It refreshes the active directory after completed agent actions so newly created, renamed, and removed files appear without reopening the workspace.
 - The central Workspace previews and edits text, code, Markdown, JSON, CSV or TSV data, images, and PDFs. It also displays unified run diffs without requiring a download.
@@ -73,8 +73,8 @@ inserted into the page.
 1. Open a repository with the native folder picker or enter its absolute path.
 2. Select a file to inspect source, Markdown, JSON, CSV/TSV data, raster images, PDFs, or binary metadata in the central workspace.
 3. Create a conversation and describe the intended repository task.
-4. Quiloo reads and edits files, searches the repository, runs tests or validation commands, uses typed TCAD operations, and may delegate bounded work to a specialist subagent.
-5. Open Activity to inspect the operational timeline, sanitized plan items, grouped tool actions, backend-recorded phase, commands, outcomes, explicit validation evidence, approval waits, and delegated task results. Quiloo does not infer scientific evidence from filenames or prose, and does not store or display raw provider reasoning.
+4. Agent Kronig reads and edits files, searches the repository, runs tests or validation commands, uses typed TCAD operations, and may delegate bounded work to a specialist subagent.
+5. Open Activity to inspect the operational timeline, sanitized plan items, grouped tool actions, backend-recorded phase, commands, outcomes, explicit validation evidence, approval waits, and delegated task results. Agent Kronig does not infer scientific evidence from filenames or prose, and does not store or display raw provider reasoning.
 6. Repository-local reads, edits, tests, builds, and validation run without interruption. Access outside the selected repository, package installation, network activity, destructive commands, Git mutation, and remote mutation stop at an approval card.
 7. Open Changes to inspect the run-scoped file list, exact line counts, rename metadata, action attribution, linked validation IDs, uncertainty labels for non-text changes, and unified diffs. Terminal run manifests are persisted before completion so later runs cannot rewrite historical evidence.
 8. The researcher can approve one action, approve future actions in the same permission category for the current run, deny, pause, resume, stop, refresh, or return later. Category approval expires when that run ends. Conversations, messages, run state, approvals, run-scoped grants, and normalized events are persisted locally.
@@ -89,7 +89,7 @@ Available agent tools are:
 - the `tcad_domain` tool for specification validation, backend compilation, knowledge retrieval, result validation, and report generation
 - native OpenHands task delegation
 
-Built-in `code-explorer`, `bash-runner`, and `general-purpose` subagents are available. Quiloo also registers `tcad-researcher` for evidence-backed TCAD investigation and `tcad-reviewer` for read-only checks of units, capability support, requested outputs, and validation evidence. Network-enabled research is disabled by default.
+Built-in `code-explorer`, `bash-runner`, and `general-purpose` subagents are available. Agent Kronig also registers `tcad-researcher` for evidence-backed TCAD investigation and `tcad-reviewer` for read-only checks of units, capability support, requested outputs, and validation evidence. Network-enabled research is disabled by default.
 
 ### Agent execution model
 
@@ -108,7 +108,7 @@ The runtime supports the following loop:
 7. Reinspect changed files and rerun checks until the task reaches a terminal result.
 8. Return exact evidence, modified paths, validation results, and remaining limitations.
 
-The user can pause, resume, or stop this loop. A stopped run keeps completed local edits. Quiloo does not automatically stage, commit, push, or discard those changes.
+The user can pause, resume, or stop this loop. A stopped run keeps completed local edits. Agent Kronig does not automatically stage, commit, push, or discard those changes.
 
 ### Repository-agent capability boundary
 
@@ -219,7 +219,7 @@ application responsive.
 
 ## Deliberate pilot limits
 
-Quiloo is currently intended for small exploratory drift-diffusion studies, architecture validation, and researcher workflow testing. It is not yet a fabrication-calibrated prediction system.
+Agent Kronig is currently intended for small exploratory drift-diffusion studies, architecture validation, and researcher workflow testing. It is not yet a fabrication-calibrated prediction system.
 
 | Limitation | Current consequence |
 | --- | --- |
@@ -307,8 +307,8 @@ See [Installation and setup](INSTALLATION.md) for the complete Linux workstation
 Clone the repository and create the project environment:
 
 ```bash
-git clone https://github.com/NovAtom-Labs/Quiloo.git
-cd Quiloo
+git clone <organization-approved-repository-url> agent-kronig
+cd agent-kronig
 
 /usr/local/bin/python3.13 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
@@ -325,7 +325,7 @@ Dependency constraints are edited only in `pyproject.toml`. Maintainers regenera
 Use `.venv/bin/python scripts/sync_requirements.py --check` to detect dependency-file drift
 without modifying files or accessing the network.
 
-Install DEVSIM separately. Point Quiloo to its Python executable when it is not available at the default sibling location:
+Install DEVSIM separately. Point Agent Kronig to its Python executable when it is not available at the default sibling location:
 
 ```bash
 export TCAD_DEVSIM_PYTHON=/absolute/path/to/devsim/.venv/bin/python

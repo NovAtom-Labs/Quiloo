@@ -4,7 +4,7 @@
 
 - Python: 3.13
 - DEVSIM package: 2.9.1
-- default executable: `../devsim/.venv/bin/python` relative to the Quiloo checkout
+- default executable: `../devsim/.venv/bin/python` relative to the Agent Kronig checkout
 - reviewed source commit: `43b41ca845184c47e22b72d144db7e7db8509377`
 
 DEVSIM has its own virtual environment so product dependencies and simulator dependencies cannot silently alter each other.

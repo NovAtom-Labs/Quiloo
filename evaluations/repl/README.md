@@ -1,10 +1,10 @@
-# Quiloo REPL end-to-end evaluation
+# Agent Kronig REPL end-to-end evaluation
 
 This evaluation creates a disposable Git repository that resembles a researcher handoff rather than a product-specific demo. It exercises repository discovery, scientific reasoning, cross-file repair, command execution, artifact generation, Git review, persistence, and approval boundaries.
 
 ## Create a fresh workspace
 
-From the Quiloo project root:
+From the Agent Kronig project root:
 
 ```bash
 python scripts/create_repl_test_repo.py --include-external-fixture
@@ -12,7 +12,7 @@ python scripts/create_repl_test_repo.py --include-external-fixture
 
 The command creates:
 
-- `test-workspaces/pn-junction-research/`, the repository Quiloo should open
+- `test-workspaces/pn-junction-research/`, the repository Agent Kronig should open
 - `test-workspaces/external-calibration.csv`, an optional file outside that repository for approval testing
 
 The generated repository starts on `main`, has one deterministic baseline commit, has no uncommitted changes, and intentionally has three failing checks.
@@ -33,7 +33,7 @@ The baseline score is 25/100. A correct repair scores 100/100. The independent g
 
 ## Reset
 
-Delete the disposable `test-workspaces/pn-junction-research/` directory and run the creation command again. Never reset the main Quiloo repository to reset this fixture.
+Delete the disposable `test-workspaces/pn-junction-research/` directory and run the creation command again. Never reset the main Agent Kronig repository to reset this fixture.
 
 ## What can be tested today
 

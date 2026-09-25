@@ -40,7 +40,7 @@ Start this after the agent has diagnosed the three failures but before approving
 Pause here. Record the current plan, files inspected, commands run, failures observed, and the next intended edit so this conversation can be resumed after the service restarts. Do not modify files while paused.
 ```
 
-Restart Quiloo, reopen the stable conversation URL, then send:
+Restart Agent Kronig, reopen the stable conversation URL, then send:
 
 ```text
 Resume from the persisted checkpoint. Verify the repository has not changed since the checkpoint, then continue the approved repair from the next pending step.

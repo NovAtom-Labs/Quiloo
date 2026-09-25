@@ -257,7 +257,7 @@ def test_permission_categories_have_plain_language_explanations(
     explanation = policy_module.approval_explanation(workspace, event, result)
 
     assert result.value == category
-    assert explanation.startswith("Quiloo wants to")
+    assert explanation.startswith("Agent Kronig wants to")
     assert plain_text in explanation
     assert command not in explanation
 

@@ -192,7 +192,7 @@
     };
   }
 
-  globalThis.QuilooIDEState = {
+  globalThis.AgentKronigIDEState = {
     controlsForState,
     createRefreshCoordinator,
     createRepositoryRequestCoordinator,

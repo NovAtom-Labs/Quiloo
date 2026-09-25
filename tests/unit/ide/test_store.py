@@ -112,7 +112,7 @@ def test_permission_category_grant_is_scoped_to_one_run_and_persisted(
         "action-1",
         "terminal",
         "HIGH",
-        "Quiloo wants to change Git history or send changes online.",
+        "Agent Kronig wants to change Git history or send changes online.",
         {"command": "git push"},
         permission_category="git_mutation",
     )
@@ -146,7 +146,7 @@ def test_broad_unrecognized_permission_cannot_be_granted_for_a_run(
         "action-1",
         "terminal",
         "HIGH",
-        "Quiloo wants to perform a higher-risk action.",
+        "Agent Kronig wants to perform a higher-risk action.",
         {"command": "unknown-tool && rm -rf /tmp/output"},
     )
 

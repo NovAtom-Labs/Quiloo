@@ -879,7 +879,7 @@ Expected: the root-shell assertions fail because `/` still serves the guided wor
 ```html
 <div class="ide-shell">
   <header class="ide-header">
-    <a class="brand" href="/">Quiloo</a>
+    <a class="brand" href="/">Agent Kronig</a>
     <div id="workspace-status" aria-live="polite">No workspace open</div>
     <a href="/simulate">Guided simulation</a>
   </header>
@@ -1054,7 +1054,7 @@ def serve_command(
     port: Annotated[int, typer.Option("--port", min=1, max=65535)] = 8765,
     no_browser: Annotated[bool, typer.Option("--no-browser")] = False,
 ) -> None:
-    """Start the Linux-local Quiloo IDE and TCAD workflow."""
+    """Start the Linux-local Agent Kronig IDE and TCAD workflow."""
     from tcad_agent.web.launcher import run_server
 
     try:

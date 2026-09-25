@@ -2,7 +2,7 @@
 
 ## 1. Objective
 
-Quiloo will present its existing repository agent as a mature scientific workbench. A
+Agent Kronig will present its existing repository agent as a mature scientific workbench. A
 researcher must be able to keep the repository, current file, agent conversation, execution
 state, permissions, changes, and validation evidence visible without reading a raw event log.
 
@@ -59,7 +59,7 @@ repository" are not sufficient.
 
 ### 3.5 Honest attribution
 
-Quiloo must distinguish changes made during the current run from changes that already existed
+Agent Kronig must distinguish changes made during the current run from changes that already existed
 in the workspace. It must not silently claim ownership of unrelated modifications.
 
 ## 4. Visual and Spatial Model
@@ -67,7 +67,7 @@ in the workspace. It must not silently claim ownership of unrelated modification
 ### 4.1 Brand treatment
 
 The application header uses the official NovAtom Labs horizontal wordmark as a bundled local
-asset. Quiloo appears beside it as the product name. Production must not hotlink the public
+asset. Agent Kronig appears beside it as the product name. Production must not hotlink the public
 website or depend on external availability for branding.
 
 ### 4.2 Desktop grid
@@ -160,7 +160,7 @@ separately.
 
 ### 5.3 Operational reasoning summary
 
-During a run, Quiloo may show a short user-facing reasoning summary containing:
+During a run, Agent Kronig may show a short user-facing reasoning summary containing:
 
 - Current objective.
 - Working hypothesis.
@@ -279,15 +279,15 @@ inline code, emphasis, and safe links are sufficient for the first implementatio
 
 ### 7.4 Run-scoped change manifest
 
-Before a write-capable run begins, Quiloo records a read-only workspace baseline. For Git
+Before a write-capable run begins, Agent Kronig records a read-only workspace baseline. For Git
 repositories this includes HEAD identity, branch, staged state, unstaged state, untracked paths,
 and content hashes needed to distinguish pre-existing modifications. For non-Git repositories,
-Quiloo scans the workspace subject to explicit file-count and file-size limits. It records path,
+Agent Kronig scans the workspace subject to explicit file-count and file-size limits. It records path,
 size, modification time, and a content hash for files within the hashing limit. Larger files use
 metadata-only comparison and are labelled as uncertain if they change. Ignored runtime data and
 repository metadata are excluded by a defined policy.
 
-After relevant tool completions and at terminal run states, Quiloo computes a run change
+After relevant tool completions and at terminal run states, Agent Kronig computes a run change
 manifest. The manifest contains:
 
 - Relative path.

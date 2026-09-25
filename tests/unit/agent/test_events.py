@@ -134,7 +134,7 @@ def test_high_risk_action_creates_one_pending_approval(tmp_path: Path) -> None:
     assert approvals[0].action_id == action.id
     assert approvals[0].payload == {"command": "git push"}
     assert approvals[0].permission_category.value == "git_mutation"
-    assert approvals[0].summary.startswith("Quiloo wants to change Git history")
+    assert approvals[0].summary.startswith("Agent Kronig wants to change Git history")
     assert store.get_run(run.id).state.value == "waiting_for_approval"
 
 

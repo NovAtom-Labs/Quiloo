@@ -32,7 +32,7 @@ body { overflow: hidden; background: var(--background); }
   border-right: 1px solid var(--border);
   text-decoration: none;
 }
-.product-wordmark { color: var(--text-strong); font-size: 0.92rem; font-weight: 680; letter-spacing: -0.018em; }
+.product-wordmark { color: var(--text-strong); font-size: 0.92rem; font-weight: 680; letter-spacing: -0.018em; white-space: nowrap; }
 .workspace-status {
   overflow: hidden;
   padding: 0 16px;
@@ -670,6 +670,8 @@ dialog button { padding: 7px 12px; }
   }
   .agent-panel.is-open { visibility: visible; pointer-events: auto; transform: translateX(0); }
   .agent-resizer { display: none; }
+  .agent-heading { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; align-items: stretch; }
+  .agent-heading-actions { justify-content: flex-end; }
   #close-agent-panel { display: inline-flex; }
   .workspace-welcome { padding: 36px 20px; }
   .workspace-facts > div { grid-template-columns: 1fr; gap: 5px; }

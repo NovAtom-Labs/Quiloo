@@ -97,7 +97,7 @@
     const agentHandle = options.agentHandle;
     const windowRef = options.windowRef || window;
     const storage = options.storage || windowRef.localStorage;
-    const storageKey = `quiloo.layout.${options.workspaceId || "default"}`;
+    const storageKey = `agent-kronig.layout.${options.workspaceId || "default"}`;
     let preferred = parseStoredLayout(storage.getItem(storageKey));
     let current = null;
     let dragging = null;
@@ -224,7 +224,7 @@
     });
   }
 
-  globalThis.QuilooLayout = {
+  globalThis.AgentKronigLayout = {
     DEFAULTS,
     LIMITS,
     clampLayout,

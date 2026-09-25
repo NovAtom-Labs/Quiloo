@@ -69,11 +69,11 @@ let editingFile = null;
 let fileRequestGeneration = 0;
 let selectedRunId = null;
 let activeChangeSet = null;
-const navigationGuard = window.QuilooIDEState.createNavigationGuard();
-const repositoryRequests = window.QuilooIDEState.createRepositoryRequestCoordinator();
-const submissions = window.QuilooIDEState.createSubmissionTracker();
-const runPresentation = window.QuilooIDEEvents.createRunPresentation();
-const runChanges = window.QuilooIDEState.createRunResourceCache();
+const navigationGuard = window.AgentKronigIDEState.createNavigationGuard();
+const repositoryRequests = window.AgentKronigIDEState.createRepositoryRequestCoordinator();
+const submissions = window.AgentKronigIDEState.createSubmissionTracker();
+const runPresentation = window.AgentKronigIDEEvents.createRunPresentation();
+const runChanges = window.AgentKronigIDEState.createRunResourceCache();
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -165,7 +165,7 @@ function setFileEditing(isEditing) {
   fileViewerCancel.hidden = !isEditing;
   fileViewerRefresh.disabled = isEditing;
   fileViewerModes.hidden = isEditing || !activeFile
-    || window.QuilooFileViewer.viewModes(activeFile.kind).length < 2;
+    || window.AgentKronigFileViewer.viewModes(activeFile.kind).length < 2;
   if (activeFile) fileViewerState.textContent = isEditing ? "Editing" : "Read only";
 }
 
@@ -224,7 +224,7 @@ async function saveFileEdit() {
 
 function renderSource(content) {
   const source = document.createElement("ol");
-  const lines = window.QuilooFileViewer.sourceLines(content || "");
+  const lines = window.AgentKronigFileViewer.sourceLines(content || "");
   const displayLines = lines.slice(0, 20000);
   source.className = "file-source";
   displayLines.forEach((line) => {
@@ -243,7 +243,7 @@ function renderSource(content) {
 function renderMarkdown(content) {
   const article = document.createElement("article");
   article.className = "markdown-preview";
-  window.QuilooMarkdown.render(article, content || "");
+  window.AgentKronigMarkdown.render(article, content || "");
   fileViewerBody.append(article);
 }
 
@@ -291,8 +291,8 @@ function renderJson(content) {
 }
 
 function renderTable(content, delimiter) {
-  const parsed = window.QuilooFileViewer.parseDelimited(content || "", delimiter);
-  const limited = window.QuilooFileViewer.limitTable(parsed, 500, 100);
+  const parsed = window.AgentKronigFileViewer.parseDelimited(content || "", delimiter);
+  const limited = window.AgentKronigFileViewer.limitTable(parsed, 500, 100);
   const wrap = document.createElement("div");
   const table = document.createElement("table");
   const head = table.createTHead();
@@ -321,7 +321,7 @@ function renderImage(preview) {
   stage.className = "image-stage";
   controls.className = "image-controls";
   image.alt = preview.name;
-  image.src = window.QuilooFileViewer.fileUrl(activeWorkspace.id, preview.path, false);
+  image.src = window.AgentKronigFileViewer.fileUrl(activeWorkspace.id, preview.path, false);
   const setZoom = (next) => {
     zoom = Math.min(4, Math.max(0.25, next));
     image.style.transform = `scale(${zoom})`;
@@ -348,7 +348,7 @@ function renderPdf(preview) {
   const frame = document.createElement("iframe");
   frame.className = "pdf-viewer";
   frame.title = preview.name;
-  frame.src = window.QuilooFileViewer.fileUrl(activeWorkspace.id, preview.path, false);
+  frame.src = window.AgentKronigFileViewer.fileUrl(activeWorkspace.id, preview.path, false);
   fileViewerBody.append(frame);
 }
 
@@ -396,14 +396,14 @@ function showFile(preview) {
   fileViewerTitle.textContent = preview.name;
   fileViewerPath.textContent = preview.path;
   fileViewerType.textContent = preview.mime_type;
-  fileViewerSize.textContent = window.QuilooFileViewer.formatBytes(preview.size);
+  fileViewerSize.textContent = window.AgentKronigFileViewer.formatBytes(preview.size);
   fileViewerState.textContent = "Read only";
   fileViewerRefresh.hidden = false;
   fileViewerEdit.hidden = false;
   fileViewerDownload.hidden = false;
-  fileViewerDownload.href = window.QuilooFileViewer.fileUrl(activeWorkspace.id, preview.path, true);
+  fileViewerDownload.href = window.AgentKronigFileViewer.fileUrl(activeWorkspace.id, preview.path, true);
   fileViewerDownload.download = preview.name;
-  const modes = window.QuilooFileViewer.viewModes(preview.kind);
+  const modes = window.AgentKronigFileViewer.viewModes(preview.kind);
   fileViewerModes.hidden = modes.length < 2;
   fileViewerPreview.hidden = !modes.includes("preview");
   fileViewerSource.hidden = !modes.includes("source");
@@ -572,7 +572,7 @@ function appendMessage(message) {
     time.textContent = new Date(message.created_at).toLocaleTimeString([], {hour: "2-digit", minute: "2-digit"});
   }
   content.className = "message-body";
-  window.QuilooMarkdown.render(content, message.content);
+  window.AgentKronigMarkdown.render(content, message.content);
   header.append(role, time);
   article.append(header, content);
   conversationMessages.append(article);
@@ -597,7 +597,7 @@ function renderMessages(messages, {forceScroll = false} = {}) {
   const previousScrollTop = conversationMessages.scrollTop;
   const wasNearBottom = isConversationNearBottom();
   const nextLastId = messages.at(-1)?.id;
-  const shouldFollow = window.QuilooIDEState.shouldAutoFollowChat(
+  const shouldFollow = window.AgentKronigIDEState.shouldAutoFollowChat(
     previousLastId,
     nextLastId,
     wasNearBottom,
@@ -616,11 +616,11 @@ function renderMessages(messages, {forceScroll = false} = {}) {
 }
 
 function renderRunIndicator() {
-  const controls = window.QuilooIDEState.controlsForState(activeRun?.state);
+  const controls = window.AgentKronigIDEState.controlsForState(activeRun?.state);
   agentProgress.hidden = controls.send || !activeRun;
   if (agentProgress.hidden) return;
   const presentation = runPresentation.snapshot(activeRun?.id || selectedRunId);
-  const current = window.QuilooAgentView.operationalUpdates(presentation)
+  const current = window.AgentKronigAgentView.operationalUpdates(presentation)
     .filter((update) => ["running", "waiting"].includes(update.status))
     .at(-1);
   agentProgressText.textContent = activeRun.state === "waiting_for_approval"
@@ -653,7 +653,7 @@ async function synchronizeConversation(conversationId) {
   renderApprovals(approvals);
 }
 
-const refreshCoordinator = window.QuilooIDEState.createRefreshCoordinator(
+const refreshCoordinator = window.AgentKronigIDEState.createRefreshCoordinator(
   synchronizeConversation,
 );
 
@@ -677,7 +677,7 @@ function setRun(run) {
   activeRun = run;
   if (run?.id) selectRun(run.id, {refresh: true});
   const state = run?.state || "idle";
-  const controls = window.QuilooIDEState.controlsForState(state);
+  const controls = window.AgentKronigIDEState.controlsForState(state);
   runState.textContent = state.replaceAll("_", " ").toUpperCase();
   pauseRun.hidden = !controls.pause;
   resumeRun.hidden = !controls.resume;
@@ -706,7 +706,7 @@ function activateAgentView(name, {focus = false} = {}) {
 }
 
 function renderRunSummary(snapshot) {
-  const summary = window.QuilooAgentView.outcomeSummary(snapshot, activeChangeSet);
+  const summary = window.AgentKronigAgentView.outcomeSummary(snapshot, activeChangeSet);
   clearNode(agentRunSummary);
   agentRunSummary.hidden = !summary.visible;
   if (!summary.visible) return;
@@ -750,7 +750,7 @@ function renderRunSummary(snapshot) {
 
 function renderReasoning(snapshot) {
   clearNode(agentReasoning);
-  const updates = window.QuilooAgentView.operationalUpdates(snapshot);
+  const updates = window.AgentKronigAgentView.operationalUpdates(snapshot);
   agentReasoning.hidden = !updates.length;
   if (!updates.length) return;
   const heading = document.createElement("div");
@@ -782,7 +782,7 @@ function renderReasoning(snapshot) {
 
 function renderActivity(snapshot) {
   clearNode(agentActivity);
-  const rows = window.QuilooAgentView.activityRows(snapshot);
+  const rows = window.AgentKronigAgentView.activityRows(snapshot);
   if (!rows.length && !snapshot.approvalHistory?.length && !snapshot.technicalEvents?.length) {
     agentActivity.append(emptyCopy("Tool activity will appear here when a run starts."));
   }
@@ -811,13 +811,13 @@ function renderActivity(snapshot) {
       output.textContent = String(row.output);
       technical.append(output);
     }
-    const affectedPaths = window.QuilooAgentView.affectedFilePaths(row, activeWorkspace?.root);
+    const affectedPaths = window.AgentKronigAgentView.affectedFilePaths(row, activeWorkspace?.root);
     affectedPaths.forEach((affectedPath) => {
       const open = document.createElement("button");
       open.type = "button";
       open.textContent = `Affected file: ${affectedPath}`;
       open.addEventListener("click", () => {
-        const changed = window.QuilooChanges.toRows(activeChangeSet)
+        const changed = window.AgentKronigChanges.toRows(activeChangeSet)
           .find((candidate) => candidate.label === affectedPath);
         if (changed?.diff || (changed && !changed.canOpenFile)) showDiff(changed);
         else void openFile({path: affectedPath});
@@ -864,8 +864,8 @@ function renderChanges(changeSet) {
   const runId = changeSet?.run_id || selectedRunId;
   runChanges.put(runId, changeSet);
   activeChangeSet = runChanges.current();
-  const rows = window.QuilooChanges.toRows(changeSet);
-  const incomplete = window.QuilooChanges.isIncomplete(changeSet);
+  const rows = window.AgentKronigChanges.toRows(changeSet);
+  const incomplete = window.AgentKronigChanges.isIncomplete(changeSet);
   clearNode(agentChanges);
   changesCount.textContent = String(rows.length);
   changesState.textContent = incomplete ? "PARTIAL SCAN" : rows.length ? `${rows.length} CHANGED` : "NO CHANGES";
@@ -1017,7 +1017,7 @@ function renderApprovals(approvals) {
   clearNode(pendingApprovals);
   approvalSection.classList.toggle("hidden", approvals.length === 0);
   approvals.forEach((approval) => {
-    const view = window.QuilooAgentView.permissionView(approval);
+    const view = window.AgentKronigAgentView.permissionView(approval);
     const card = document.createElement("article");
     const heading = document.createElement("div");
     const tool = document.createElement("strong");
@@ -1123,7 +1123,7 @@ function connectEvents(conversationId) {
       void loadApprovals(conversationId);
     }
     if (event.kind === "tool_call_completed") void refreshChanges(selectedRunId);
-    if (window.QuilooIDEState.shouldRefreshRepository(event.kind)) {
+    if (window.AgentKronigIDEState.shouldRefreshRepository(event.kind)) {
       void refreshCurrentRepository().catch((error) => showError(error.message));
     }
     if (["run_completed", "run_failed", "run_blocked", "run_cancelled"].includes(event.kind)) {
@@ -1272,7 +1272,7 @@ messageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const draft = messageInput.value.trim();
   if (!draft || !activeConversation || sendingPrompt) return;
-  if (!window.QuilooIDEState.controlsForState(activeRun?.state).send) return;
+  if (!window.AgentKronigIDEState.controlsForState(activeRun?.state).send) return;
   const conversationId = activeConversation.id;
   const submission = submissions.begin(conversationId, draft);
   sendingPrompt = true;
@@ -1367,7 +1367,7 @@ document.addEventListener("visibilitychange", () => {
 });
 setInterval(() => {
   if (!activeConversation) return;
-  const shouldRefresh = window.QuilooIDEState.isActiveState(activeRun?.state)
+  const shouldRefresh = window.AgentKronigIDEState.isActiveState(activeRun?.state)
     || streamState.textContent === "RECONNECTING";
   if (shouldRefresh) void refreshCoordinator.request(activeConversation.id).catch((error) => showError(error.message));
 }, 5000);

@@ -4,7 +4,7 @@ function assertEqual(actual, expected, message) {
   if (actual !== expected) throw new Error(`${message}: ${actual}`);
 }
 
-const changes = globalThis.QuilooChanges;
+const changes = globalThis.AgentKronigChanges;
 const rows = changes.toRows({
   files: [
     {path: "src/physics.py", operation: "modified", additions: 8, deletions: 3, uncertain: false, diff: "@@", validation_action_ids: ["validate-1"]},

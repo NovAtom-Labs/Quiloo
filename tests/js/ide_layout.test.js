@@ -8,7 +8,7 @@ function assertDeepEqual(actual, expected, message) {
   assertEqual(JSON.stringify(actual), JSON.stringify(expected), message);
 }
 
-const layout = globalThis.QuilooLayout;
+const layout = globalThis.AgentKronigLayout;
 
 assertDeepEqual(
   layout.clampLayout({viewport: 1180, explorer: 410, agent: 610}),

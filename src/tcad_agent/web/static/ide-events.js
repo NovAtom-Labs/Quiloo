@@ -246,5 +246,5 @@
     return {accept, reset, snapshot};
   }
 
-  globalThis.QuilooIDEEvents = {createRunPresentation};
+  globalThis.AgentKronigIDEEvents = {createRunPresentation};
 })();

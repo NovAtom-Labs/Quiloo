@@ -4,7 +4,7 @@ function assertEqual(actual, expected, message) {
   if (actual !== expected) throw new Error(`${message}: ${actual}`);
 }
 
-const viewer = globalThis.QuilooFileViewer;
+const viewer = globalThis.AgentKronigFileViewer;
 
 const rows = viewer.parseDelimited(
   'bias,current,note\n0,0,"equilibrium, reference"\n1,2e-6,forward\n',

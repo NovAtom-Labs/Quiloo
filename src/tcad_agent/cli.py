@@ -47,7 +47,7 @@ def serve_command(
     port: Annotated[int, typer.Option("--port", min=1, max=65535)] = 8765,
     no_browser: Annotated[bool, typer.Option("--no-browser")] = False,
 ) -> None:
-    """Start the Linux-local Quiloo IDE and TCAD workflow."""
+    """Start the Linux-local Agent Kronig IDE and TCAD workflow."""
     from tcad_agent.web.launcher import run_server
 
     try:

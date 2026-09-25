@@ -1,8 +1,8 @@
-# Quiloo Installation and Setup
+# Agent Kronig Installation and Setup
 
-This guide installs the complete Quiloo pilot on a Linux workstation. It covers the repository agent, local web interface, Bedrock model access, DEVSIM execution, and the checks needed before a researcher uses the system.
+This guide installs the complete Agent Kronig pilot on a Linux workstation. It covers the repository agent, local web interface, Bedrock model access, DEVSIM execution, and the checks needed before a researcher uses the system.
 
-Sentaurus is not installed by these steps. It must remain on a separately licensed host and is connected through Quiloo's restricted remote-runner protocol.
+Sentaurus is not installed by these steps. It must remain on a separately licensed host and is connected through Agent Kronig's restricted remote-runner protocol.
 
 ## 1. Supported installation profile
 
@@ -39,16 +39,16 @@ tmux -V
 
 Python must report version 3.13.x. The project intentionally rejects other minor Python versions so the tested OpenHands and scientific dependency set remains reproducible.
 
-## 3. Clone Quiloo
+## 3. Clone Agent Kronig
 
 ```bash
-git clone https://github.com/NovAtom-Labs/Quiloo.git
-cd Quiloo
+git clone <organization-approved-repository-url> agent-kronig
+cd agent-kronig
 ```
 
 For an internal or private deployment, use the organization-approved clone URL and authentication method. Do not place personal access tokens in shell history or repository files.
 
-## 4. Create the Quiloo environment
+## 4. Create the Agent Kronig environment
 
 ```bash
 python3.13 -m venv .venv
@@ -79,16 +79,16 @@ Confirm the command is installed:
 
 ## 5. Install DEVSIM separately
 
-Keep DEVSIM in a separate environment so simulator packages cannot silently alter the application dependency graph. The default layout places it beside the Quiloo repository:
+Keep DEVSIM in a separate environment so simulator packages cannot silently alter the application dependency graph. The default layout places it beside the Agent Kronig repository:
 
 ```text
 parent-directory/
-  Quiloo/
+  agent-kronig/
   devsim/
     .venv/
 ```
 
-From the Quiloo repository:
+From the Agent Kronig repository:
 
 ```bash
 mkdir -p ../devsim
@@ -110,7 +110,7 @@ Expected output:
 DEVSIM_VERSION=2.9.1
 ```
 
-If DEVSIM is installed elsewhere, record its absolute interpreter path in `TCAD_DEVSIM_PYTHON`. Quiloo invokes that interpreter directly and never executes arbitrary simulator shell text.
+If DEVSIM is installed elsewhere, record its absolute interpreter path in `TCAD_DEVSIM_PYTHON`. Agent Kronig invokes that interpreter directly and never executes arbitrary simulator shell text.
 
 ## 6. Create the local configuration
 
@@ -185,7 +185,7 @@ Headless Linux:
 .venv/bin/tcad-agent serve --no-browser
 ```
 
-Open the loopback URL printed by the server. The default is `http://127.0.0.1:8765`. If an older process owns that port, Quiloo chooses the next available loopback port and prints it.
+Open the loopback URL printed by the server. The default is `http://127.0.0.1:8765`. If an older process owns that port, Agent Kronig chooses the next available loopback port and prints it.
 
 The server stores local state under `TCAD_WORKSPACE`, which defaults to `.tcad-agent`. This includes SQLite databases, OpenHands conversation state, event records, compiled jobs, and result bundles. Stop the service before copying this directory for backup.
 
@@ -199,7 +199,7 @@ Create a disposable scientific repository:
 
 To test approval-gated access outside the selected repository, add `--include-external-fixture`. The generator creates a sibling calibration file that must not be read without an explicit primary-agent approval.
 
-In Quiloo:
+In Agent Kronig:
 
 1. Select `Open folder` and choose `test-workspaces/pn-junction-research`.
 2. Create a conversation.
@@ -252,9 +252,9 @@ A model configuration error usually means the credential, region, or inference p
 
 ## 12. Sentaurus connection
 
-Do not install Sentaurus into the Quiloo application environment. Follow `docs/operations/sentaurus-integration.md` on the licensed machine. The connection requires an approved HTTPS endpoint, exact release identity, reviewed structure generation, native-result extraction, signing keys, quotas, and cross-backend conformance cases.
+Do not install Sentaurus into the Agent Kronig application environment. Follow `docs/operations/sentaurus-integration.md` on the licensed machine. The connection requires an approved HTTPS endpoint, exact release identity, reviewed structure generation, native-result extraction, signing keys, quotas, and cross-backend conformance cases.
 
-Quiloo must continue to refuse licensed execution until that integration is explicitly configured and verified.
+Agent Kronig must continue to refuse licensed execution until that integration is explicitly configured and verified.
 
 ## 13. Troubleshooting
 

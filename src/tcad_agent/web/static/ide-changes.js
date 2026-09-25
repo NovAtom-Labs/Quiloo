@@ -41,5 +41,5 @@
     return Boolean(changeSet?.baseline_truncated);
   }
 
-  globalThis.QuilooChanges = {isIncomplete, toRows};
+  globalThis.AgentKronigChanges = {isIncomplete, toRows};
 })();

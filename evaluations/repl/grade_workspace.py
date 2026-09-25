@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independently grade a generated Quiloo REPL research workspace."""
+"""Independently grade a generated Agent Kronig REPL research workspace."""
 
 from __future__ import annotations
 
@@ -136,7 +136,7 @@ def _scientific_artifacts_pass(workspace: Path) -> bool:
 
 
 def _generalizes_beyond_reference(workspace: Path) -> bool:
-    with tempfile.TemporaryDirectory(prefix="quiloo-repl-grade-") as temporary:
+    with tempfile.TemporaryDirectory(prefix="agent-kronig-repl-grade-") as temporary:
         temporary_root = Path(temporary)
         alternate_input = temporary_root / "alternate.toml"
         alternate_output = temporary_root / "artifacts"

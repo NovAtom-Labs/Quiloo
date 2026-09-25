@@ -37,7 +37,7 @@
       label: step.summary || step.toolName || "Agent action",
       status: step.status || "running",
       toolName: step.toolName || "tool",
-      owner: step.subagent || "Quiloo",
+      owner: step.subagent || "Agent Kronig",
       duration: durationText(step.startedAt, step.completedAt),
       command: technicalCommand(step),
       output: step.output || null,
@@ -266,7 +266,7 @@
     };
   }
 
-  globalThis.QuilooAgentView = {
+  globalThis.AgentKronigAgentView = {
     affectedFilePaths,
     activityRows,
     durationText,

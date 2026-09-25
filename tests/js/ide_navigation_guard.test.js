@@ -4,7 +4,7 @@ function assertEqual(actual, expected, message) {
   if (actual !== expected) throw new Error(message);
 }
 
-const guard = globalThis.QuilooIDEState.createNavigationGuard();
+const guard = globalThis.AgentKronigIDEState.createNavigationGuard();
 const firstRoute = guard.beginRoute();
 const pendingMessage = guard.captureMessage(firstRoute, "conversation-a", "inspect the deck");
 
@@ -34,7 +34,7 @@ assertEqual(
   "a response must not clear a draft typed while it was pending",
 );
 
-const submissions = globalThis.QuilooIDEState.createSubmissionTracker();
+const submissions = globalThis.AgentKronigIDEState.createSubmissionTracker();
 const firstAttempt = submissions.begin("conversation-b", "edit and test");
 assertEqual(firstAttempt.messageId, null, "a new prompt should create a message");
 submissions.recordMessage(firstAttempt, "message-1");
@@ -43,32 +43,32 @@ assertEqual(retry.messageId, "message-1", "a retry must reuse the persisted mess
 submissions.recordRun(retry, "run-1");
 assertEqual(submissions.current(), null, "a successful run should clear submission state");
 
-const eventLedger = globalThis.QuilooIDEState.createEventLedger();
+const eventLedger = globalThis.AgentKronigIDEState.createEventLedger();
 assertEqual(eventLedger.accept(17), true, "a new SSE event should render");
 assertEqual(eventLedger.accept(17), false, "a replayed SSE event must not render twice");
 assertEqual(eventLedger.accept(18), true, "the next SSE event should render");
 
-const runningControls = globalThis.QuilooIDEState.controlsForState("running");
+const runningControls = globalThis.AgentKronigIDEState.controlsForState("running");
 assertEqual(runningControls.pause, true, "running work can be paused");
 assertEqual(runningControls.stop, true, "running work can be stopped");
 assertEqual(runningControls.send, false, "another prompt cannot start while running");
-const pausedControls = globalThis.QuilooIDEState.controlsForState("paused");
+const pausedControls = globalThis.AgentKronigIDEState.controlsForState("paused");
 assertEqual(pausedControls.resume, true, "paused work can be resumed");
-const finishedControls = globalThis.QuilooIDEState.controlsForState("completed");
+const finishedControls = globalThis.AgentKronigIDEState.controlsForState("completed");
 assertEqual(finishedControls.send, true, "a terminal run re-enables prompting");
 
 assertEqual(
-  globalThis.QuilooIDEState.isActiveState("waiting_for_approval"),
+  globalThis.AgentKronigIDEState.isActiveState("waiting_for_approval"),
   true,
   "approval waits should continue background synchronization",
 );
 assertEqual(
-  globalThis.QuilooIDEState.isActiveState("completed"),
+  globalThis.AgentKronigIDEState.isActiveState("completed"),
   false,
   "terminal runs should not trigger active-run polling",
 );
 
-const runResources = globalThis.QuilooIDEState.createRunResourceCache();
+const runResources = globalThis.AgentKronigIDEState.createRunResourceCache();
 runResources.select("run-1");
 runResources.put("run-1", {files: [{path: "first.py"}]});
 assertEqual(runResources.current().files[0].path, "first.py", "selected run receives its own changes");
@@ -79,7 +79,7 @@ assertEqual(runResources.current(), null, "late response for another run cannot 
 runResources.put("run-2", {files: [{path: "second.py"}]});
 assertEqual(runResources.current().files[0].path, "second.py", "current run accepts its matching response");
 
-const repositoryRequests = globalThis.QuilooIDEState.createRepositoryRequestCoordinator();
+const repositoryRequests = globalThis.AgentKronigIDEState.createRepositoryRequestCoordinator();
 const firstRepositoryRequest = repositoryRequests.beginNavigation("models");
 assertEqual(repositoryRequests.currentPath(), "models", "navigation records its intended path before awaiting");
 assertEqual(
@@ -110,45 +110,45 @@ assertEqual(
 assertEqual(repositoryRequests.isCurrent(thirdRepositoryRequest), true, "foreground navigation remains current");
 repositoryRequests.finish(thirdRepositoryRequest);
 assertEqual(
-  globalThis.QuilooIDEState.shouldRefreshRepository("tool_call_completed"),
+  globalThis.AgentKronigIDEState.shouldRefreshRepository("tool_call_completed"),
   true,
   "completed tools refresh the repository tree",
 );
 assertEqual(
-  globalThis.QuilooIDEState.shouldRefreshRepository("run_completed"),
+  globalThis.AgentKronigIDEState.shouldRefreshRepository("run_completed"),
   true,
   "terminal runs perform a final repository refresh",
 );
 assertEqual(
-  globalThis.QuilooIDEState.shouldRefreshRepository("tool_call_started"),
+  globalThis.AgentKronigIDEState.shouldRefreshRepository("tool_call_started"),
   false,
   "starting a tool does not issue a premature refresh",
 );
 
 assertEqual(
-  globalThis.QuilooIDEState.shouldAutoFollowChat("message-1", "message-2", true, false),
+  globalThis.AgentKronigIDEState.shouldAutoFollowChat("message-1", "message-2", true, false),
   true,
   "a new message follows when the reader is already near the bottom",
 );
 assertEqual(
-  globalThis.QuilooIDEState.shouldAutoFollowChat("message-1", "message-2", false, false),
+  globalThis.AgentKronigIDEState.shouldAutoFollowChat("message-1", "message-2", false, false),
   false,
   "a new message preserves the reader's position when they scrolled up",
 );
 assertEqual(
-  globalThis.QuilooIDEState.shouldAutoFollowChat("message-2", "message-2", true, false),
+  globalThis.AgentKronigIDEState.shouldAutoFollowChat("message-2", "message-2", true, false),
   false,
   "unchanged polling data does not force a scroll",
 );
 assertEqual(
-  globalThis.QuilooIDEState.shouldAutoFollowChat("message-2", "message-2", false, true),
+  globalThis.AgentKronigIDEState.shouldAutoFollowChat("message-2", "message-2", false, true),
   true,
   "an explicit send can always request bottom alignment",
 );
 
 let refreshCalls = 0;
 let releaseRefresh;
-const refreshCoordinator = globalThis.QuilooIDEState.createRefreshCoordinator(
+const refreshCoordinator = globalThis.AgentKronigIDEState.createRefreshCoordinator(
   () => {
     refreshCalls += 1;
     return new Promise((resolve) => { releaseRefresh = resolve; });
