@@ -230,21 +230,21 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 }
 .file-viewer.hidden { display: none; }
 .file-viewer-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  min-height: 72px;
-  padding: 13px 16px;
+  gap: 12px;
+  min-height: 46px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--border);
   background: var(--surface);
 }
 .file-identity { min-width: 0; }
 .file-identity h1 {
-  margin: 4px 0 3px;
+  margin: 0 0 2px;
   overflow: hidden;
   color: var(--text-strong);
-  font-size: 0.93rem;
+  font-size: 0.8rem;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -253,26 +253,34 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
   margin: 0;
   overflow: hidden;
   color: var(--muted);
-  font: 0.62rem var(--font-mono);
+  font: 0.54rem var(--font-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.file-viewer-actions, .file-viewer-modes, .image-controls {
+.file-viewer-actions, .file-viewer-modes, .file-viewer-utilities, .image-controls {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
 }
-.file-viewer-actions > button, .file-viewer-actions > a, .file-viewer-modes button, .image-controls button {
-  padding: 6px 8px;
+.file-viewer-actions {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.file-viewer-actions::-webkit-scrollbar { display: none; }
+.file-viewer-utilities > button, .file-viewer-utilities > a, .file-viewer-modes button, .image-controls button {
+  min-height: 26px;
+  padding: 4px 7px;
   color: #aeb7c1;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-small);
   background: transparent;
-  font-size: 0.62rem;
+  font-size: 0.58rem;
   text-decoration: none;
   white-space: nowrap;
 }
-.file-viewer-actions > button:hover, .file-viewer-actions > a:hover, .file-viewer-modes button:hover, .image-controls button:hover {
+.file-viewer-utilities > button:hover, .file-viewer-utilities > a:hover, .file-viewer-modes button:hover, .image-controls button:hover {
   color: var(--text-strong);
   background: var(--surface-hover);
 }
@@ -288,6 +296,7 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
   background: #0d1014;
   font: 0.58rem var(--font-mono);
 }
+.file-viewer-meta[hidden] { display: none; }
 .file-viewer-meta span + span::before { content: "·"; margin-right: 14px; color: #45505b; }
 .file-viewer-notice {
   margin: 0;
@@ -656,6 +665,6 @@ dialog button { padding: 7px 12px; }
   #close-agent-panel { display: inline-flex; }
   .workspace-welcome { padding: 36px 20px; }
   .workspace-facts > div { grid-template-columns: 1fr; gap: 5px; }
-  .file-viewer-header { align-items: stretch; flex-direction: column; gap: 8px; }
-  .file-viewer-actions { flex-wrap: wrap; }
+  .file-viewer-header { grid-template-columns: minmax(0, 1fr); gap: 5px; min-height: 0; padding: 7px 8px; }
+  .file-viewer-actions { width: 100%; }
 }

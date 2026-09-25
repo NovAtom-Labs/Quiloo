@@ -214,3 +214,21 @@ def test_responsive_styles_keep_agent_panel_available_as_a_drawer() -> None:
         source,
         re.DOTALL,
     )
+
+
+def test_file_viewer_toolbar_stays_compact_across_widths() -> None:
+    project_root = Path(__file__).parents[3]
+    source = (project_root / "src/tcad_agent/web/static/ide.css").read_text()
+
+    header = re.search(r"\.file-viewer-header\s*\{([^}]*)\}", source, re.DOTALL)
+    assert header is not None
+    assert "grid-template-columns: minmax(0, 1fr) auto" in header.group(1)
+    assert "min-height: 46px" in header.group(1)
+    assert "min-height: 72px" not in source
+    assert ".file-viewer-meta[hidden] { display: none; }" in source
+    assert re.search(
+        r"\.file-viewer-actions\s*\{[^}]*overflow-x:\s*auto",
+        source,
+        re.DOTALL,
+    )
+    assert ".file-viewer-actions { flex-wrap: wrap; }" not in source

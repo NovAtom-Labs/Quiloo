@@ -112,6 +112,20 @@ def test_workspace_header_separates_product_and_company_branding(tmp_path: Path)
     assert 'aria-valuenow="420"' in page
 
 
+def test_file_viewer_uses_one_compact_toolbar(tmp_path: Path) -> None:
+    page = client(tmp_path).get("/").text
+
+    assert 'class="file-viewer-utilities"' in page
+    assert 'id="file-viewer-meta" class="file-viewer-meta" hidden' in page
+    assert 'id="file-viewer-kind"' not in page
+    assert page.index('id="file-viewer-edit"') < page.index(
+        'id="file-viewer-refresh"'
+    )
+    assert page.index('id="file-viewer-download"') < page.index(
+        'id="file-viewer-close"'
+    )
+
+
 def test_legacy_guided_pages_redirect_to_repository_workspace(tmp_path: Path) -> None:
     web = client(tmp_path)
     simulation = web.get("/simulate", follow_redirects=False)

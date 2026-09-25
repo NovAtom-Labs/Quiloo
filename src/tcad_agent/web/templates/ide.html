@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260925-7">
+    <link rel="stylesheet" href="/static/ide.css?v=20260925-8">
   </head>
   <body>
     <div class="ide-shell">
@@ -67,7 +67,6 @@
         <section id="file-viewer" class="file-viewer hidden" aria-label="File viewer">
           <header class="file-viewer-header">
             <div class="file-identity">
-              <span id="file-viewer-kind" class="section-label">File</span>
               <h1 id="file-viewer-title">File viewer</h1>
               <p id="file-viewer-path"></p>
             </div>
@@ -76,15 +75,17 @@
                 <button id="file-viewer-preview" class="is-active" type="button">Preview</button>
                 <button id="file-viewer-source" type="button">Source</button>
               </div>
-              <button id="file-viewer-refresh" type="button">Refresh</button>
-              <button id="file-viewer-edit" type="button">Edit</button>
-              <button id="file-viewer-save" type="button" hidden>Save</button>
-              <button id="file-viewer-cancel" type="button" hidden>Cancel</button>
-              <a id="file-viewer-download" href="#" download>Download</a>
-              <button id="file-viewer-close" type="button" aria-label="Close file">Close</button>
+              <div class="file-viewer-utilities">
+                <button id="file-viewer-edit" type="button">Edit</button>
+                <button id="file-viewer-save" type="button" hidden>Save</button>
+                <button id="file-viewer-cancel" type="button" hidden>Cancel</button>
+                <button id="file-viewer-refresh" type="button">Refresh</button>
+                <a id="file-viewer-download" href="#" download>Download</a>
+                <button id="file-viewer-close" type="button" aria-label="Close file">Close</button>
+              </div>
             </div>
           </header>
-          <div class="file-viewer-meta">
+          <div id="file-viewer-meta" class="file-viewer-meta" hidden>
             <span id="file-viewer-type">Unknown type</span>
             <span id="file-viewer-size">0 B</span>
             <span id="file-viewer-state">Read only</span>
@@ -175,6 +176,6 @@
     <script src="/static/ide-layout.js?v=20260925-3" defer></script>
     <script src="/static/ide-agent.js?v=20260925-5" defer></script>
     <script src="/static/ide-changes.js?v=20260925-3" defer></script>
-    <script src="/static/ide.js?v=20260925-10" defer></script>
+    <script src="/static/ide.js?v=20260925-11" defer></script>
   </body>
 </html>

@@ -41,7 +41,6 @@ const sendMessage = document.querySelector("#send-message");
 const errorNotice = document.querySelector("#ide-error");
 const workspaceWelcome = document.querySelector("#workspace-welcome");
 const fileViewer = document.querySelector("#file-viewer");
-const fileViewerKind = document.querySelector("#file-viewer-kind");
 const fileViewerTitle = document.querySelector("#file-viewer-title");
 const fileViewerPath = document.querySelector("#file-viewer-path");
 const fileViewerType = document.querySelector("#file-viewer-type");
@@ -394,7 +393,6 @@ function showFile(preview) {
   editingFile = null;
   workspaceWelcome.classList.add("hidden");
   fileViewer.classList.remove("hidden");
-  fileViewerKind.textContent = preview.kind.toUpperCase();
   fileViewerTitle.textContent = preview.name;
   fileViewerPath.textContent = preview.path;
   fileViewerType.textContent = preview.mime_type;
@@ -418,7 +416,6 @@ function showDiff(change) {
   editingFile = null;
   workspaceWelcome.classList.add("hidden");
   fileViewer.classList.remove("hidden");
-  fileViewerKind.textContent = change.operationLabel.toUpperCase();
   fileViewerTitle.textContent = change.label.split("/").at(-1) || change.label;
   fileViewerPath.textContent = change.detail || change.label;
   fileViewerType.textContent = "Unified diff";
