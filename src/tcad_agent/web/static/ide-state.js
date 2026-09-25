@@ -92,6 +92,66 @@
     };
   }
 
+  function createRepositoryRequestCoordinator(initialPath = ".") {
+    let generation = 0;
+    let desiredPath = initialPath;
+    let refreshPending = false;
+    const pendingNavigation = new Set();
+
+    function createToken(path, kind) {
+      generation += 1;
+      return {generation, kind, path};
+    }
+
+    return {
+      beginNavigation(path) {
+        desiredPath = path;
+        const token = createToken(path, "navigation");
+        pendingNavigation.add(token);
+        return token;
+      },
+      beginRefresh() {
+        if (pendingNavigation.size) {
+          refreshPending = true;
+          return null;
+        }
+        return createToken(desiredPath, "refresh");
+      },
+      currentPath() {
+        return desiredPath;
+      },
+      finish(token) {
+        if (token?.kind !== "navigation" || !pendingNavigation.delete(token)) return false;
+        if (pendingNavigation.size || !refreshPending) return false;
+        refreshPending = false;
+        return true;
+      },
+      hasNavigationPending() {
+        return pendingNavigation.size > 0;
+      },
+      isCurrent(token) {
+        return Boolean(token)
+          && token.generation === generation
+          && token.path === desiredPath;
+      },
+    };
+  }
+
+  function shouldAutoFollowChat(previousLastId, nextLastId, wasNearBottom, forceScroll) {
+    if (forceScroll) return true;
+    return Boolean(nextLastId && nextLastId !== previousLastId && wasNearBottom);
+  }
+
+  function shouldRefreshRepository(eventKind) {
+    return [
+      "tool_call_completed",
+      "run_completed",
+      "run_failed",
+      "run_blocked",
+      "run_cancelled",
+    ].includes(eventKind);
+  }
+
   function controlsForState(state) {
     const running = state === "queued" || state === "running";
     const waiting = state === "waiting_for_approval" || state === "waiting_for_user";
@@ -135,10 +195,13 @@
   globalThis.QuilooIDEState = {
     controlsForState,
     createRefreshCoordinator,
+    createRepositoryRequestCoordinator,
     createRunResourceCache,
     createEventLedger,
     createNavigationGuard,
     createSubmissionTracker,
     isActiveState,
+    shouldAutoFollowChat,
+    shouldRefreshRepository,
   };
 })();

@@ -79,6 +79,73 @@ assertEqual(runResources.current(), null, "late response for another run cannot 
 runResources.put("run-2", {files: [{path: "second.py"}]});
 assertEqual(runResources.current().files[0].path, "second.py", "current run accepts its matching response");
 
+const repositoryRequests = globalThis.QuilooIDEState.createRepositoryRequestCoordinator();
+const firstRepositoryRequest = repositoryRequests.beginNavigation("models");
+assertEqual(repositoryRequests.currentPath(), "models", "navigation records its intended path before awaiting");
+assertEqual(
+  repositoryRequests.beginRefresh(),
+  null,
+  "background refresh cannot supersede pending user navigation",
+);
+const secondRepositoryRequest = repositoryRequests.beginNavigation("results");
+assertEqual(repositoryRequests.isCurrent(firstRepositoryRequest), false, "stale repository responses are ignored");
+assertEqual(repositoryRequests.isCurrent(secondRepositoryRequest), true, "latest repository response is accepted");
+assertEqual(
+  repositoryRequests.finish(secondRepositoryRequest),
+  false,
+  "a deferred refresh waits for every foreground navigation to settle",
+);
+assertEqual(
+  repositoryRequests.finish(firstRepositoryRequest),
+  true,
+  "the final foreground completion replays one coalesced repository refresh",
+);
+const backgroundRepositoryRequest = repositoryRequests.beginRefresh();
+const thirdRepositoryRequest = repositoryRequests.beginNavigation("plots");
+assertEqual(
+  repositoryRequests.isCurrent(backgroundRepositoryRequest),
+  false,
+  "later navigation supersedes an in-flight background refresh",
+);
+assertEqual(repositoryRequests.isCurrent(thirdRepositoryRequest), true, "foreground navigation remains current");
+repositoryRequests.finish(thirdRepositoryRequest);
+assertEqual(
+  globalThis.QuilooIDEState.shouldRefreshRepository("tool_call_completed"),
+  true,
+  "completed tools refresh the repository tree",
+);
+assertEqual(
+  globalThis.QuilooIDEState.shouldRefreshRepository("run_completed"),
+  true,
+  "terminal runs perform a final repository refresh",
+);
+assertEqual(
+  globalThis.QuilooIDEState.shouldRefreshRepository("tool_call_started"),
+  false,
+  "starting a tool does not issue a premature refresh",
+);
+
+assertEqual(
+  globalThis.QuilooIDEState.shouldAutoFollowChat("message-1", "message-2", true, false),
+  true,
+  "a new message follows when the reader is already near the bottom",
+);
+assertEqual(
+  globalThis.QuilooIDEState.shouldAutoFollowChat("message-1", "message-2", false, false),
+  false,
+  "a new message preserves the reader's position when they scrolled up",
+);
+assertEqual(
+  globalThis.QuilooIDEState.shouldAutoFollowChat("message-2", "message-2", true, false),
+  false,
+  "unchanged polling data does not force a scroll",
+);
+assertEqual(
+  globalThis.QuilooIDEState.shouldAutoFollowChat("message-2", "message-2", false, true),
+  true,
+  "an explicit send can always request bottom alignment",
+);
+
 let refreshCalls = 0;
 let releaseRefresh;
 const refreshCoordinator = globalThis.QuilooIDEState.createRefreshCoordinator(

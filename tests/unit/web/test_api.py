@@ -72,7 +72,11 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert parser.elements["file-editor"] == "textarea"
     assert parser.elements["file-viewer-download"] == "a"
     assert parser.elements["agent-panel"] == "aside"
+    assert parser.elements["conversation-select"] == "select"
+    assert "conversation-list" not in parser.elements
+    assert "Select a conversation" in page.text
     assert parser.elements["conversation-messages"] == "div"
+    assert parser.elements["agent-progress"] == "div"
     assert parser.elements["agent-activity"] == "div"
     assert parser.elements["open-workspace"] == "button"
     assert parser.elements["browse-workspace"] == "button"

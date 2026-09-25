@@ -6,7 +6,7 @@ const browseWorkspace = document.querySelector("#browse-workspace");
 const workspaceStatus = document.querySelector("#workspace-status");
 const gitState = document.querySelector("#git-state");
 const repositoryTree = document.querySelector("#repository-tree");
-const conversationList = document.querySelector("#conversation-list");
+const conversationSelect = document.querySelector("#conversation-select");
 const agentPanel = document.querySelector("#agent-panel");
 const toggleAgentPanel = document.querySelector("#toggle-agent-panel");
 const closeAgentPanel = document.querySelector("#close-agent-panel");
@@ -16,8 +16,9 @@ const conversationDialog = document.querySelector("#conversation-dialog");
 const conversationForm = document.querySelector("#conversation-form");
 const conversationTitleInput = document.querySelector("#conversation-title-input");
 const cancelConversation = document.querySelector("#cancel-conversation");
-const conversationTitle = document.querySelector("#conversation-title");
 const conversationMessages = document.querySelector("#conversation-messages");
+const agentProgress = document.querySelector("#agent-progress");
+const agentProgressText = document.querySelector("#agent-progress-text");
 const agentTabs = Array.from(document.querySelectorAll("[data-agent-view]"));
 const agentViews = Array.from(document.querySelectorAll("[data-agent-panel]"));
 const agentActivity = document.querySelector("#agent-activity");
@@ -70,6 +71,7 @@ let fileRequestGeneration = 0;
 let selectedRunId = null;
 let activeChangeSet = null;
 const navigationGuard = window.QuilooIDEState.createNavigationGuard();
+const repositoryRequests = window.QuilooIDEState.createRepositoryRequestCoordinator();
 const submissions = window.QuilooIDEState.createSubmissionTracker();
 const runPresentation = window.QuilooIDEEvents.createRunPresentation();
 const runChanges = window.QuilooIDEState.createRunResourceCache();
@@ -458,56 +460,104 @@ async function openFile(entry) {
   }
 }
 
-async function loadEntries(relative = ".", routeToken = navigationGuard.currentRoute()) {
+async function loadEntries(
+  relative = ".",
+  routeToken = navigationGuard.currentRoute(),
+  {background = false} = {},
+) {
   const workspaceId = activeWorkspace.id;
-  const entries = await api(`/api/workspaces/${workspaceId}/entries?path=${encodeURIComponent(relative)}`);
-  if (!navigationGuard.isCurrent(routeToken) || activeWorkspace?.id !== workspaceId) return;
-  clearNode(repositoryTree);
-  if (relative !== ".") {
-    const rootButton = document.createElement("button");
-    rootButton.type = "button";
-    rootButton.className = "tree-entry tree-back";
-    rootButton.textContent = "← Repository root";
-    rootButton.addEventListener("click", () => void loadEntries(".").catch((error) => showError(error.message)));
-    repositoryTree.append(rootButton);
-  }
-  if (!entries.length) repositoryTree.append(emptyCopy("This directory is empty."));
-  entries.forEach((entry) => {
-    const button = document.createElement("button");
-    const marker = document.createElement("span");
-    const name = document.createElement("span");
-    button.type = "button";
-    button.className = "tree-entry";
-    button.dataset.path = entry.path;
-    button.setAttribute("role", "treeitem");
-    marker.className = `entry-marker is-${entry.kind}`;
-    marker.textContent = entry.kind === "directory" ? "D" : entry.kind === "file" ? "F" : "L";
-    name.textContent = entry.name;
-    button.append(marker, name);
-    if (entry.kind === "directory") {
-      button.addEventListener("click", () => void loadEntries(entry.path).catch((error) => showError(error.message)));
-    } else {
-      button.addEventListener("click", () => void openFile(entry));
+  const request = background
+    ? repositoryRequests.beginRefresh()
+    : repositoryRequests.beginNavigation(relative);
+  if (!request) return;
+  try {
+    const entries = await api(
+      `/api/workspaces/${workspaceId}/entries?path=${encodeURIComponent(request.path)}`,
+    );
+    if (
+      !repositoryRequests.isCurrent(request)
+      || !navigationGuard.isCurrent(routeToken)
+      || activeWorkspace?.id !== workspaceId
+    ) return;
+    clearNode(repositoryTree);
+    if (request.path !== ".") {
+      const rootButton = document.createElement("button");
+      rootButton.type = "button";
+      rootButton.className = "tree-entry tree-back";
+      rootButton.textContent = "← Repository root";
+      rootButton.addEventListener("click", () => void loadEntries(".").catch((error) => showError(error.message)));
+      repositoryTree.append(rootButton);
     }
-    repositoryTree.append(button);
-  });
+    if (!entries.length) repositoryTree.append(emptyCopy("This directory is empty."));
+    entries.forEach((entry) => {
+      const button = document.createElement("button");
+      const marker = document.createElement("span");
+      const name = document.createElement("span");
+      button.type = "button";
+      button.className = "tree-entry";
+      button.dataset.path = entry.path;
+      button.setAttribute("role", "treeitem");
+      marker.className = `entry-marker is-${entry.kind}`;
+      marker.textContent = entry.kind === "directory" ? "D" : entry.kind === "file" ? "F" : "L";
+      name.textContent = entry.name;
+      button.append(marker, name);
+      if (entry.kind === "directory") {
+        button.addEventListener("click", () => void loadEntries(entry.path).catch((error) => showError(error.message)));
+      } else {
+        button.addEventListener("click", () => void openFile(entry));
+      }
+      repositoryTree.append(button);
+    });
+  } catch (error) {
+    const stale = !repositoryRequests.isCurrent(request)
+      || !navigationGuard.isCurrent(routeToken)
+      || activeWorkspace?.id !== workspaceId;
+    if (!stale) throw error;
+  } finally {
+    const refreshDeferred = repositoryRequests.finish(request);
+    if (refreshDeferred) {
+      queueMicrotask(() => {
+        if (!activeWorkspace) return;
+        void refreshCurrentRepository().catch((error) => showError(error.message));
+      });
+    }
+  }
 }
 
-function renderConversationList(conversations) {
-  clearNode(conversationList);
-  const heading = document.createElement("p");
-  heading.className = "list-label";
-  heading.textContent = "CONVERSATIONS";
-  conversationList.append(heading);
-  if (!conversations.length) conversationList.append(emptyCopy("No conversations yet."));
+async function refreshCurrentRepository() {
+  if (!activeWorkspace) return;
+  const relative = repositoryRequests.currentPath();
+  try {
+    await loadEntries(relative, navigationGuard.currentRoute(), {background: true});
+  } catch (error) {
+    if (
+      relative === "."
+      || repositoryRequests.currentPath() !== relative
+      || repositoryRequests.hasNavigationPending()
+    ) throw error;
+    await loadEntries(".");
+  }
+}
+
+function renderConversationSelect(conversations) {
+  clearNode(conversationSelect);
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = conversations.length ? "Select a conversation" : "No conversations";
+  placeholder.disabled = conversations.length > 0;
+  conversationSelect.append(placeholder);
+  if (!conversations.length) {
+    conversationSelect.disabled = true;
+    return;
+  }
   conversations.forEach((conversation) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = conversation.id === activeConversation?.id ? "is-active" : "";
-    button.textContent = conversation.title;
-    button.addEventListener("click", () => navigate(`/workspaces/${activeWorkspace.id}/conversations/${conversation.id}`));
-    conversationList.append(button);
+    const option = document.createElement("option");
+    option.value = conversation.id;
+    option.textContent = conversation.title;
+    conversationSelect.append(option);
   });
+  conversationSelect.disabled = false;
+  conversationSelect.value = activeConversation?.id || "";
 }
 
 function appendMessage(message) {
@@ -532,53 +582,64 @@ function appendMessage(message) {
   return article;
 }
 
-function renderMessages(messages, {focusFinal = false} = {}) {
+function scrollConversationToBottom() {
+  requestAnimationFrame(() => {
+    conversationMessages.scrollTop = conversationMessages.scrollHeight;
+  });
+}
+
+function isConversationNearBottom() {
+  const remaining = conversationMessages.scrollHeight
+    - conversationMessages.clientHeight
+    - conversationMessages.scrollTop;
+  return remaining <= 48;
+}
+
+function renderMessages(messages, {forceScroll = false} = {}) {
+  const previousLastId = conversationMessages.querySelector(".message:last-of-type")?.dataset.messageId;
+  const previousScrollTop = conversationMessages.scrollTop;
+  const wasNearBottom = isConversationNearBottom();
+  const nextLastId = messages.at(-1)?.id;
+  const shouldFollow = window.QuilooIDEState.shouldAutoFollowChat(
+    previousLastId,
+    nextLastId,
+    wasNearBottom,
+    forceScroll,
+  );
   clearNode(conversationMessages);
   if (!messages.length) {
     conversationMessages.append(emptyCopy("Send the first task for this workspace."));
     return;
   }
-  let finalAssistant = null;
   messages.forEach((message) => {
-    const node = appendMessage(message);
-    if (message.role === "assistant") finalAssistant = node;
+    appendMessage(message);
   });
-  if (focusFinal && finalAssistant) finalAssistant.scrollIntoView({block: "start"});
-  else conversationMessages.scrollTop = conversationMessages.scrollHeight;
+  if (shouldFollow) scrollConversationToBottom();
+  else requestAnimationFrame(() => { conversationMessages.scrollTop = previousScrollTop; });
 }
 
 function renderRunIndicator() {
-  document.querySelector("#agent-running")?.remove();
   const controls = window.QuilooIDEState.controlsForState(activeRun?.state);
-  if (controls.send || !activeRun) return;
-  const indicator = document.createElement("article");
-  indicator.id = "agent-running";
-  indicator.className = "message is-agent-status";
-  const label = document.createElement("span");
-  const copy = document.createElement("p");
-  label.textContent = "AGENT";
+  agentProgress.hidden = controls.send || !activeRun;
+  if (agentProgress.hidden) return;
   const presentation = runPresentation.snapshot(activeRun?.id || selectedRunId);
   const current = window.QuilooAgentView.activityRows(presentation)
     .filter((row) => row.status === "running")
     .at(-1);
-  copy.textContent = activeRun.state === "waiting_for_approval"
+  agentProgressText.textContent = activeRun.state === "waiting_for_approval"
     ? "Waiting for your approval"
     : activeRun.state === "paused"
       ? "Run paused"
       : current
         ? `${current.phase}: ${current.label}`
-        : "Run active. Waiting for the next recorded action.";
-  indicator.append(label, copy);
-  conversationMessages.append(indicator);
+        : "Working";
 }
 
-async function refreshMessages(conversationId = activeConversation?.id) {
+async function refreshMessages(conversationId = activeConversation?.id, options = {}) {
   if (!conversationId) return;
   const messages = await api(`/api/conversations/${conversationId}/messages`);
   if (activeConversation?.id !== conversationId) return;
-  const previousLast = conversationMessages.querySelector(".message:last-of-type")?.dataset.messageId;
-  const last = messages.at(-1);
-  renderMessages(messages, {focusFinal: last?.role === "assistant" && last.id !== previousLast});
+  renderMessages(messages, options);
   renderRunIndicator();
 }
 
@@ -1050,6 +1111,9 @@ function connectEvents(conversationId) {
       void loadApprovals(conversationId);
     }
     if (event.kind === "tool_call_completed") void refreshChanges(selectedRunId);
+    if (window.QuilooIDEState.shouldRefreshRepository(event.kind)) {
+      void refreshCurrentRepository().catch((error) => showError(error.message));
+    }
     if (["run_completed", "run_failed", "run_blocked", "run_cancelled"].includes(event.kind)) {
       void refreshChanges(selectedRunId);
       void refreshCoordinator.request(conversationId).catch((error) => showError(error.message));
@@ -1075,8 +1139,7 @@ async function loadConversation(conversationId, routeToken) {
   if (!navigationGuard.isCurrent(routeToken)) return;
   activeConversation = conversation;
   setAgentPanelOpen(true);
-  conversationTitle.textContent = activeConversation.title;
-  await refreshMessages(conversationId);
+  await refreshMessages(conversationId, {forceScroll: true});
   if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
   const run = await api(`/api/conversations/${conversationId}/runs/active`);
   if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
@@ -1093,7 +1156,7 @@ function clearConversation() {
   activeChangeSet = null;
   submissions.reset();
   runPresentation.reset();
-  conversationTitle.textContent = "No conversation";
+  conversationSelect.value = "";
   setRun(null);
   clearNode(conversationMessages);
   conversationMessages.append(emptyCopy("Start or select a conversation."));
@@ -1129,7 +1192,7 @@ async function restoreRoute() {
     if (!navigationGuard.isCurrent(routeToken)) return;
     const conversations = await api(`/api/workspaces/${route.workspaceId}/conversations`);
     if (!navigationGuard.isCurrent(routeToken)) return;
-    renderConversationList(conversations);
+    renderConversationSelect(conversations);
   } catch (error) {
     if (navigationGuard.isCurrent(routeToken)) showError(error.message);
   }
@@ -1213,7 +1276,7 @@ messageForm.addEventListener("submit", async (event) => {
       messageId = message.id;
       if (conversationMessages.querySelector(".empty-copy")) clearNode(conversationMessages);
       appendMessage(message);
-      conversationMessages.scrollTop = conversationMessages.scrollHeight;
+      scrollConversationToBottom();
     }
     const run = await api(`/api/conversations/${conversationId}/runs`, {
       method: "POST",
@@ -1253,6 +1316,10 @@ pauseRun.addEventListener("click", () => void controlRun("pause"));
 resumeRun.addEventListener("click", () => void controlRun("resume"));
 stopRun.addEventListener("click", () => void controlRun("stop"));
 refreshConversation.addEventListener("click", () => void requestConversationRefresh());
+conversationSelect.addEventListener("change", () => {
+  if (!conversationSelect.value || !activeWorkspace) return;
+  navigate(`/workspaces/${activeWorkspace.id}/conversations/${conversationSelect.value}`);
+});
 agentTabs.forEach((button) => {
   button.addEventListener("click", () => activateAgentView(button.dataset.agentView));
   button.addEventListener("keydown", (event) => {

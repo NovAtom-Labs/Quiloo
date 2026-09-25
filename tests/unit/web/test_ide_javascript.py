@@ -1,4 +1,5 @@
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -172,7 +173,11 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         "permission_category",
         "technicalArguments",
         "Reversibility:",
-        "Run active. Waiting for the next recorded action.",
+        "refreshCurrentRepository",
+        "shouldRefreshRepository(event.kind)",
+        'conversationSelect.addEventListener("change"',
+        "scrollConversationToBottom",
+        "agentProgress",
         "change-validation-link",
         "data-action-id",
         "affectedFilePaths(row, activeWorkspace?.root)",
@@ -185,6 +190,7 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
 
     assert ".slice(0, 12_000)" not in source
     assert "Working in the repository" not in source
+    assert "Run active. Waiting for the next recorded action." not in source
     assert 'addEventListener("keydown"' in source
 
 
@@ -201,3 +207,10 @@ def test_responsive_styles_keep_agent_panel_available_as_a_drawer() -> None:
     assert "text-overflow: ellipsis" in source
     assert ".approval-technical" in source
     assert ".is-approve-category" in source
+    assert ".agent-progress" in source
+    assert "height: 100%" in source
+    assert re.search(
+        r"\.agent-chat\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column",
+        source,
+        re.DOTALL,
+    )

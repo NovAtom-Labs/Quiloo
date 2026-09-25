@@ -132,30 +132,6 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .browse-workspace { width: 100%; margin-top: 7px; padding: 7px 10px; }
 .path-entry button:hover, .browse-workspace:hover, #create-conversation:hover, #send-message:hover { background: #6d8bb8; }
 
-.conversation-list { padding: 9px 6px; border-bottom: 1px solid var(--border); }
-.list-label {
-  margin: 3px 7px 7px;
-  color: var(--muted);
-  font-size: 0.57rem;
-  font-weight: 650;
-  letter-spacing: 0.055em;
-  text-transform: uppercase;
-}
-.conversation-list button {
-  width: 100%;
-  padding: 7px 8px;
-  overflow: hidden;
-  color: #aeb7c1;
-  border: 0;
-  border-radius: var(--radius-small);
-  background: transparent;
-  font-size: 0.7rem;
-  text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.conversation-list button:hover { color: var(--text); background: var(--surface-hover); }
-.conversation-list button.is-active { color: var(--text-strong); background: var(--blue-soft); }
 .repository-tree { padding: 8px 6px 24px; }
 .tree-entry {
   display: flex;
@@ -422,14 +398,28 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .agent-view { min-width: 0; min-height: 0; }
 .agent-view[hidden] { display: none; }
 .agent-chat {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto auto;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   min-height: 0;
 }
-.agent-heading > div:first-child { display: grid; gap: 3px; min-width: 0; }
+.agent-session { display: grid; gap: 3px; min-width: 0; margin: 0; }
 .agent-heading span { color: var(--muted); font-size: 0.56rem; letter-spacing: 0.055em; }
-.agent-heading strong { overflow: hidden; font-size: 0.74rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .agent-heading b { color: var(--blue-strong); font-weight: 650; }
+.agent-session select {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 24px 0 0;
+  overflow: hidden;
+  color: #d1d7dd;
+  border: 0;
+  background: transparent;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+.agent-session select:focus-visible { outline: 1px solid var(--blue); outline-offset: 2px; }
 .agent-heading-actions { display: flex; align-items: center; gap: 5px; }
 #create-conversation, #refresh-conversation, #close-agent-panel { padding: 6px 8px; white-space: nowrap; }
 #refresh-conversation, #close-agent-panel {
@@ -460,6 +450,23 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 }
 .run-controls button:hover { color: var(--text-strong); background: var(--surface-hover); }
 #stop-run { margin-left: auto; color: #d6a4a7; border-color: rgba(198, 124, 128, 0.45); }
+.agent-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 29px;
+  padding: 5px 11px;
+  overflow: hidden;
+  color: #aeb8c2;
+  border-bottom: 1px solid var(--border);
+  background: rgba(97, 127, 174, 0.055);
+  font: 0.58rem var(--font-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-progress[hidden] { display: none; }
+.agent-progress::before { flex: 0 0 auto; color: var(--blue-strong); content: "●"; animation: thinking-pulse 1.2s ease-in-out infinite; }
+.agent-progress span { overflow: hidden; text-overflow: ellipsis; }
 .ide-error {
   margin: 8px 10px 0;
   padding: 8px 9px;
@@ -469,12 +476,10 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
   font-size: 0.68rem;
 }
 .conversation-messages, .agent-activity, .agent-changes { min-height: 0; overflow-y: auto; }
-.conversation-messages { padding: 0 11px; }
+.conversation-messages { flex: 1 1 auto; padding: 0 11px; }
 .message { padding: 13px 2px 14px 10px; border-bottom: 1px solid var(--border); border-left: 2px solid var(--border-strong); }
 .message.is-user { border-left-color: var(--blue); }
 .message.is-assistant { border-left-color: #6b8f83; }
-.message.is-agent-status { border-left-color: var(--amber); background: rgba(202, 160, 92, 0.06); }
-.message.is-agent-status p::after { content: ""; display: inline-block; width: 1.1em; animation: agent-pulse 1.2s steps(4, end) infinite; }
 .message > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .message > header span, .message > header time { color: var(--muted-dim); font: 0.52rem var(--font-mono); letter-spacing: 0.055em; }
 .message-body { margin-top: 6px; color: #d3d8de; font-size: 0.73rem; line-height: 1.58; }
@@ -567,18 +572,12 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
   0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
 }
-.message-form { padding: 10px; border-top: 1px solid var(--border); background: var(--surface); }
+.message-form { position: relative; z-index: 1; flex: 0 0 auto; padding: 10px; border-top: 1px solid var(--border); background: var(--surface); }
 .message-form textarea { min-height: 70px; font-size: 0.72rem; }
 .message-form > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 7px; }
 .message-form > div > span { color: var(--muted-dim); font-size: 0.55rem; }
 #send-message { padding: 6px 14px; }
 
-@keyframes agent-pulse {
-  0% { content: ""; }
-  25% { content: "."; }
-  50% { content: ".."; }
-  75%, 100% { content: "..."; }
-}
 
 dialog {
   width: min(420px, calc(100vw - 40px));

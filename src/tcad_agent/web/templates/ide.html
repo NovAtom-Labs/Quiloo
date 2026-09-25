@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Quiloo workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260924-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260925-4">
+    <link rel="stylesheet" href="/static/ide.css?v=20260925-5">
   </head>
   <body>
     <div class="ide-shell">
@@ -38,7 +38,6 @@
           </div>
           <button id="browse-workspace" class="browse-workspace" type="button">Open folder</button>
         </form>
-        <div id="conversation-list" class="conversation-list" aria-label="Conversations"></div>
         <div id="repository-tree" class="repository-tree" role="tree">
           <p class="empty-copy">Open a local repository to inspect its files.</p>
         </div>
@@ -103,7 +102,12 @@
         </nav>
         <section id="agent-view-chat" class="agent-view agent-chat is-active" data-agent-panel="chat" role="tabpanel" aria-labelledby="agent-tab-chat">
           <div class="agent-heading">
-            <div><span>SESSION · <b id="run-state">IDLE</b></span><strong id="conversation-title">No conversation</strong></div>
+            <label class="agent-session" for="conversation-select">
+              <span>SESSION · <b id="run-state">IDLE</b></span>
+              <select id="conversation-select" aria-label="Conversation" disabled>
+                <option value="">Select a conversation</option>
+              </select>
+            </label>
             <div class="agent-heading-actions">
               <button id="refresh-conversation" type="button" disabled>Refresh</button>
               <button id="create-conversation" type="button" disabled>New conversation</button>
@@ -114,6 +118,9 @@
             <button id="pause-run" type="button" hidden>Pause</button>
             <button id="resume-run" type="button" hidden>Resume</button>
             <button id="stop-run" type="button" hidden>Stop</button>
+          </div>
+          <div id="agent-progress" class="agent-progress" role="status" aria-live="polite" hidden>
+            <span id="agent-progress-text">Working</span>
           </div>
           <p id="ide-error" class="ide-error hidden" role="alert" aria-live="assertive"></p>
           <div id="conversation-messages" class="conversation-messages" aria-live="polite">
@@ -156,13 +163,13 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/ide-state.js?v=20260925-3" defer></script>
+    <script src="/static/ide-state.js?v=20260925-6" defer></script>
     <script src="/static/file-viewer.js?v=20260924-1" defer></script>
     <script src="/static/ide-markdown.js?v=20260925-1" defer></script>
     <script src="/static/ide-events.js?v=20260925-4" defer></script>
     <script src="/static/ide-layout.js?v=20260925-2" defer></script>
     <script src="/static/ide-agent.js?v=20260925-5" defer></script>
     <script src="/static/ide-changes.js?v=20260925-3" defer></script>
-    <script src="/static/ide.js?v=20260925-7" defer></script>
+    <script src="/static/ide.js?v=20260925-10" defer></script>
   </body>
 </html>
