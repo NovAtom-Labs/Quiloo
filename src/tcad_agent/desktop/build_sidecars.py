@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import platform
 import shutil
 import subprocess
@@ -12,6 +13,44 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
+
+
+def _digest(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while chunk := handle.read(1024 * 1024):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_web_assets(project_root: Path, backend_distribution: Path) -> None:
+    """Fail when frozen frontend assets differ from the checkout being built."""
+
+    source_web = project_root / "src" / "tcad_agent" / "web"
+    if not source_web.is_dir():
+        return
+    packaged_web = backend_distribution / "_internal" / "tcad_agent" / "web"
+    source_files = {
+        path.relative_to(source_web)
+        for folder in ("static", "templates")
+        for path in (source_web / folder).rglob("*")
+        if path.is_file()
+    }
+    packaged_files = {
+        path.relative_to(packaged_web)
+        for folder in ("static", "templates")
+        for path in (packaged_web / folder).rglob("*")
+        if path.is_file()
+    }
+    mismatches = source_files ^ packaged_files
+    for relative in source_files & packaged_files:
+        if _digest(source_web / relative) != _digest(packaged_web / relative):
+            mismatches.add(relative)
+    if mismatches:
+        summary = ", ".join(str(path) for path in sorted(mismatches)[:5])
+        raise RuntimeError(
+            "packaged frontend does not match the current checkout: " + summary
+        )
 
 
 def platform_tag(system: str, machine: str) -> str:
@@ -96,6 +135,11 @@ def build_sidecars(
                 raise FileNotFoundError(
                     f"PyInstaller output is missing: {executable}"
                 )
+
+        verify_web_assets(
+            project_root,
+            staging_root / "dist" / "agent-kronig-backend",
+        )
 
         target.mkdir(parents=True)
         for destination, distribution_name, _ in builds:

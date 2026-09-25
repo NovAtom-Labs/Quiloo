@@ -110,3 +110,49 @@ def test_build_sidecars_fails_when_pyinstaller_output_is_absent(
                 command, 0
             ),
         )
+
+
+def test_build_sidecars_rejects_frontend_assets_from_a_stale_install(
+    tmp_path: Path,
+) -> None:
+    project = tmp_path / "project"
+    specs = project / "packaging" / "pyinstaller"
+    specs.mkdir(parents=True)
+    (specs / "backend.spec").write_text("backend")
+    (specs / "devsim_runner.spec").write_text("devsim")
+    source_asset = project / "src" / "tcad_agent" / "web" / "static" / "ide.css"
+    source_asset.parent.mkdir(parents=True)
+    source_asset.write_text("current checkout")
+    staging = tmp_path / "staging"
+
+    def runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        name = (
+            "agent-kronig-backend"
+            if command[-1].endswith("backend.spec")
+            else "agent-kronig-devsim"
+        )
+        distribution = staging / "dist" / name
+        distribution.mkdir(parents=True)
+        (distribution / name).write_text("executable")
+        if name == "agent-kronig-backend":
+            packaged_asset = (
+                distribution
+                / "_internal"
+                / "tcad_agent"
+                / "web"
+                / "static"
+                / "ide.css"
+            )
+            packaged_asset.parent.mkdir(parents=True)
+            packaged_asset.write_text("stale installed package")
+        return subprocess.CompletedProcess(command, 0)
+
+    with pytest.raises(RuntimeError, match="does not match the current checkout"):
+        build_sidecars(
+            project,
+            output_root=project / "desktop" / "resources",
+            staging_root=staging,
+            system="Linux",
+            machine="x86_64",
+            run_command=runner,
+        )

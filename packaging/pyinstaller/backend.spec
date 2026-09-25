@@ -13,7 +13,8 @@ from PyInstaller.utils.hooks import (
 )
 
 project_root = Path.cwd()
-package_datas = collect_data_files("tcad_agent", include_py_files=True)
+source_package = project_root / "src" / "tcad_agent"
+package_datas = [(str(source_package), "tcad_agent")]
 openhands_datas, openhands_binaries, openhands_hidden = collect_all("openhands")
 
 
@@ -42,6 +43,8 @@ dependency_datas = []
 for dependency_name in sorted(dependency_names):
     distribution_metadata += copy_metadata(dependency_name)
 for package_name, owning_distributions in packages_distributions().items():
+    if package_name == "tcad_agent":
+        continue
     if any(canonicalize_name(name) in dependency_names for name in owning_distributions):
         dependency_datas += collect_data_files(package_name, include_py_files=True)
 
