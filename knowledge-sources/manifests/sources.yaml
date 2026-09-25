@@ -9,7 +9,7 @@ sources:
     backend: portable
     version: "0.1"
     reviewed: false
-    local_path: TCAD Agent/knowledge-sources/curated
+    local_path: knowledge-sources/curated
   - id: devsim-source-2.9.1
     title: DEVSIM source and examples
     url: https://github.com/devsim/devsim/tree/43b41ca845184c47e22b72d144db7e7db8509377

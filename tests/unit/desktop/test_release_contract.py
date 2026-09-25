@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from scripts.release_contract import load_release_identity
 
+ROOT = Path(__file__).resolve().parents[3]
+
 
 def write_versions(root: Path, python_version: str, desktop_version: str) -> None:
     (root / "desktop").mkdir()
@@ -27,6 +29,13 @@ def test_release_identity_accepts_matching_alpha_versions(tmp_path: Path) -> Non
 
     assert identity.version == "0.1.0-alpha.1"
     assert identity.tag == "v0.1.0-alpha.1"
+
+
+def test_repository_release_identity_is_alpha_2() -> None:
+    identity = load_release_identity(ROOT, "v0.1.0-alpha.2")
+
+    assert identity.version == "0.1.0-alpha.2"
+    assert identity.tag == "v0.1.0-alpha.2"
 
 
 @pytest.mark.parametrize(

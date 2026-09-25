@@ -14,7 +14,7 @@ The desktop application is built for Linux first and is also packaged for Window
 | Intel Mac | x64 `.dmg` | Open the disk image and drag Agent Kronig into Applications. |
 | Apple Silicon | arm64 `.dmg` | Open the disk image and drag Agent Kronig into Applications. |
 
-Install only an artifact produced by the project release workflow and verify it against the release checksum manifest. Alpha 1 packages are unsigned, so Windows SmartScreen and macOS Gatekeeper can warn before opening them. Signing and notarization are required before broader distribution.
+Install only an artifact produced by the project release workflow and verify it against the release checksum manifest. Alpha 2 packages are unsigned, so Windows SmartScreen and macOS Gatekeeper can warn before opening them. Signing and notarization are required before broader distribution.
 
 ## First launch
 
@@ -52,7 +52,7 @@ Startup failures are shown in a small recovery window with Retry and Quit action
 
 ## Updates
 
-Alpha 1 uses manual updates and does not publish automatic update metadata. Managed updates remain disabled unless a future release administrator supplies an HTTPS feed through `AGENT_KRONIG_UPDATE_URL`. `AGENT_KRONIG_UPDATE_CHANNEL` accepts `stable` or `pilot`; it defaults to `stable`.
+Alpha 2 uses manual updates and does not publish automatic update metadata. Managed updates remain disabled unless a future release administrator supplies an HTTPS feed through `AGENT_KRONIG_UPDATE_URL`. `AGENT_KRONIG_UPDATE_CHANNEL` accepts `stable` or `pilot`; it defaults to `stable`.
 
 Agent Kronig can check for and download an update while idle. It will not install or restart while an agent run or simulation is active. The researcher must finish, pause, or stop active work before applying a downloaded update. If no valid HTTPS feed is configured, update controls report that managed updates are unavailable and the installed application continues to work.
 

@@ -77,6 +77,16 @@ jobs:
       - name: Install Python application and build tools
         run: python -m pip install --upgrade pip "pyinstaller==6.16.0" "devsim==2.9.1" -e ".[agent,knowledge,dev]"
 
+      - name: Fetch pinned DEVSIM knowledge source
+        shell: bash
+        run: |
+          mkdir -p devsim/source
+          git -C devsim/source init
+          git -C devsim/source remote add origin https://github.com/devsim/devsim.git
+          git -C devsim/source fetch --depth 1 origin 43b41ca845184c47e22b72d144db7e7db8509377
+          git -C devsim/source checkout --detach FETCH_HEAD
+          test "$(git -C devsim/source rev-parse HEAD)" = "43b41ca845184c47e22b72d144db7e7db8509377"
+
       - name: Build reviewed knowledge index
         run: tcad-agent knowledge build --manifest knowledge-sources/manifests/sources.yaml --root . --index knowledge-sources/index/knowledge.sqlite3
 
@@ -142,8 +152,8 @@ jobs:
       - name: Publish Agent Kronig alpha
         run: |
           gh release create "${GITHUB_REF_NAME}" release-assets/* \
-            --title "Agent Kronig 0.1.0 Alpha 1" \
-            --notes-file docs/releases/v0.1.0-alpha.1.md \
+            --title "Agent Kronig 0.1.0 Alpha 2" \
+            --notes-file docs/releases/v0.1.0-alpha.2.md \
             --prerelease \
             --verify-tag
         env:
