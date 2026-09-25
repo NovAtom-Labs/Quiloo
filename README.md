@@ -315,6 +315,16 @@ cd Quiloo
 .venv/bin/python -m pip install . --no-deps
 ```
 
+Dependency constraints are edited only in `pyproject.toml`. Maintainers regenerate
+`requirements.lock` and `requirements.txt` on Linux with Python 3.13 by running:
+
+```bash
+.venv/bin/python scripts/sync_requirements.py
+```
+
+Use `.venv/bin/python scripts/sync_requirements.py --check` to detect dependency-file drift
+without modifying files or accessing the network.
+
 Install DEVSIM separately. Point Quiloo to its Python executable when it is not available at the default sibling location:
 
 ```bash

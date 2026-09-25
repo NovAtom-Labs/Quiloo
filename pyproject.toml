@@ -30,6 +30,7 @@ agent = [
 ]
 dev = [
   "mypy>=1.18,<2",
+  "packaging>=26,<27",
   "pip-tools==7.5.2",
   "pytest>=8.4,<10",
   "pytest-cov>=7,<8",

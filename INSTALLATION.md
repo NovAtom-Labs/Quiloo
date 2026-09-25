@@ -57,7 +57,19 @@ python3.13 -m venv .venv
 .venv/bin/python -m pip install . --no-deps
 ```
 
-`requirements.txt` is the supported Linux installer entry point. It pins the direct runtime, OpenHands, knowledge, and verification dependencies while allowing pip to select platform-compatible transitive packages. `requirements.lock` records the complete development environment used to verify this checkout, and `pyproject.toml` remains the source of direct dependency constraints.
+`requirements.txt` is the supported Linux installer entry point. It pins the direct runtime, OpenHands, knowledge, and verification dependencies while allowing pip to select platform-compatible transitive packages. `requirements.lock` records the complete development environment used to verify this checkout. Edit dependency constraints only in `pyproject.toml`; the two requirements files are generated artifacts.
+
+After changing dependencies, regenerate both files on Linux with Python 3.13:
+
+```bash
+.venv/bin/python scripts/sync_requirements.py
+```
+
+The full refresh deliberately refuses other operating systems and Python minor versions so a developer's machine cannot silently replace the canonical Linux lock. This read-only check is safe on every supported checkout and does not access the network:
+
+```bash
+.venv/bin/python scripts/sync_requirements.py --check
+```
 
 Confirm the command is installed:
 
@@ -280,6 +292,7 @@ Before upgrading, stop the local server and back up `.env` and `TCAD_WORKSPACE` 
 
 ```bash
 git pull --ff-only
+.venv/bin/python scripts/sync_requirements.py --check
 .venv/bin/python -m pip install -r requirements.txt
 .venv/bin/python -m pip install . --no-deps
 OPENHANDS_SUPPRESS_BANNER=1 .venv/bin/pytest -q
