@@ -28,7 +28,7 @@ The launcher binds only to `127.0.0.1`. If a healthy matching instance is alread
 
 1. Select `Open folder` and choose a repository with the native desktop picker. On headless Linux, enter an absolute path and select `Open path`.
 2. Create a conversation and send a concrete repository task.
-3. Watch normalized file, terminal, TCAD, validation, and subagent events in the activity panel.
+3. Watch the safe operational timeline plus normalized file, terminal, TCAD, validation, and subagent events in the Activity panel. The timeline can show sanitized task titles and a content-free model-generation state, but never raw provider reasoning or private task notes.
 4. Decide any action that crosses the selected repository boundary or changes the wider machine. The approval card first explains the request in plain language. Expand Technical details to inspect the tool, permission category, risk, canonical path, or clipped command.
 5. Select Approve for the current action, Approve all like this for matching permission categories during the current run, or Deny. Run-scoped grants expire when that run finishes and never carry into a new run.
 6. Use Pause, Resume, or Stop as needed. Refreshing the page restores the persisted run, its category grants, and pending decisions.
@@ -80,7 +80,9 @@ Expected evidence includes three repaired source files, five passing visible tes
 5. Let the agent run the deterministic adapter, bounded runner, canonical normalizer, validators, and report builder through the typed `tcad_domain` tool.
 6. Inspect changed repository files, activity evidence, validation results, and the final response.
 
-The interface shows concrete actions and stage progress, not hidden model reasoning. The separate
+The interface shows concrete actions and stage progress, not hidden model reasoning. Activity derives
+its operational timeline from persisted run lifecycle, sanitized task plans, tools, delegation,
+validation, and approval events. Model-generation lifecycle events contain no generated text. The separate
 simulation workstation is no longer part of the browser product. Legacy `/simulate` links redirect
 to the repository IDE, while the simulator APIs and CLI remain available.
 

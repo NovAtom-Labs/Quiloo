@@ -11,7 +11,10 @@ from typing import cast
 from uuid import UUID
 
 from openhands.sdk.agent.stream_context import (
+    StreamAborted,
+    StreamDelta,
     StreamProgress,
+    StreamStarted,
 )
 from openhands.sdk.event import (
     ActionEvent,
@@ -28,6 +31,7 @@ from openhands.sdk.llm import content_to_str
 from openhands.sdk.security import SecurityRisk
 from openhands.tools.file_editor.definition import FileEditorAction
 from openhands.tools.task.definition import TaskAction, TaskObservation
+from openhands.tools.task_tracker.definition import TaskTrackerAction
 from openhands.tools.terminal.definition import TerminalAction
 from pydantic import JsonValue
 
@@ -240,9 +244,30 @@ class AgentEventBridge:
             )
 
     def on_stream(self, frame: StreamProgress) -> None:
-        """Discard provider stream deltas because they may contain private reasoning."""
+        """Expose content-free inference lifecycle while discarding every token."""
 
-        del frame
+        if isinstance(frame, StreamStarted):
+            self.events.append(
+                self.conversation_id,
+                "agent_progress_started",
+                {
+                    "run_id": str(self.run_id),
+                    "item_id": frame.item_id,
+                    "attempt": frame.attempt,
+                },
+            )
+        elif isinstance(frame, StreamAborted):
+            self.events.append(
+                self.conversation_id,
+                "agent_progress_interrupted",
+                {
+                    "run_id": str(self.run_id),
+                    "item_id": frame.item_id,
+                    "attempt": frame.attempt,
+                },
+            )
+        elif isinstance(frame, StreamDelta):
+            return
 
     def _action(self, event: ActionEvent) -> None:
         policy_workspace = self.workspace or Path.cwd()
@@ -390,6 +415,16 @@ class AgentEventBridge:
             return {
                 "description": self._safe(action.description or "delegated task"),
                 "subagent_type": action.subagent_type,
+            }
+        if isinstance(action, TaskTrackerAction) and action.command == "plan":
+            return {
+                "tasks": [
+                    {
+                        "title": self._safe(item.title),
+                        "status": item.status,
+                    }
+                    for item in action.task_list
+                ]
             }
         if isinstance(action, TcadDomainAction):
             result: dict[str, JsonValue] = {"operation": action.operation}

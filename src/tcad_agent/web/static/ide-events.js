@@ -28,6 +28,7 @@
       approvalHistory: [],
       approvalsById: new Map(),
       technicalEvents: [],
+      inference: null,
     };
   }
 
@@ -155,7 +156,20 @@
       if (!selectedRunId || ["run_created", "run_started"].includes(event.kind)) {
         selectedRunId = runId;
       }
-      if (event.kind === "tool_call_started") startTool(state, event);
+      if (state.inference?.status === "running"
+        && !["agent_progress_started", "agent_progress_interrupted"].includes(event.kind)) {
+        state.inference.status = "completed";
+      }
+      if (event.kind === "agent_progress_started") {
+        state.inference = {
+          id: String(event.payload?.item_id || `inference-${event.id}`),
+          label: "Analyzing context and choosing the next action",
+          status: "running",
+          startedAt: event.created_at || null,
+        };
+      } else if (event.kind === "agent_progress_interrupted") {
+        if (state.inference) state.inference.status = "interrupted";
+      } else if (event.kind === "tool_call_started") startTool(state, event);
       else if (event.kind === "tool_call_completed") completeTool(state, event);
       else if (event.kind === "approval_requested") {
         const payload = event.payload || {};
@@ -184,6 +198,7 @@
         "run_created", "run_started", "run_state_changed", "run_completed", "run_failed",
         "run_blocked", "run_cancelled", "run_paused", "run_recovered_paused",
         "permission_grant_created", "permission_grant_used",
+        "agent_progress_started", "agent_progress_interrupted",
       ].includes(event.kind)) {
         state.technicalEvents.push(event);
       }
@@ -201,6 +216,7 @@
           currentOperation: "Idle",
           steps: [],
           reasoning: [],
+          inference: null,
           pendingApprovals: [],
           approvalHistory: [],
           technicalEvents: [],
@@ -213,6 +229,7 @@
         currentOperation: state.currentOperation,
         steps: state.steps,
         reasoning: [],
+        inference: state.inference,
         pendingApprovals: Array.from(state.pendingApprovals.values()),
         approvalHistory: state.approvalHistory,
         technicalEvents: state.technicalEvents,

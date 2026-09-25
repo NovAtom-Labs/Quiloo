@@ -539,11 +539,19 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .agent-run-summary.is-warning { border-left-color: var(--amber); }
 .agent-reasoning { max-height: 34%; overflow-y: auto; border-bottom: 1px solid var(--border); }
 .agent-reasoning[hidden] { display: none; }
-.reasoning-entry { padding: 7px 10px; }
-.reasoning-entry + .reasoning-entry { border-top: 1px solid var(--border); }
-.reasoning-entry summary { cursor: pointer; color: #9f96c8; font-size: 0.62rem; user-select: none; }
-.reasoning-entry.is-live summary::after { content: "…"; animation: thinking-pulse 1.2s steps(4, end) infinite; }
-.reasoning-entry pre { margin: 7px 0 0; overflow-x: hidden; color: #8f97a8; font: 0.58rem/1.48 var(--font-mono); white-space: pre-wrap; word-break: break-word; }
+.progress-log-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px 5px; }
+.progress-log-heading strong { color: #b8c1ca; font-size: 0.62rem; font-weight: 620; }
+.progress-log-heading span { color: var(--muted-dim); font: 0.52rem var(--font-mono); text-transform: uppercase; letter-spacing: 0.04em; }
+.progress-log { display: grid; gap: 0; margin: 0; padding: 0 10px 8px; list-style: none; }
+.progress-log-entry { position: relative; display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 2px 7px; padding: 5px 0 5px 13px; border-left: 1px solid var(--border-strong); }
+.progress-log-entry::before { position: absolute; top: 9px; left: -3px; width: 5px; height: 5px; border-radius: 50%; background: #5f8378; content: ""; }
+.progress-log-entry > span { color: #7f8a96; font: 0.52rem var(--font-mono); text-transform: uppercase; }
+.progress-log-entry > strong { overflow: hidden; color: #aeb7c1; font-size: 0.59rem; font-weight: 560; text-overflow: ellipsis; white-space: nowrap; }
+.progress-log-entry > small { grid-column: 2; overflow: hidden; color: #76818d; font: 0.54rem var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.progress-log-entry.is-running::before { background: var(--blue-strong); animation: thinking-pulse 1.2s ease-in-out infinite; }
+.progress-log-entry.is-waiting::before { background: var(--amber); }
+.progress-log-entry.is-interrupted::before { background: var(--amber); }
+.progress-log-entry.is-failed::before { background: var(--red); }
 .agent-activity { padding: 0 9px 9px; }
 .execution-step { border-bottom: 1px solid var(--border); }
 .execution-step summary { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 9px 2px; cursor: pointer; list-style: none; }

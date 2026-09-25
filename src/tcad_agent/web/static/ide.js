@@ -620,8 +620,8 @@ function renderRunIndicator() {
   agentProgress.hidden = controls.send || !activeRun;
   if (agentProgress.hidden) return;
   const presentation = runPresentation.snapshot(activeRun?.id || selectedRunId);
-  const current = window.QuilooAgentView.activityRows(presentation)
-    .filter((row) => row.status === "running")
+  const current = window.QuilooAgentView.operationalUpdates(presentation)
+    .filter((update) => ["running", "waiting"].includes(update.status))
     .at(-1);
   agentProgressText.textContent = activeRun.state === "waiting_for_approval"
     ? "Waiting for your approval"
@@ -750,19 +750,34 @@ function renderRunSummary(snapshot) {
 
 function renderReasoning(snapshot) {
   clearNode(agentReasoning);
-  const rows = window.QuilooAgentView.activityRows(snapshot);
-  const current = rows.filter((row) => row.status === "running").at(-1);
-  const active = !["idle", "completed", "failed", "blocked", "cancelled"].includes(snapshot.runState);
-  agentReasoning.hidden = !active || !current;
-  if (!active || !current) return;
-  const details = document.createElement("details");
-  const heading = document.createElement("summary");
-  const content = document.createElement("pre");
-  details.className = "reasoning-entry is-live";
-  heading.textContent = `Current phase: ${current.phase}`;
-  content.textContent = current.label;
-  details.append(heading, content);
-  agentReasoning.append(details);
+  const updates = window.QuilooAgentView.operationalUpdates(snapshot);
+  agentReasoning.hidden = !updates.length;
+  if (!updates.length) return;
+  const heading = document.createElement("div");
+  const title = document.createElement("strong");
+  const note = document.createElement("span");
+  const list = document.createElement("ol");
+  heading.className = "progress-log-heading";
+  title.textContent = "Agent progress";
+  note.textContent = "Operational summary";
+  list.className = "progress-log";
+  updates.forEach((update) => {
+    const item = document.createElement("li");
+    const phase = document.createElement("span");
+    const label = document.createElement("strong");
+    item.className = `progress-log-entry is-${update.status}`;
+    phase.textContent = update.phase;
+    label.textContent = update.label;
+    item.append(phase, label);
+    if (update.detail) {
+      const detail = document.createElement("small");
+      detail.textContent = update.detail;
+      item.append(detail);
+    }
+    list.append(item);
+  });
+  heading.append(title, note);
+  agentReasoning.append(heading, list);
 }
 
 function renderActivity(snapshot) {
@@ -1123,6 +1138,7 @@ function connectEvents(conversationId) {
     "run_completed", "run_failed", "run_blocked", "run_paused",
     "run_cancelled", "run_recovered_paused", "agent_error", "runtime_state_changed",
     "thinking_started", "thinking_delta", "thinking_aborted", "change_baseline_warning",
+    "agent_progress_started", "agent_progress_interrupted",
   ].forEach((kind) => eventSource.addEventListener(kind, receive));
   eventSource.onopen = () => {
     streamState.textContent = "LIVE";

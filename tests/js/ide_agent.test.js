@@ -41,6 +41,89 @@ assertEqual(
   "absolute action paths are normalized to the repository",
 );
 
+const progress = agent.operationalUpdates({
+  runState: "running",
+  steps: [
+    {
+      id: "plan-1",
+      toolName: "task_tracker",
+      summary: "task_tracker: update 2 tasks",
+      status: "completed",
+      phase: "plan",
+      arguments: {tasks: [
+        {title: "Inspect simulator inputs", status: "done"},
+        {title: "Run validation", status: "in_progress"},
+      ]},
+    },
+    {
+      id: "think-1",
+      toolName: "think",
+      summary: "think: internal planning",
+      status: "completed",
+      phase: "plan",
+    },
+    {
+      id: "validate-1",
+      toolName: "terminal",
+      summary: "terminal: pytest -q",
+      status: "running",
+      phase: "validate",
+      arguments: {command: "pytest -q"},
+    },
+  ],
+  pendingApprovals: [],
+});
+assertEqual(progress[0].label, "Understanding the request and preparing an approach", "run start has a useful safe update");
+assertEqual(progress[1].label, "Plan updated", "task tracker becomes a plan update");
+assertEqual(progress[1].detail, "Inspect simulator inputs · Run validation", "plan titles are visible without hidden notes");
+assertEqual(progress[2].label, "Reviewing evidence and choosing the next action", "internal thought content is replaced by a safe summary");
+assertEqual(progress[3].label, "Running validation", "active validation has a plain-language label");
+assertEqual(progress[3].detail, "pytest -q", "technical evidence stays inspectable");
+assertEqual(JSON.stringify(progress).includes("internal planning"), false, "private reasoning labels never leak into progress");
+
+const betweenActions = agent.operationalUpdates({
+  runState: "running",
+  steps: [{
+    id: "inspect-1",
+    toolName: "file_editor",
+    summary: "file_editor view: experiment.yaml",
+    status: "completed",
+    phase: "inspect",
+    arguments: {path: "experiment.yaml"},
+  }],
+  pendingApprovals: [],
+});
+assertEqual(betweenActions.at(-1).label, "Reviewing results and choosing the next action", "quiet model time remains visibly active");
+assertEqual(betweenActions.at(-1).status, "running", "between-tool progress remains live");
+
+const waiting = agent.operationalUpdates({
+  runState: "waiting_for_approval",
+  steps: [],
+  pendingApprovals: [{summary: "Allow remote execution"}],
+});
+assertEqual(waiting.at(-1).label, "Waiting for your approval", "approval wait is explicit");
+assertEqual(waiting.at(-1).detail, "Allow remote execution", "approval reason stays visible");
+
+const inferring = agent.operationalUpdates({
+  runState: "running",
+  steps: [],
+  pendingApprovals: [],
+  inference: {
+    id: "inference-1",
+    label: "Analyzing context and choosing the next action",
+    status: "running",
+  },
+});
+assertEqual(inferring.at(-1).label, "Analyzing context and choosing the next action", "live model work uses the safe lifecycle label");
+assertEqual(inferring.at(-1).status, "running", "model lifecycle drives the live state");
+
+const emptyCompleted = agent.operationalUpdates({
+  runState: "completed",
+  steps: [],
+  pendingApprovals: [],
+});
+assertEqual(emptyCompleted[0].status, "completed", "an empty terminal run never appears to remain active");
+
 const completed = agent.outcomeSummary(
   {runState: "completed", steps: rows, currentOperation: "Run completed"},
   {files: [

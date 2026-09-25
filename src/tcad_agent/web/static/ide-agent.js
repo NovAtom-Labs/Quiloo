@@ -52,6 +52,89 @@
     }));
   }
 
+  function operationalUpdates(snapshot) {
+    const state = snapshot?.runState || "idle";
+    if (state === "idle") return [];
+    const steps = snapshot?.steps || [];
+    const updates = [{
+      id: "run-start",
+      phase: "Plan",
+      label: "Understanding the request and preparing an approach",
+      detail: null,
+      status: !steps.length && ["queued", "running"].includes(state)
+        ? "running"
+        : "completed",
+    }];
+    const labels = {
+      plan: "Updating the plan",
+      inspect: "Inspecting repository evidence",
+      edit: "Updating workspace files",
+      delegate: "Delegating a focused task",
+      execute: "Running a workspace operation",
+      validate: "Running validation",
+      report: "Preparing the result",
+    };
+    steps.forEach((step) => {
+      const phase = phaseForStep(step);
+      const command = technicalCommand(step);
+      const tasks = Array.isArray(step.arguments?.tasks) ? step.arguments.tasks : [];
+      let label = labels[step.phase] || "Working on the repository";
+      let detail = command || step.summary || null;
+      if (step.toolName === "think") {
+        label = "Reviewing evidence and choosing the next action";
+        detail = null;
+      } else if (step.toolName === "task_tracker" && tasks.length) {
+        label = "Plan updated";
+        detail = tasks.map((task) => task.title).filter(Boolean).join(" · ") || null;
+      }
+      updates.push({
+        id: step.id,
+        phase,
+        label,
+        detail,
+        status: step.status || "running",
+      });
+    });
+    if (snapshot?.inference) {
+      updates.push({
+        id: snapshot.inference.id || "agent-inference",
+        phase: "Plan",
+        label: snapshot.inference.label || "Analyzing context and choosing the next action",
+        detail: null,
+        status: snapshot.inference.status || "running",
+      });
+    }
+    const pendingApproval = (snapshot?.pendingApprovals || []).at(-1);
+    if (pendingApproval || state === "waiting_for_approval") {
+      updates.push({
+        id: "approval-wait",
+        phase: "Approval",
+        label: "Waiting for your approval",
+        detail: pendingApproval?.summary || null,
+        status: "waiting",
+      });
+    } else if (state === "paused") {
+      updates.push({
+        id: "run-paused",
+        phase: "Paused",
+        label: "Run paused",
+        detail: null,
+        status: "waiting",
+      });
+    } else if (state === "running"
+      && snapshot?.inference?.status !== "running"
+      && !steps.some((step) => step.status === "running")) {
+      updates.push({
+        id: "between-actions",
+        phase: "Plan",
+        label: "Reviewing results and choosing the next action",
+        detail: null,
+        status: "running",
+      });
+    }
+    return updates.slice(-6);
+  }
+
   function unique(values) {
     return Array.from(new Set(values.filter(Boolean)));
   }
@@ -188,6 +271,7 @@
     activityRows,
     durationText,
     outcomeSummary,
+    operationalUpdates,
     permissionView,
     phaseForStep,
     sanitizeArguments,

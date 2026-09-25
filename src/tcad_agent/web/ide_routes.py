@@ -343,7 +343,20 @@ def build_ide_router(
         run = services.store.get_run(run_id)
         conversation = services.conversations.get(run.conversation_id)
         workspace = services.workspaces.get(conversation.workspace_id)
-        baseline = services.store.get_run_baseline(run_id)
+        try:
+            baseline = services.store.get_run_baseline(run_id)
+        except IDEStoreError:
+            return WorkspaceChangeSet(
+                run_id=run_id,
+                baseline_captured_at=run.created_at,
+                generated_at=run.updated_at,
+                baseline_truncated=True,
+                manifest_warning=(
+                    "This run was created before change tracking was available. "
+                    "No changed-file claims are shown."
+                ),
+                files=(),
+            )
         terminal_states = {
             RunState.COMPLETED,
             RunState.FAILED,

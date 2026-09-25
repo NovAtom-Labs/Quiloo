@@ -9,6 +9,7 @@ from openhands.sdk.llm import Message, TextContent
 from openhands.sdk.llm.message import MessageToolCall
 from openhands.sdk.security import SecurityRisk
 from openhands.sdk.tool import Observation
+from openhands.tools.task_tracker.definition import TaskItem, TaskTrackerAction
 from openhands.tools.terminal.definition import TerminalAction
 
 from tcad_agent.agent.events import AgentEventBridge, structured_action_metadata
@@ -49,6 +50,34 @@ def _terminal_action(command: str, *, risk: SecurityRisk) -> ActionEvent:
         ),
         llm_response_id="response-1",
         security_risk=risk,
+    )
+
+
+def _task_plan_action() -> ActionEvent:
+    return ActionEvent(
+        thought=[TextContent(text="private chain of thought")],
+        reasoning_content="private reasoning",
+        action=TaskTrackerAction(
+            command="plan",
+            task_list=[
+                TaskItem(
+                    title="Inspect the simulator adapter",
+                    notes="credential secret-value must never cross the boundary",
+                    status="in_progress",
+                ),
+                TaskItem(title="Run validation", status="todo"),
+            ],
+        ),
+        tool_name="task_tracker",
+        tool_call_id="call-plan",
+        tool_call=MessageToolCall(
+            id="call-plan",
+            name="task_tracker",
+            arguments="{}",
+            origin="completion",
+        ),
+        llm_response_id="response-plan",
+        security_risk=SecurityRisk.LOW,
     )
 
 
@@ -165,6 +194,34 @@ def test_on_stream_never_persists_private_model_reasoning(
         "thinking_delta",
         "thinking_aborted",
     } & {event.kind for event in activity}
+    assert [event.kind for event in activity][-2:] == [
+        "agent_progress_started",
+        "agent_progress_interrupted",
+    ]
+    assert all("content" not in event.payload for event in activity[-2:])
+
+
+def test_task_plan_exposes_only_safe_operational_items(
+    tmp_path: Path, monkeypatch
+) -> None:
+    store, events, conversations, conversation, run = _services(tmp_path)
+    monkeypatch.setenv("AWS_BEARER_TOKEN_BEDROCK", "secret-value")
+    bridge = AgentEventBridge(conversation.id, run.id, store, events, conversations)
+
+    bridge(_task_plan_action())
+
+    started = events.list_after(conversation.id, 0)[-1]
+    assert started.kind == "tool_call_started"
+    assert started.payload["arguments"] == {
+        "tasks": [
+            {"title": "Inspect the simulator adapter", "status": "in_progress"},
+            {"title": "Run validation", "status": "todo"},
+        ]
+    }
+    serialized = str(started.payload)
+    assert "private chain of thought" not in serialized
+    assert "private reasoning" not in serialized
+    assert "secret-value" not in serialized
 
 
 def test_bridge_accepts_uuid_identifiers(tmp_path: Path) -> None:

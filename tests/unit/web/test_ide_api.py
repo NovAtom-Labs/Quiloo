@@ -253,6 +253,36 @@ def test_run_changes_endpoint_compares_against_starting_workspace(
     assert restored == payload
 
 
+def test_run_changes_endpoint_handles_legacy_run_without_baseline(
+    tmp_path: Path,
+) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    events = EventFeed(store)
+    services = IDEServices(
+        workspaces=WorkspaceManager(store),
+        conversations=ConversationService(store, events),
+        events=events,
+    )
+    web = TestClient(create_app(ide=services))
+    root = tmp_path / "repo"
+    root.mkdir()
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+    conversation = web.post(
+        f"/api/workspaces/{workspace['id']}/conversations",
+        json={"title": "Legacy run"},
+    ).json()
+    run = store.create_run(UUID(conversation["id"]), uuid4())
+
+    response = web.get(f"/api/runs/{run.id}/changes")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["run_id"] == str(run.id)
+    assert payload["files"] == []
+    assert payload["baseline_truncated"] is True
+    assert "before change tracking was available" in payload["manifest_warning"]
+
+
 def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     root.mkdir()

@@ -60,6 +60,14 @@ snapshot = view.snapshot();
 assertEqual(snapshot.reasoning.length, 0, "raw provider reasoning is never presented");
 assertEqual(JSON.stringify(snapshot).includes("private hidden reasoning"), false, "raw reasoning cannot leak through snapshot state");
 
+view.accept(event(160, "agent_progress_started", {run_id: "run-1", item_id: "inference-1"}));
+snapshot = view.snapshot();
+assertEqual(snapshot.inference.status, "running", "safe inference lifecycle becomes live progress");
+assertEqual(snapshot.inference.label, "Analyzing context and choosing the next action", "inference progress is content free");
+view.accept(event(161, "agent_progress_interrupted", {run_id: "run-1", item_id: "inference-1"}));
+assertEqual(view.snapshot().inference.status, "interrupted", "interrupted inference does not remain live");
+assertEqual(JSON.stringify(view.snapshot()).includes("private hidden reasoning"), false, "safe lifecycle never recovers discarded reasoning");
+
 view.accept(event(18, "approval_requested", {run_id: "run-1", approval_id: "approval-1", summary: "Allow network access"}));
 assertEqual(view.snapshot().pendingApprovals.length, 1, "pending approval survives in presentation state");
 view.accept(event(19, "approval_resolved", {run_id: "run-1", approval_id: "approval-1", decision: "deny"}));
