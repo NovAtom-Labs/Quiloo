@@ -8,6 +8,8 @@ __pycache__/
 *.egg-info/
 build/
 dist/
+desktop/dist/
+desktop/node_modules/
 .coverage
 htmlcov/
 .DS_Store

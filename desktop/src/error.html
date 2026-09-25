@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Agent Kronig could not start</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; background: #0b0f14; color: #e7ecf3; }
+      main { width: min(640px, calc(100vw - 48px)); border: 1px solid #28313d; border-radius: 12px; background: #10161e; padding: 30px; }
+      .label { color: #83aef5; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+      h1 { margin: 10px 0 12px; font-size: 24px; }
+      p { margin: 0 0 20px; color: #aeb8c6; line-height: 1.55; }
+      code { display: block; padding: 12px; border-radius: 6px; background: #090d12; color: #c7d1df; overflow-wrap: anywhere; }
+      .actions { display: flex; gap: 10px; margin-top: 24px; }
+      button { border: 1px solid #344154; border-radius: 6px; background: #182230; color: #e7ecf3; padding: 9px 15px; font: inherit; cursor: pointer; }
+      button.primary { border-color: #5b8cff; background: #315fae; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <span class="label">Local startup error</span>
+      <h1 id="category">Agent Kronig could not start</h1>
+      <p>The application could not start its private local service. No project files were changed.</p>
+      <code id="log-path"></code>
+      <div class="actions">
+        <button class="primary" id="retry" type="button">Retry</button>
+        <button id="quit" type="button">Quit</button>
+      </div>
+    </main>
+    <script>
+      const params = new URLSearchParams(location.search);
+      document.querySelector("#category").textContent = params.get("category") || "Agent Kronig could not start";
+      document.querySelector("#log-path").textContent = `Diagnostic log: ${params.get("logPath") || "Unavailable"}`;
+      document.querySelector("#retry").addEventListener("click", () => {
+        location.href = "agent-kronig-error://retry";
+      });
+      document.querySelector("#quit").addEventListener("click", () => {
+        location.href = "agent-kronig-error://quit";
+      });
+    </script>
+  </body>
+</html>

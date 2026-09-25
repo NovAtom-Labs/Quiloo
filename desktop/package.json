@@ -1,0 +1,22 @@
+{
+  "name": "agent-kronig-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Native desktop shell for the Agent Kronig scientific workspace",
+  "main": "src/main.js",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test test/*.test.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
+  "devDependencies": {
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3"
+  },
+  "packageManager": "pnpm@11.19.0"
+}
