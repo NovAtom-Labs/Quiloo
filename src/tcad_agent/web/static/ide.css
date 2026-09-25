@@ -32,7 +32,28 @@ body { overflow: hidden; background: var(--background); }
   border-right: 1px solid var(--border);
   text-decoration: none;
 }
-.product-wordmark { color: var(--text-strong); font-size: 0.92rem; font-weight: 680; letter-spacing: -0.018em; white-space: nowrap; }
+.product-wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.38rem;
+  color: var(--text-strong);
+  font-family: var(--font-sans, Inter, ui-sans-serif, system-ui, sans-serif);
+  line-height: 1;
+  white-space: nowrap;
+}
+.product-agent {
+  color: #9da8b7;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 650;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}
+.product-kronig {
+  font-size: 1rem;
+  font-weight: 720;
+  letter-spacing: -0.045em;
+}
 .workspace-status {
   overflow: hidden;
   padding: 0 16px;

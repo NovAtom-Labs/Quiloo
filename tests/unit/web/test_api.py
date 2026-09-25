@@ -93,19 +93,24 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
 def test_workspace_header_separates_product_and_company_branding(tmp_path: Path) -> None:
     page = client(tmp_path).get("/").text
 
-    agent_kronig = '<strong class="product-wordmark">Agent Kronig</strong>'
+    product_wordmark = '<strong class="product-wordmark" aria-label="Agent Kronig">'
+    agent_name = '<span class="product-agent" aria-hidden="true">Agent</span>'
+    kronig_name = '<span class="product-kronig" aria-hidden="true">Kronig</span>'
     company = '<span class="company-lockup" aria-label="NovAtom Labs">'
     atom = (
         '<img class="company-atom" '
         'src="/static/novatom-atom-mark.svg" alt="" aria-hidden="true">'
     )
-    assert agent_kronig in page
+    assert product_wordmark in page
+    assert agent_name in page
+    assert kronig_name in page
     assert company in page
     assert atom in page
     assert '<span class="company-nov">Nov</span>' in page
     assert '<span class="company-atom-text">Atom</span>' in page
     assert '<span class="company-labs">Labs</span>' in page
-    assert page.index(agent_kronig) < page.index('id="workspace-status"') < page.index(company)
+    assert page.index(agent_name) < page.index(kronig_name)
+    assert page.index(product_wordmark) < page.index('id="workspace-status"') < page.index(company)
     assert "Research workspace" not in page
     assert "Local runtime" not in page
     assert 'id="run-controls" class="run-controls" hidden' in page
