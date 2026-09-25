@@ -275,7 +275,7 @@
 
 - [ ] **Step 3: Build and run the macOS development application**
 
-  Install desktop dependencies, launch the Electron application against the source backend, open the fixture repository with the native folder dialog, inspect a file, and close the application. Then run `pnpm --dir desktop pack` and launch the generated `.app` bundle against its packaged backend sidecar.
+  Install desktop dependencies, launch the Electron application against the source backend, open the fixture repository with the native folder dialog, inspect a file, and close the application. Then run `pnpm --dir desktop run pack:app` and launch the generated `.app` bundle against its packaged backend sidecar.
 
 - [ ] **Step 4: Run final verification**
 
@@ -295,4 +295,3 @@
 - [ ] **Step 5: Commit Task 5**
 
   Commit: `docs(desktop): document native installation and operations`
-

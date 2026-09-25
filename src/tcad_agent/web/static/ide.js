@@ -60,6 +60,18 @@ const fileViewerCancel = document.querySelector("#file-viewer-cancel");
 const fileViewerDownload = document.querySelector("#file-viewer-download");
 const fileViewerClose = document.querySelector("#file-viewer-close");
 const fileEditor = document.querySelector("#file-editor");
+const desktopSettings = document.querySelector("#desktop-settings");
+const desktopSettingsDialog = document.querySelector("#desktop-settings-dialog");
+const desktopSettingsForm = document.querySelector("#desktop-settings-form");
+const desktopSettingsRegion = document.querySelector("#desktop-settings-region");
+const desktopSettingsModel = document.querySelector("#desktop-settings-model");
+const desktopSettingsReasoning = document.querySelector("#desktop-settings-reasoning");
+const desktopSettingsKey = document.querySelector("#desktop-settings-key");
+const desktopSettingsClear = document.querySelector("#desktop-settings-clear");
+const desktopSettingsStorage = document.querySelector("#desktop-settings-storage");
+const desktopSettingsError = document.querySelector("#desktop-settings-error");
+const desktopSettingsCancel = document.querySelector("#desktop-settings-cancel");
+const desktopSettingsSave = document.querySelector("#desktop-settings-save");
 
 let activeWorkspace = null;
 let activeConversation = null;
@@ -95,6 +107,54 @@ async function api(path, options = {}) {
 function showError(message = "") {
   errorNotice.textContent = message;
   errorNotice.classList.toggle("hidden", !message);
+}
+
+async function openDesktopSettings() {
+  if (!window.agentKronigDesktop) return;
+  desktopSettings.disabled = true;
+  desktopSettingsError.textContent = "";
+  try {
+    const settings = await window.agentKronigDesktop.getSettings();
+    desktopSettingsRegion.value = settings.region;
+    desktopSettingsModel.value = settings.model;
+    desktopSettingsReasoning.value = settings.reasoningEffort;
+    desktopSettingsKey.value = "";
+    desktopSettingsClear.checked = false;
+    let protection = "The API key is protected by this operating system.";
+    if (settings.credentialStorage === "session") {
+      protection = "This Linux session has no protected secret service. The API key will remain in memory until the application closes.";
+    } else if (settings.credentialStorage === "managed") {
+      protection = "The API key is supplied by the managed launch environment.";
+    }
+    const presence = settings.hasBedrockCredential ? "A key is configured." : "No key is configured.";
+    desktopSettingsStorage.textContent = `${presence} ${protection}`;
+    desktopSettingsDialog.showModal();
+  } catch (error) {
+    showError(error.message);
+  } finally {
+    desktopSettings.disabled = false;
+  }
+}
+
+async function saveDesktopSettings(event) {
+  event.preventDefault();
+  desktopSettingsError.textContent = "";
+  desktopSettingsSave.disabled = true;
+  desktopSettingsSave.textContent = "Saving…";
+  try {
+    await window.agentKronigDesktop.saveSettings({
+      region: desktopSettingsRegion.value,
+      model: desktopSettingsModel.value,
+      reasoningEffort: desktopSettingsReasoning.value,
+      bedrockApiKey: desktopSettingsKey.value,
+      clearCredential: desktopSettingsClear.checked,
+    });
+    desktopSettingsStorage.textContent = "Saved. Agent Kronig is restarting its private service.";
+  } catch (error) {
+    desktopSettingsError.textContent = error.message;
+    desktopSettingsSave.disabled = false;
+    desktopSettingsSave.textContent = "Save and restart";
+  }
 }
 
 function parseRoute() {
@@ -1370,6 +1430,10 @@ fileViewerRefresh.addEventListener("click", () => {
   if (activeFile) void openFile({path: activeFile.path});
 });
 fileViewerClose.addEventListener("click", closeFileViewer);
+if (window.agentKronigDesktop) desktopSettings.hidden = false;
+desktopSettings.addEventListener("click", () => void openDesktopSettings());
+desktopSettingsCancel.addEventListener("click", () => desktopSettingsDialog.close());
+desktopSettingsForm.addEventListener("submit", (event) => void saveDesktopSettings(event));
 window.addEventListener("popstate", () => void restoreRoute());
 window.addEventListener("beforeunload", () => eventSource?.close());
 document.addEventListener("visibilitychange", () => {

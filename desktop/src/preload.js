@@ -6,6 +6,8 @@ const CHANNELS = Object.freeze({
   getUpdateState: "desktop:get-update-state",
   checkForUpdates: "desktop:check-for-updates",
   applyUpdateWhenSafe: "desktop:apply-update-when-safe",
+  getSettings: "desktop:get-settings",
+  saveSettings: "desktop:save-settings",
 });
 
 function createDesktopApi(ipcRenderer) {
@@ -13,7 +15,7 @@ function createDesktopApi(ipcRenderer) {
     Object.fromEntries(
       Object.entries(CHANNELS).map(([name, channel]) => [
         name,
-        () => ipcRenderer.invoke(channel),
+        (...args) => ipcRenderer.invoke(channel, ...args),
       ]),
     ),
   );

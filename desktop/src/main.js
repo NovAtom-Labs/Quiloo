@@ -5,6 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const {BackendSupervisor} = require("./backend-supervisor");
+const {DesktopSettingsStore} = require("./settings-store");
 const {UpdateController} = require("./update-controller");
 
 function createLaunchToken() {
@@ -26,6 +27,13 @@ function attachNavigationPolicy(webContents, allowedOrigin) {
   });
 }
 
+function installPermissionPolicy(electronSession) {
+  electronSession.setPermissionRequestHandler((_webContents, _permission, callback) => {
+    callback(false);
+  });
+  electronSession.setPermissionCheckHandler(() => false);
+}
+
 function installGracefulQuit(app, stopBackend) {
   let shutdownComplete = false;
   let shutdownStarted = false;
@@ -45,9 +53,10 @@ function createApplication(
   electron = require("electron"),
   updater = require("electron-updater").autoUpdater,
 ) {
-  const {app, BrowserWindow, dialog, ipcMain} = electron;
+  const {app, BrowserWindow, dialog, ipcMain, safeStorage, session} = electron;
   let mainWindow = null;
   let supervisor = null;
+  let settingsStore = null;
   const updateController = new UpdateController({
     updater,
     feedUrl: process.env.AGENT_KRONIG_UPDATE_URL || "",
@@ -86,6 +95,7 @@ function createApplication(
       projectRoot,
       environment: {
         ...process.env,
+        ...settingsStore.environment(),
         TCAD_KNOWLEDGE_INDEX: path.join(
           resourceRoot,
           "knowledge-sources",
@@ -122,6 +132,7 @@ function createApplication(
         sandbox: true,
         nodeIntegration: false,
         webSecurity: true,
+        devTools: !app.isPackaged,
       },
     });
     window.once("ready-to-show", () => window.show());
@@ -187,6 +198,17 @@ function createApplication(
       });
     });
     ipcMain.handle("desktop:get-info", () => desktopInfo());
+    ipcMain.handle("desktop:get-settings", () => settingsStore.getPublicSettings());
+    ipcMain.handle("desktop:save-settings", async (_event, payload) => {
+      const state = settingsStore.save(payload);
+      setTimeout(async () => {
+        const previousWindow = mainWindow;
+        await stopBackend();
+        await launchWorkspace();
+        if (previousWindow && previousWindow !== mainWindow) previousWindow.close();
+      }, 50);
+      return Object.freeze({...state, restarting: true});
+    });
     ipcMain.handle("desktop:get-update-state", () => updateController.getState());
     ipcMain.handle("desktop:check-for-updates", () => updateController.checkForUpdates());
     ipcMain.handle(
@@ -213,6 +235,12 @@ function createApplication(
     installGracefulQuit(app, stopBackend);
     app.on("window-all-closed", () => app.quit());
     await app.whenReady();
+    installPermissionPolicy(session.defaultSession);
+    settingsStore = new DesktopSettingsStore({
+      dataDir: app.getPath("userData"),
+      safeStorage,
+      baseEnvironment: process.env,
+    });
     registerIpc();
     await launchWorkspace();
   }
@@ -229,5 +257,6 @@ module.exports = {
   createApplication,
   createLaunchToken,
   installGracefulQuit,
+  installPermissionPolicy,
   shouldAutoStart,
 };

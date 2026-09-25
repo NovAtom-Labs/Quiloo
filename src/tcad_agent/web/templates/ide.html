@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Agent Kronig workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260925-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260925-12">
+    <link rel="stylesheet" href="/static/ide.css?v=20260925-13">
   </head>
   <body>
     <div class="ide-shell">
@@ -24,6 +24,7 @@
         <div class="header-actions">
           <button id="toggle-explorer-panel" class="toggle-explorer-panel" type="button" aria-controls="workspace-browser" aria-expanded="false">Repository</button>
           <button id="toggle-agent-panel" class="toggle-agent-panel" type="button" aria-controls="agent-panel" aria-expanded="false">Agent</button>
+          <button id="desktop-settings" class="desktop-settings" type="button" hidden>Settings</button>
           <span class="company-lockup" aria-label="NovAtom Labs">
             <img class="company-atom" src="/static/novatom-atom-mark.svg" alt="" aria-hidden="true">
             <span class="company-copy" aria-hidden="true">
@@ -170,6 +171,34 @@
         </div>
       </form>
     </dialog>
+    <dialog id="desktop-settings-dialog" aria-labelledby="desktop-settings-title">
+      <form id="desktop-settings-form">
+        <span class="section-label">Desktop configuration</span>
+        <h2 id="desktop-settings-title">Model access</h2>
+        <p id="desktop-settings-storage" class="settings-storage"></p>
+        <label for="desktop-settings-region">AWS region</label>
+        <input id="desktop-settings-region" autocomplete="off" required>
+        <label for="desktop-settings-model">Bedrock model identifier</label>
+        <input id="desktop-settings-model" autocomplete="off" required>
+        <label for="desktop-settings-reasoning">Reasoning effort</label>
+        <select id="desktop-settings-reasoning">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+        </select>
+        <label for="desktop-settings-key">Bedrock API key</label>
+        <input id="desktop-settings-key" type="password" autocomplete="new-password" placeholder="Leave blank to keep the current key">
+        <label class="settings-check" for="desktop-settings-clear">
+          <input id="desktop-settings-clear" type="checkbox">
+          <span>Remove the saved API key</span>
+        </label>
+        <p id="desktop-settings-error" class="settings-error" role="alert"></p>
+        <div class="dialog-actions">
+          <button id="desktop-settings-cancel" type="button">Cancel</button>
+          <button id="desktop-settings-save" type="submit">Save and restart</button>
+        </div>
+      </form>
+    </dialog>
     <script src="/static/ide-state.js?v=20260925-8" defer></script>
     <script src="/static/file-viewer.js?v=20260925-2" defer></script>
     <script src="/static/ide-markdown.js?v=20260925-2" defer></script>
@@ -178,6 +207,6 @@
     <script src="/static/ide-agent.js?v=20260925-6" defer></script>
     <script src="/static/ide-changes.js?v=20260925-4" defer></script>
     <script src="/static/desktop-bridge.js?v=20260925-1" defer></script>
-    <script src="/static/ide.js?v=20260925-14" defer></script>
+    <script src="/static/ide.js?v=20260925-15" defer></script>
   </body>
 </html>

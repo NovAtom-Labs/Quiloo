@@ -85,7 +85,7 @@ body { overflow: hidden; background: var(--background); }
 .company-nov { font-weight: 500; }
 .company-atom-text { font-weight: 720; }
 .company-labs { margin-top: 3px; color: #9aa6c4; font: 600 0.43rem var(--font-mono); letter-spacing: 0.3em; text-transform: uppercase; }
-.guided-link, .toggle-agent-panel, .toggle-explorer-panel {
+.guided-link, .toggle-agent-panel, .toggle-explorer-panel, .desktop-settings {
   padding: 6px 9px;
   color: #cbd2da;
   border: 1px solid var(--border-strong);
@@ -93,8 +93,9 @@ body { overflow: hidden; background: var(--background); }
   font-size: 0.68rem;
   text-decoration: none;
 }
-.guided-link:hover, .toggle-agent-panel:hover, .toggle-explorer-panel:hover { color: var(--text-strong); background: var(--surface-hover); }
+.guided-link:hover, .toggle-agent-panel:hover, .toggle-explorer-panel:hover, .desktop-settings:hover { color: var(--text-strong); background: var(--surface-hover); }
 .toggle-agent-panel, .toggle-explorer-panel { display: none; }
+.desktop-settings { background: transparent; }
 
 .workspace-browser, .agent-panel { min-height: 0; background: var(--surface); }
 .workspace-browser { grid-column: 1; grid-row: 2; overflow-y: auto; }
@@ -622,10 +623,15 @@ dialog {
 dialog::backdrop { background: rgba(0, 0, 0, 0.72); }
 dialog form { padding: 24px; }
 dialog h2 { margin: 8px 0 22px; font-size: 1.2rem; font-weight: 580; }
-dialog input { margin-bottom: 20px; }
+dialog input, dialog select { margin-bottom: 20px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 dialog button { padding: 7px 12px; }
-#cancel-conversation { color: #b8c0c9; border: 1px solid var(--border-strong); background: transparent; }
+#cancel-conversation, #desktop-settings-cancel { color: #b8c0c9; border: 1px solid var(--border-strong); background: transparent; }
+.settings-storage { margin: -12px 0 20px; color: var(--muted); font-size: 0.7rem; line-height: 1.5; }
+.settings-check { display: flex; align-items: center; gap: 8px; margin: -4px 0 18px; }
+.settings-check input { width: auto; height: auto; margin: 0; }
+.settings-check span { color: var(--muted); font-size: 0.68rem; }
+.settings-error { min-height: 1rem; margin: 0 0 12px; color: var(--red); font-size: 0.67rem; }
 
 @media (max-width: 995px) {
   .ide-shell {

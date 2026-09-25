@@ -30,6 +30,7 @@ def test_desktop_operations_guide_covers_supported_distribution_contract() -> No
         "No browser is required",
         "AGENT_KRONIG_UPDATE_URL",
         "AGENT_KRONIG_UPDATE_CHANNEL",
+        "operating system's protected credential storage",
         "does not delete a selected repository",
         "Sentaurus",
         "scripts/run_desktop_dev.sh",

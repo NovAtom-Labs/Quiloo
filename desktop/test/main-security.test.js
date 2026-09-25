@@ -6,7 +6,22 @@ const {
   createLaunchToken,
   shouldAutoStart,
   installGracefulQuit,
+  installPermissionPolicy,
 } = require("../src/main");
+
+test("denies every renderer permission request and check", () => {
+  let requestHandler;
+  let checkHandler;
+  installPermissionPolicy({
+    setPermissionRequestHandler(handler) { requestHandler = handler; },
+    setPermissionCheckHandler(handler) { checkHandler = handler; },
+  });
+
+  let decision = true;
+  requestHandler({}, "media", (allowed) => { decision = allowed; });
+  assert.equal(decision, false);
+  assert.equal(checkHandler({}, "clipboard-read"), false);
+});
 
 test("navigation policy allows only the authenticated loopback origin", () => {
   let openHandler;

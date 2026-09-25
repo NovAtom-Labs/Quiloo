@@ -28,7 +28,9 @@ Only one Agent Kronig window can own its local application data at a time. Start
 
 ## Configuration and credentials
 
-The application reads configuration from its launch environment. Development runs also load the repository's ignored `.env` through `scripts/run_desktop_dev.sh`. Release deployments should inject secrets through an approved operating-system secret mechanism or a managed launch environment.
+Open `Settings` in the application header to configure the AWS region, Bedrock model identifier, reasoning effort, and Bedrock API key. Saving settings restarts only the private local service and returns to the workspace. The API key is encrypted with the operating system's protected credential storage and is never returned to the renderer after saving. On Linux without a working secret service, the key stays only in memory for the current application session and must be entered again after restart.
+
+Development runs also load the repository's ignored `.env` through `scripts/run_desktop_dev.sh`. A managed deployment may inject configuration through its approved launch environment.
 
 At minimum, online agent operation needs a valid Bedrock credential, region, and model identifier. No credentials, `.env` files, private keys, proprietary Sentaurus material, or licensed examples are included in installers. The release workflow inventories every artifact and rejects application-owned credential material.
 
@@ -85,6 +87,7 @@ Release builds are target-native. Linux artifacts are built on Linux, Windows ar
 .venv/bin/python scripts/build_desktop_sidecars.py
 pnpm --dir desktop install --frozen-lockfile
 pnpm --dir desktop test
+pnpm --dir desktop run pack:app
 pnpm --dir desktop dist
 .venv/bin/python scripts/inspect_desktop_artifacts.py desktop/dist
 ```

@@ -27,7 +27,9 @@ test("preload exposes only the allowlisted desktop contract", () => {
     "applyUpdateWhenSafe",
     "checkForUpdates",
     "getDesktopInfo",
+    "getSettings",
     "getUpdateState",
+    "saveSettings",
     "selectDirectory",
   ]);
   assert.equal(Object.isFrozen(exposedApi), true);
@@ -38,7 +40,9 @@ test("preload exposes only the allowlisted desktop contract", () => {
       "desktop:apply-update-when-safe",
       "desktop:check-for-updates",
       "desktop:get-info",
+      "desktop:get-settings",
       "desktop:get-update-state",
+      "desktop:save-settings",
       "desktop:select-directory",
     ]);
   });

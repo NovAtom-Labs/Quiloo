@@ -305,7 +305,7 @@ See [Installation and setup](INSTALLATION.md) for release and source installatio
 
 ## Native desktop application
 
-Agent Kronig is available as a self-contained native application for Linux, Windows, Intel Mac, and Apple Silicon. The application embeds its private backend and reviewed DEVSIM runtime, opens the same workbench shown in browser mode, uses the operating system folder picker, and operates directly on selected local repositories. No separate Python, Node.js, DEVSIM, Electron, or browser installation is required for an end user.
+Agent Kronig is available as a self-contained native application for Linux, Windows, Intel Mac, and Apple Silicon. The application embeds its private backend and reviewed DEVSIM runtime, opens the same workbench shown in browser mode, uses the operating system folder picker, and operates directly on selected local repositories. No separate Python, Node.js, DEVSIM, Electron, or browser installation is required for an end user. Desktop settings store the Bedrock credential with operating-system protection, or keep it in memory when a Linux secret service is unavailable.
 
 Linux is the primary deployment target. CI also produces Windows and macOS artifacts from native runners. Sentaurus is never bundled and remains behind the separately licensed runner boundary. The existing local web application remains supported for source development and headless workflows.
 

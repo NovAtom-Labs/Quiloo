@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test test/*.test.js",
-    "pack": "electron-builder --config electron-builder.yml --dir",
+    "pack:app": "electron-builder --config electron-builder.yml --dir",
     "dist": "electron-builder --config electron-builder.yml"
   },
   "dependencies": {
