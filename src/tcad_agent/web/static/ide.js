@@ -1241,10 +1241,13 @@ browseWorkspace.addEventListener("click", async () => {
   browseWorkspace.disabled = true;
   browseWorkspace.textContent = "Choosing folder…";
   try {
-    const selection = await api("/api/system/directories/select", {method: "POST"});
-    if (!selection.path) return;
-    workspacePath.value = selection.path;
-    await openWorkspace(selection.path);
+    const selectedPath = await window.AgentKronigDesktopBridge.selectDirectory(
+      window.fetch.bind(window),
+      window.agentKronigDesktop,
+    );
+    if (!selectedPath) return;
+    workspacePath.value = selectedPath;
+    await openWorkspace(selectedPath);
   } catch (error) {
     showError(error.message);
   } finally {

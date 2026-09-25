@@ -118,6 +118,8 @@ def test_workspace_header_separates_product_and_company_branding(tmp_path: Path)
     assert "Local runtime" not in page
     assert 'id="run-controls" class="run-controls" hidden' in page
     assert 'aria-valuenow="420"' in page
+    assert 'src="/static/desktop-bridge.js?v=20260925-1"' in page
+    assert page.index("desktop-bridge.js") < page.index("ide.js")
 
 
 def test_typography_assets_are_self_hosted_and_served(tmp_path: Path) -> None:
