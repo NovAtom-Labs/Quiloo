@@ -91,7 +91,7 @@ jobs:
         run: tcad-agent knowledge build --manifest knowledge-sources/manifests/sources.yaml --root . --index knowledge-sources/index/knowledge.sqlite3
 
       - name: Verify Python application
-        run: pytest -q
+        run: python scripts/run_ci_pytest.py
 
       - name: Install locked desktop dependencies
         run: pnpm --dir desktop install --frozen-lockfile
@@ -152,8 +152,8 @@ jobs:
       - name: Publish Agent Kronig alpha
         run: |
           gh release create "${GITHUB_REF_NAME}" release-assets/* \
-            --title "Agent Kronig 0.1.0 Alpha 3" \
-            --notes-file docs/releases/v0.1.0-alpha.3.md \
+            --title "Agent Kronig 0.1.0 Alpha 4" \
+            --notes-file docs/releases/v0.1.0-alpha.4.md \
             --prerelease \
             --verify-tag
         env:

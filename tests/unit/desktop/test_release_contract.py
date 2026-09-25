@@ -31,11 +31,11 @@ def test_release_identity_accepts_matching_alpha_versions(tmp_path: Path) -> Non
     assert identity.tag == "v0.1.0-alpha.1"
 
 
-def test_repository_release_identity_is_alpha_3() -> None:
-    identity = load_release_identity(ROOT, "v0.1.0-alpha.3")
+def test_repository_release_identity_is_alpha_4() -> None:
+    identity = load_release_identity(ROOT, "v0.1.0-alpha.4")
 
-    assert identity.version == "0.1.0-alpha.3"
-    assert identity.tag == "v0.1.0-alpha.3"
+    assert identity.version == "0.1.0-alpha.4"
+    assert identity.tag == "v0.1.0-alpha.4"
 
 
 @pytest.mark.parametrize(

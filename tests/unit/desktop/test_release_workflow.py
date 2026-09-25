@@ -56,8 +56,8 @@ def test_release_workflow_limits_write_permission_and_publishes_a_prerelease() -
     )
     assert "--prerelease" in commands
     assert "--verify-tag" in commands
-    assert 'Agent Kronig 0.1.0 Alpha 3' in commands
-    assert "docs/releases/v0.1.0-alpha.3.md" in commands
+    assert 'Agent Kronig 0.1.0 Alpha 4' in commands
+    assert "docs/releases/v0.1.0-alpha.4.md" in commands
     assert release["steps"][-1]["env"] == {"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}
 
 
