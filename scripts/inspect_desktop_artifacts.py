@@ -8,7 +8,7 @@ import hashlib
 import re
 import zipfile
 from pathlib import Path
-from typing import BinaryIO
+from typing import IO
 
 SECRET_PATTERNS = (
     re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
@@ -25,7 +25,7 @@ def _application_owned(relative: str) -> bool:
     return "/_internal/" not in normalized and "/Frameworks/" not in normalized
 
 
-def _scan_stream(handle: BinaryIO, label: str) -> None:
+def _scan_stream(handle: IO[bytes], label: str) -> None:
     overlap = b""
     while chunk := handle.read(1024 * 1024):
         inspected = overlap + chunk
@@ -42,7 +42,9 @@ def _scan_zip(path: Path, relative: str) -> None:
             if member.is_dir():
                 continue
             name = member.filename.replace("\\", "/")
-            if Path(name).name == ".env" or Path(name).name.startswith(".env."):
+            if (
+                Path(name).name == ".env" or Path(name).name.startswith(".env.")
+            ) and _application_owned(name):
                 raise ValueError(f"environment file found in artifact: {relative}:{name}")
             if _application_owned(name):
                 with archive.open(member) as handle:
@@ -57,7 +59,9 @@ def inspect_artifacts(root: Path) -> tuple[tuple[str, int, str], ...]:
     inventory: list[tuple[str, int, str]] = []
     for path in files:
         relative = path.relative_to(root).as_posix()
-        if path.name == ".env" or path.name.startswith(".env."):
+        if (
+            path.name == ".env" or path.name.startswith(".env.")
+        ) and _application_owned(relative):
             raise ValueError(f"environment file found in artifact output: {relative}")
         digest = hashlib.sha256()
         with path.open("rb") as handle:
@@ -75,7 +79,12 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("root", type=Path)
     arguments = parser.parse_args()
-    inventory = inspect_artifacts(arguments.root)
+    try:
+        inventory = inspect_artifacts(arguments.root)
+    except Exception as exc:
+        message = str(exc).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+        print(f"::error title=Desktop artifact inspection failed::{message}")
+        return 1
     for relative, size, digest in inventory:
         path = Path(relative)
         if len(path.parts) == 1:

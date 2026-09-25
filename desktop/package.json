@@ -1,7 +1,7 @@
 {
   "name": "agent-kronig-desktop",
   "productName": "Agent Kronig",
-  "version": "0.1.0-alpha.5",
+  "version": "0.1.0-alpha.6",
   "private": true,
   "description": "Native desktop shell for the Agent Kronig scientific workspace",
   "main": "src/main.js",

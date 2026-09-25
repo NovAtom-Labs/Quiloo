@@ -56,8 +56,8 @@ def test_release_workflow_limits_write_permission_and_publishes_a_prerelease() -
     )
     assert "--prerelease" in commands
     assert "--verify-tag" in commands
-    assert 'Agent Kronig 0.1.0 Alpha 5' in commands
-    assert "docs/releases/v0.1.0-alpha.5.md" in commands
+    assert 'Agent Kronig 0.1.0 Alpha 6' in commands
+    assert "docs/releases/v0.1.0-alpha.6.md" in commands
     assert release["steps"][-1]["env"] == {"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}
 
 
@@ -129,7 +129,7 @@ def test_windows_build_installs_the_official_devsim_math_runtime() -> None:
     install = steps[names.index("Install Windows DEVSIM math runtime")]
 
     assert install["if"] == "matrix.platform == 'win'"
-    assert 'mkl==2023.2.2' in install["run"]
+    assert 'mkl==2025.2.0' in install["run"]
     assert names.index("Install Windows DEVSIM math runtime") < names.index(
         "Verify Python application"
     )

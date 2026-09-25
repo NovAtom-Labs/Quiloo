@@ -83,7 +83,7 @@ jobs:
 
       - name: Install Windows DEVSIM math runtime
         if: matrix.platform == 'win'
-        run: python -m pip install "mkl==2023.2.2"
+        run: python -m pip install "mkl==2025.2.0"
 
       - name: Configure simulator runtime
         run: python scripts/configure_ci_environment.py
@@ -166,8 +166,8 @@ jobs:
       - name: Publish Agent Kronig alpha
         run: |
           gh release create "${GITHUB_REF_NAME}" release-assets/* \
-            --title "Agent Kronig 0.1.0 Alpha 5" \
-            --notes-file docs/releases/v0.1.0-alpha.5.md \
+            --title "Agent Kronig 0.1.0 Alpha 6" \
+            --notes-file docs/releases/v0.1.0-alpha.6.md \
             --prerelease \
             --verify-tag
         env:
