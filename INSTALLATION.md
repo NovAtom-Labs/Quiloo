@@ -1,8 +1,18 @@
 # Agent Kronig Installation and Setup
 
-This guide installs the complete Agent Kronig pilot on a Linux workstation. It covers the repository agent, local web interface, Bedrock model access, DEVSIM execution, and the checks needed before a researcher uses the system.
+This guide covers both the self-contained native application and a complete source installation. Most researchers should use the native application. Developers and operators who need the CLI, browser mode, or a modifiable checkout should use the Linux source procedure.
 
 Sentaurus is not installed by these steps. It must remain on a separately licensed host and is connected through Agent Kronig's restricted remote-runner protocol.
+
+## Self-contained native installation
+
+Release artifacts are produced for Linux AppImage, Debian or Ubuntu `.deb`, Windows NSIS and portable `.zip`, Intel Mac `.dmg` and `.zip`, and Apple Silicon `.dmg` and `.zip`. The native application includes its private backend and reviewed DEVSIM runner. End users do not install Python, Node.js, DEVSIM, Electron, or a browser.
+
+Download the artifact for the machine's operating system and architecture from the approved release. Install or open it using the normal operating system workflow, then choose `Open folder` to select a local repository. Agent Kronig changes the selected files directly on that computer.
+
+Detailed platform instructions, application-data locations, update behavior, recovery, release building, and uninstall behavior are in [the desktop application operations guide](docs/operations/desktop-application.md).
+
+## Linux source installation
 
 ## 1. Supported installation profile
 

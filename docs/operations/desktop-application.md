@@ -1,0 +1,106 @@
+# Agent Kronig Desktop Application
+
+Agent Kronig Desktop is the supported self-contained application for researchers. It presents the same repository, agent, activity, changes, file viewer, and TCAD workflow as the local web application in a native window. No browser is required, and the application does not expose a network service.
+
+The desktop application is built for Linux first and is also packaged for Windows, Intel Mac, and Apple Silicon. Each release contains the user interface, private local backend, reviewed Python runtime, and fixed DEVSIM runner. A researcher does not need to install Python, Node.js, pnpm, Electron, DEVSIM, or a browser.
+
+## Choose the correct installer
+
+| System | Artifact | Installation |
+| --- | --- | --- |
+| Linux workstation | Linux AppImage | Mark the file executable and open it. No root access is required. |
+| Debian or Ubuntu | `.deb` package | Install with the system software center or `sudo apt install ./Agent-Kronig-*.deb`. |
+| Windows 10 or 11 | Windows installer | Run the NSIS `.exe`, choose the destination if needed, then launch Agent Kronig from the Start menu. A portable `.zip` is also produced. |
+| Intel Mac | x64 `.dmg` | Open the disk image and drag Agent Kronig into Applications. |
+| Apple Silicon | arm64 `.dmg` | Open the disk image and drag Agent Kronig into Applications. |
+
+Install only an artifact produced by the project release workflow and signed by NovAtom Labs. Local development builds are intentionally unsigned. Windows SmartScreen and macOS Gatekeeper can warn about unsigned local builds, so they are not suitable for distribution.
+
+## First launch
+
+1. Start Agent Kronig from the operating system application launcher.
+2. The application starts a private backend on an operating-system-selected `127.0.0.1` port. The port is not exposed to other machines.
+3. Select `Open folder`. The native operating-system folder dialog appears.
+4. Choose a local repository. Agent Kronig operates directly on those files. It does not copy the repository to a remote service.
+5. Create a conversation and send a task. Repository edits appear on disk and in the file tree.
+
+Only one Agent Kronig window can own its local application data at a time. Starting a second copy brings the existing window forward. A repository remains ordinary local data and can be opened with other tools when Agent Kronig is not writing to it.
+
+## Configuration and credentials
+
+The application reads configuration from its launch environment. Development runs also load the repository's ignored `.env` through `scripts/run_desktop_dev.sh`. Release deployments should inject secrets through an approved operating-system secret mechanism or a managed launch environment.
+
+At minimum, online agent operation needs a valid Bedrock credential, region, and model identifier. No credentials, `.env` files, private keys, proprietary Sentaurus material, or licensed examples are included in installers. The release workflow inventories every artifact and rejects application-owned credential material.
+
+The packaged DEVSIM runner is fixed and reviewed. It accepts a compiler-produced job manifest, verifies paths and hashes, and does not execute arbitrary shell text. Sentaurus is not bundled. Licensed Sentaurus execution remains a separate restricted integration and must stay disabled until its host, exact simulator release, extractor, signing, quotas, and conformance tests are approved.
+
+## Local data and logs
+
+Agent Kronig keeps conversations, run state, approvals, compiled jobs, evidence bundles, and startup logs in the normal per-user application-data directory:
+
+| System | Default application-data location |
+| --- | --- |
+| Linux | `~/.local/share/Agent Kronig` |
+| Windows | `%APPDATA%\Agent Kronig` |
+| macOS | `~/Library/Application Support/Agent Kronig` |
+
+Repositories are never stored inside that directory unless the researcher explicitly selected a repository there. Back up the application-data directory only while Agent Kronig is closed so its SQLite files are consistent.
+
+Startup failures are shown in a small recovery window with Retry and Quit actions. The diagnostic log contains bounded, sanitized backend output and removes values labelled as tokens, passwords, secrets, and API keys. The exact log directory follows the operating system's Electron log location.
+
+## Updates
+
+Managed updates are disabled unless a release administrator supplies an HTTPS feed through `AGENT_KRONIG_UPDATE_URL`. `AGENT_KRONIG_UPDATE_CHANNEL` accepts `stable` or `pilot`; it defaults to `stable`.
+
+Agent Kronig can check for and download an update while idle. It will not install or restart while an agent run or simulation is active. The researcher must finish, pause, or stop active work before applying a downloaded update. If no valid HTTPS feed is configured, update controls report that managed updates are unavailable and the installed application continues to work.
+
+Release administrators must sign Windows and macOS installers. macOS releases also require notarization. Update metadata and packages must be served over HTTPS from infrastructure controlled by NovAtom Labs.
+
+## Browser mode remains available
+
+The existing web application is preserved for source deployments and remote development. Run `.venv/bin/tcad-agent serve` to open it in a browser, or add `--no-browser` and use the printed loopback address. Browser mode and desktop mode share the same application interface but use separate launch and lifecycle management.
+
+A machine with a graphical desktop but no installed browser can use the native application normally. A truly headless machine cannot display the desktop window and should use the CLI or local web server with an approved remote display arrangement. Agent Kronig never requires a browser inside the packaged desktop application.
+
+## Supported developer launch
+
+Developers need Python 3.13, the project virtual environment, Node.js 24, pnpm 11.19, and installed desktop dependencies. From the repository root:
+
+```bash
+pnpm --dir desktop install --frozen-lockfile
+scripts/run_desktop_dev.sh
+```
+
+`scripts/run_desktop_dev.sh` checks the required local environment, loads an ignored `.env` without printing it, assigns a desktop-specific workspace when `TCAD_WORKSPACE` is unset, and starts Electron. The private backend is supervised by Electron and is stopped when the application exits.
+
+## Build release artifacts
+
+Release builds are target-native. Linux artifacts are built on Linux, Windows artifacts on Windows, Intel Mac artifacts on Intel macOS, and Apple Silicon artifacts on Apple Silicon macOS. A build machine needs Python 3.13, PyInstaller 6.16.0, DEVSIM 2.9.1, Node.js 24, pnpm 11.19, and the project dependencies.
+
+```bash
+.venv/bin/tcad-agent knowledge build \
+  --manifest knowledge-sources/manifests/sources.yaml \
+  --root . \
+  --index knowledge-sources/index/knowledge.sqlite3
+.venv/bin/python scripts/build_desktop_sidecars.py
+pnpm --dir desktop install --frozen-lockfile
+pnpm --dir desktop test
+pnpm --dir desktop dist
+.venv/bin/python scripts/inspect_desktop_artifacts.py desktop/dist
+```
+
+The packaged scientific and agent runtime is intentionally substantial. First launch can take up to two minutes on slower machines while the private backend initializes. Later launches usually benefit from operating-system file caching.
+
+The GitHub release workflow builds every supported target and uploads platform-specific artifacts. Signing secrets belong only in the release system. They must not be written to the repository or a developer `.env`.
+
+## Recovery and uninstall
+
+If the application does not start:
+
+1. Close any existing Agent Kronig process.
+2. Start it again and use Retry if the recovery window appears.
+3. Inspect the sanitized startup log shown in that window.
+4. Confirm that security software has not quarantined a signed sidecar.
+5. Preserve the application-data directory before attempting repair.
+
+Uninstall the application through the operating system package manager or by removing the application bundle. Uninstallation does not delete a selected repository. It also does not automatically delete the per-user application-data directory, so conversations and evidence can be preserved across reinstallations. Remove that directory separately only when its contents are no longer needed and a backup has been taken.

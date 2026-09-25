@@ -17,6 +17,7 @@ htmlcov/
 runs/
 compiled/
 .tcad-agent/
+.tcad-agent-desktop/
 knowledge-sources/index/
 .env
 .env.*

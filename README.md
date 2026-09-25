@@ -294,13 +294,20 @@ Public DEVSIM material can be indexed locally. Proprietary Sentaurus manuals and
 
 ## Requirements
 
-- Linux for the supported local IDE and runner workflow
+- Linux, Windows, or macOS for the self-contained native application
+- Linux for the supported source IDE and runner workflow
 - Python `3.13`
 - a DEVSIM Python environment for real local simulations
 - an Amazon Bedrock API key for the natural-language model gateway
 - Sentaurus only on a separately configured and licensed host
 
-See [Installation and setup](INSTALLATION.md) for the complete Linux workstation procedure, verification commands, DEVSIM setup, Bedrock configuration, and troubleshooting.
+See [Installation and setup](INSTALLATION.md) for release and source installation. See the [native desktop application guide](docs/operations/desktop-application.md) for platform installers, local data, updates, recovery, and release operations.
+
+## Native desktop application
+
+Agent Kronig is available as a self-contained native application for Linux, Windows, Intel Mac, and Apple Silicon. The application embeds its private backend and reviewed DEVSIM runtime, opens the same workbench shown in browser mode, uses the operating system folder picker, and operates directly on selected local repositories. No separate Python, Node.js, DEVSIM, Electron, or browser installation is required for an end user.
+
+Linux is the primary deployment target. CI also produces Windows and macOS artifacts from native runners. Sentaurus is never bundled and remains behind the separately licensed runner boundary. The existing local web application remains supported for source development and headless workflows.
 
 ## Installation
 
@@ -652,6 +659,7 @@ tests/                            unit, integration, and end-to-end verification
 ## Documentation
 
 - [Installation and setup](INSTALLATION.md)
+- [Native desktop application](docs/operations/desktop-application.md)
 - [Technical architecture](docs/architecture.md)
 - [Concise product and technical brief](docs/tcad_agent_brief.md)
 - [Local web application](docs/operations/local-web-app.md)
