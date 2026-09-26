@@ -138,11 +138,13 @@ def test_changes_view_model_handles_text_binary_and_rename_operations() -> None:
 
 
 @pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
-def test_production_ide_script_parses() -> None:
+def test_production_ide_script_parses(tmp_path: Path) -> None:
     project_root = Path(__file__).parents[3]
     source = (project_root / "src/tcad_agent/web/static/ide.js").read_text()
+    parser = tmp_path / "parse-ide.js"
+    parser.write_text(f"new Function({json.dumps(source)});", encoding="utf-8")
     completed = subprocess.run(
-        [_javascript_runner() or "", "-e", f"new Function({json.dumps(source)})"],
+        [_javascript_runner() or "", str(parser)],
         check=False,
         capture_output=True,
         text=True,
@@ -152,13 +154,15 @@ def test_production_ide_script_parses() -> None:
 
 
 @pytest.mark.skipif(_javascript_runner() is None, reason="No JavaScript runtime installed")
-def test_desktop_bridge_script_parses() -> None:
+def test_desktop_bridge_script_parses(tmp_path: Path) -> None:
     project_root = Path(__file__).parents[3]
     source = (
         project_root / "src/tcad_agent/web/static/desktop-bridge.js"
     ).read_text()
+    parser = tmp_path / "parse-desktop-bridge.js"
+    parser.write_text(f"new Function({json.dumps(source)});", encoding="utf-8")
     completed = subprocess.run(
-        [_javascript_runner() or "", "-e", f"new Function({json.dumps(source)})"],
+        [_javascript_runner() or "", str(parser)],
         check=False,
         capture_output=True,
         text=True,

@@ -167,8 +167,8 @@ jobs:
       - name: Publish Agent Kronig alpha
         run: |
           gh release create "${GITHUB_REF_NAME}" release-assets/* \
-            --title "Agent Kronig 0.1.0 Alpha 9" \
-            --notes-file docs/releases/v0.1.0-alpha.9.md \
+            --title "Agent Kronig 0.1.0 Alpha 10" \
+            --notes-file docs/releases/v0.1.0-alpha.10.md \
             --prerelease \
             --verify-tag
         env:

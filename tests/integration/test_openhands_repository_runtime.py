@@ -133,9 +133,11 @@ def test_openhands_edits_tests_and_delegates_inside_repository(
     assert messages[-1].content == "Updated mobility, tests pass, review complete."
     activity = events.list_after(conversation.id, 0)
     completed = [event for event in activity if event.kind == "tool_call_completed"]
-    assert any("1 passed" in str(event.payload) for event in completed), [
-        event.payload for event in completed
-    ]
+    validation = next(
+        event for event in completed if event.payload.get("tool_call_id") == "test-1"
+    )
+    assert validation.payload["is_error"] is False
+    assert validation.payload["validated_files"].keys() == {"device.txt"}
     assert any(event.payload.get("task_id") for event in completed)
     assert [event.kind for event in activity].count("tool_call_started") == 4
     started = {
