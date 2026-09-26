@@ -130,6 +130,12 @@ class ScriptedRuntimeFactory:
         return conversation
 
 
+class FailingRuntimeFactory:
+    def create(self, workspace: Path, conversation_id: UUID, callback):
+        del workspace, conversation_id, callback
+        raise RuntimeError("model configuration is unavailable")
+
+
 @pytest.fixture
 def services(tmp_path: Path):
     store = SqliteIDEStore(tmp_path / "ide.sqlite3")
@@ -223,6 +229,23 @@ def test_supervisor_rejects_a_second_active_writer(services) -> None:
     supervisor.join(first.id, timeout=2)
 
 
+def test_runtime_initialization_failure_terminates_the_created_run(services) -> None:
+    supervisor = AgentSupervisor(services, FailingRuntimeFactory())
+
+    with pytest.raises(RuntimeError, match="model configuration is unavailable"):
+        supervisor.start(services.conversation.id, "Run the TCAD study")
+
+    (run,) = services.store.list_runs(services.conversation.id)
+    assert run.state is RunState.FAILED
+    events = services.events.iter_after(services.conversation.id, 0)
+    assert any(
+        event.kind == "run_failed"
+        and event.payload["run_id"] == str(run.id)
+        and event.payload["detail"] == "model configuration is unavailable"
+        for event in events
+    )
+
+
 def test_approval_resumes_and_denial_rejects_pending_action(services) -> None:
     runtime = ScriptedRuntimeFactory(
         [], status=ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
@@ -304,3 +327,20 @@ def test_restart_recovery_pauses_interrupted_running_run(services) -> None:
     AgentSupervisor(services, ScriptedRuntimeFactory([]))
 
     assert services.store.get_run(run.id).state is RunState.PAUSED
+
+
+def test_restart_recovery_fails_run_that_never_finished_starting(services) -> None:
+    run = services.store.create_run(
+        services.conversation.id, services.conversation.id
+    )
+
+    AgentSupervisor(services, ScriptedRuntimeFactory([]))
+
+    assert services.store.get_run(run.id).state is RunState.FAILED
+    events = services.events.iter_after(services.conversation.id, 0)
+    assert any(
+        event.kind == "run_failed"
+        and event.payload["run_id"] == str(run.id)
+        and "previous service stopped" in str(event.payload["detail"])
+        for event in events
+    )
