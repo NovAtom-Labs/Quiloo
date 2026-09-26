@@ -229,6 +229,19 @@ def test_supervisor_rejects_a_second_active_writer(services) -> None:
     supervisor.join(first.id, timeout=2)
 
 
+def test_active_run_for_workspace_returns_only_live_work(services) -> None:
+    gate = Event()
+    supervisor = AgentSupervisor(services, ScriptedRuntimeFactory([], gate=gate))
+    workspace_id = services.conversation.workspace_id
+
+    run = supervisor.start(services.conversation.id, "Run tests")
+
+    assert supervisor.active_run_for_workspace(workspace_id).id == run.id
+    gate.set()
+    supervisor.join(run.id, timeout=2)
+    assert supervisor.active_run_for_workspace(workspace_id) is None
+
+
 def test_runtime_initialization_failure_terminates_the_created_run(services) -> None:
     supervisor = AgentSupervisor(services, FailingRuntimeFactory())
 

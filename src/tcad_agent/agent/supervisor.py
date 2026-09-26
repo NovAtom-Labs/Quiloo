@@ -238,6 +238,20 @@ class AgentSupervisor:
         )
         return cancelled
 
+    def active_run_for_workspace(
+        self, workspace_id: UUID
+    ) -> AgentRunRecord | None:
+        """Return the live writer for one workspace, if one exists."""
+
+        active = (
+            run
+            for run in reversed(
+                self.services.store.list_runs_for_workspace(workspace_id)
+            )
+            if run.state in _ACTIVE_STATES
+        )
+        return next(active, None)
+
     def join(self, run_id: UUID, timeout: float | None = None) -> None:
         thread = self._threads.get(run_id)
         if thread is not None:

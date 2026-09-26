@@ -106,6 +106,12 @@ class WorkspaceRecord(StrictModel):
     last_opened_at: datetime
 
 
+class WorkspaceSessionRecord(StrictModel):
+    id: UUID
+    workspace_id: UUID
+    created_at: datetime
+
+
 class ConversationState(StrEnum):
     IDLE = "idle"
     RUNNING = "running"

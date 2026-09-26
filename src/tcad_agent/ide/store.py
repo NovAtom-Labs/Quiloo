@@ -329,6 +329,47 @@ class SqliteIDEStore:
             ).fetchall()
         return tuple(self._conversation(row) for row in rows)
 
+    def delete_conversation_tree(self, conversation_id: UUID) -> None:
+        """Delete one internal session and every record owned by it."""
+
+        key = str(conversation_id)
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            current = connection.execute(
+                "SELECT id FROM conversations WHERE id = ?", (key,)
+            ).fetchone()
+            if current is None:
+                raise ConversationNotFoundError(
+                    f"conversation does not exist: {conversation_id}"
+                )
+            run_ids = "SELECT id FROM agent_runs WHERE conversation_id = ?"
+            for table in (
+                "approval_requests",
+                "run_permission_grants",
+                "run_change_baselines",
+                "run_change_manifests",
+            ):
+                connection.execute(
+                    f"DELETE FROM {table} WHERE run_id IN ({run_ids})", (key,)
+                )
+            connection.execute(
+                "DELETE FROM agent_runs WHERE conversation_id = ?", (key,)
+            )
+            connection.execute(
+                "DELETE FROM conversation_messages WHERE conversation_id = ?", (key,)
+            )
+            connection.execute(
+                "DELETE FROM ide_events WHERE conversation_id = ?", (key,)
+            )
+            connection.execute("DELETE FROM conversations WHERE id = ?", (key,))
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
     def append_message(
         self,
         conversation_id: UUID,
