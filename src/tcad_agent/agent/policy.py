@@ -98,13 +98,17 @@ _SYSTEM_COMMANDS = {"chmod", "chown", "docker", "podman", "sudo"}
 _WINDOWS_EXECUTABLE = re.compile(r'^(?:"?[A-Za-z]:\\)')
 
 
-def _command_tokens(command: str) -> list[str]:
+def command_tokens(command: str) -> list[str]:
+    """Split one supported shell command across POSIX and Windows path syntax."""
+
     windows_style = bool(_WINDOWS_EXECUTABLE.match(command))
     tokens = shlex.split(command, posix=not windows_style)
     return [token.strip('"') for token in tokens]
 
 
-def _executable_name(token: str) -> str:
+def executable_name(token: str) -> str:
+    """Return a normalized executable basename for policy and event metadata."""
+
     name = re.split(r"[\\/]", token)[-1].lower()
     return name.removesuffix(".exe")
 
@@ -120,7 +124,7 @@ def _inside_workspace(workspace: Path, candidate: Path) -> bool:
 
 def _workspace_wrapped_command(workspace: Path, command: str) -> str | None:
     try:
-        tokens = _command_tokens(command)
+        tokens = command_tokens(command)
     except ValueError:
         return None
     if len(tokens) < 4 or tokens[0] != "cd" or tokens[2] != "&&":
@@ -149,13 +153,13 @@ def _terminal_risk(workspace: Path, action: TerminalAction) -> SecurityRisk:
     if _SHELL_CONTROL.search(command):
         return SecurityRisk.HIGH
     try:
-        tokens = _command_tokens(command)
+        tokens = command_tokens(command)
     except ValueError:
         return SecurityRisk.HIGH
     if not tokens:
         return SecurityRisk.HIGH
 
-    executable = _executable_name(tokens[0])
+    executable = executable_name(tokens[0])
     if executable == "git":
         git_arguments = tokens[1:]
         if git_arguments and git_arguments[0] == "--no-pager":
@@ -211,14 +215,14 @@ def _terminal_permission_category(
             return PermissionCategory.COMPLEX_SHELL
         command = wrapped
     try:
-        tokens = _command_tokens(command)
+        tokens = command_tokens(command)
     except ValueError:
         return PermissionCategory.COMPLEX_SHELL
     if not tokens:
         return PermissionCategory.UNRECOGNIZED_ACTION
 
     categories: set[PermissionCategory] = set()
-    executable = _executable_name(tokens[0])
+    executable = executable_name(tokens[0])
     if executable in _PACKAGE_COMMANDS:
         categories.add(PermissionCategory.PACKAGE_INSTALLATION)
     elif executable in _NETWORK_COMMANDS:

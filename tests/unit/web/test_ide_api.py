@@ -286,7 +286,7 @@ def test_run_changes_endpoint_handles_legacy_run_without_baseline(
 def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     root.mkdir()
-    (root / "README.md").write_text("# Research\n")
+    (root / "README.md").write_text("# Research\n", encoding="utf-8", newline="\n")
     web = ide_client(tmp_path)
 
     opened = web.post("/api/workspaces", json={"path": str(root)})
@@ -319,9 +319,13 @@ def test_workspace_file_preview_classifies_and_formats_supported_text(
 ) -> None:
     root = tmp_path / "repo"
     root.mkdir()
-    (root / "notes.md").write_text("# Junction\n\nBuilt-in potential.\n")
+    (root / "notes.md").write_text(
+        "# Junction\n\nBuilt-in potential.\n", encoding="utf-8", newline="\n"
+    )
     (root / "result.json").write_text('{"voltage":0.71,"converged":true}')
-    (root / "sweep.csv").write_text("bias,current\n0,0\n1,2e-6\n")
+    (root / "sweep.csv").write_text(
+        "bias,current\n0,0\n1,2e-6\n", encoding="utf-8", newline="\n"
+    )
     web = ide_client(tmp_path)
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
 
@@ -361,7 +365,9 @@ def test_workspace_file_preview_recognizes_extensionless_utf8_text(
 ) -> None:
     root = tmp_path / "repo"
     root.mkdir()
-    (root / "Makefile").write_text("validate:\n\tpython scripts/check.py\n")
+    (root / "Makefile").write_text(
+        "validate:\n\tpython scripts/check.py\n", encoding="utf-8", newline="\n"
+    )
     web = ide_client(tmp_path)
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
 
@@ -482,7 +488,7 @@ def test_workspace_text_file_can_be_loaded_and_saved_with_conflict_protection(
     root = tmp_path / "repo"
     root.mkdir()
     target = root / "model.py"
-    target.write_text("value = 1\n")
+    target.write_text("value = 1\n", encoding="utf-8", newline="\n")
     web = ide_client(tmp_path)
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
     endpoint = f"/api/workspaces/{workspace['id']}/files/content"

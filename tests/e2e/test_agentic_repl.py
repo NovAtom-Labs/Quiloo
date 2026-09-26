@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import os
-import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -120,9 +119,7 @@ def _scripted_responses(repository: Path) -> list[Message | Exception]:
             "run-checks",
             "terminal",
             {
-                "command": (
-                    f"{shlex.quote(sys.executable)} scripts/check.py"
-                )
+                "command": "python scripts/check.py"
             },
         ),
         _tool_call(
@@ -201,8 +198,12 @@ def _start_through_http(
 
 
 def test_repository_agent_repairs_validates_and_delegates_end_to_end(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setenv(
+        "PATH",
+        str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", ""),
+    )
     repository = create_repository(tmp_path / "pn-junction-research")
     llm = TestLLM.from_messages(_scripted_responses(repository))
     services = _services(tmp_path)

@@ -15,7 +15,7 @@ def test_configure_environment_exports_the_active_python(tmp_path: Path) -> None
     )
 
     assert github_environment.read_text(encoding="utf-8") == (
-        "TCAD_DEVSIM_PYTHON=/opt/python/bin/python\n"
+        f"TCAD_DEVSIM_PYTHON={Path('/opt/python/bin/python')}\n"
     )
 
 

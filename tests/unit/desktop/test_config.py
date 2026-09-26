@@ -22,24 +22,26 @@ def test_default_data_dir_uses_platform_conventions() -> None:
     ) == Path("C:/Users/researcher/AppData/Roaming/Agent Kronig")
 
 
-def test_desktop_launch_config_reads_valid_environment() -> None:
+def test_desktop_launch_config_reads_valid_environment(tmp_path: Path) -> None:
     token = "a" * 43
+    data_dir = tmp_path / "agent-kronig-data"
+    runner = tmp_path / "agent-kronig-devsim"
     config = DesktopLaunchConfig.from_environment(
         {
             "AGENT_KRONIG_DESKTOP_TOKEN": token,
             "AGENT_KRONIG_DESKTOP_HOST": "127.0.0.1",
             "AGENT_KRONIG_DESKTOP_PORT": "0",
-            "AGENT_KRONIG_DATA_DIR": "/tmp/agent-kronig-data",
-            "AGENT_KRONIG_DEVSIM_RUNNER": "/opt/agent-kronig/devsim-runner",
+            "AGENT_KRONIG_DATA_DIR": str(data_dir),
+            "AGENT_KRONIG_DEVSIM_RUNNER": str(runner),
         }
     )
 
     assert config.host == "127.0.0.1"
     assert config.port == 0
     assert config.launch_token == token
-    assert config.data_dir == Path("/tmp/agent-kronig-data").resolve()
+    assert config.data_dir == data_dir.resolve()
     assert config.protocol_version == 1
-    assert config.devsim_runner == Path("/opt/agent-kronig/devsim-runner")
+    assert config.devsim_runner == runner.resolve()
 
 
 @pytest.mark.parametrize(

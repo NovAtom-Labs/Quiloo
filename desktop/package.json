@@ -1,9 +1,14 @@
 {
   "name": "agent-kronig-desktop",
   "productName": "Agent Kronig",
-  "version": "0.1.0-alpha.8",
+  "version": "0.1.0-alpha.9",
   "private": true,
   "description": "Native desktop shell for the Agent Kronig scientific workspace",
+  "homepage": "https://github.com/NovAtom-Labs/Quiloo",
+  "author": {
+    "name": "NovAtom Labs",
+    "email": "admin@novatomlabs.com"
+  },
   "main": "src/main.js",
   "license": "UNLICENSED",
   "scripts": {

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import shlex
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -39,7 +39,13 @@ def tool_call(identifier: str, name: str, arguments: dict[str, object]) -> Messa
     )
 
 
-def test_openhands_edits_tests_and_delegates_inside_repository(tmp_path: Path) -> None:
+def test_openhands_edits_tests_and_delegates_inside_repository(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv(
+        "PATH",
+        str(Path(sys.executable).parent) + os.pathsep + os.environ.get("PATH", ""),
+    )
     repository = tmp_path / "device-repository"
     repository.mkdir()
     (repository / "device.txt").write_text("mobility = 100\n")
@@ -53,8 +59,8 @@ def test_openhands_edits_tests_and_delegates_inside_repository(tmp_path: Path) -
     responses: list[Message | Exception] = [
         tool_call(
             "view-1",
-            "file_editor",
-            {"command": "view", "path": str(repository / "device.txt")},
+            "terminal",
+            {"command": "cat device.txt"},
         ),
         tool_call(
             "edit-1",
@@ -69,7 +75,7 @@ def test_openhands_edits_tests_and_delegates_inside_repository(tmp_path: Path) -
         tool_call(
             "test-1",
             "terminal",
-            {"command": f"{shlex.quote(sys.executable)} -m pytest -q"},
+            {"command": "python -m pytest -q"},
         ),
         tool_call(
             "task-1",
@@ -82,8 +88,8 @@ def test_openhands_edits_tests_and_delegates_inside_repository(tmp_path: Path) -
         ),
         tool_call(
             "child-read-1",
-            "terminal",
-            {"command": "sed -n 1,20p device.txt"},
+            "file_editor",
+            {"command": "view", "path": str(repository / "device.txt")},
         ),
         Message(
             role="assistant",

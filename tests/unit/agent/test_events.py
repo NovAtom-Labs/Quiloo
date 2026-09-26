@@ -267,6 +267,21 @@ def test_structured_phase_metadata_uses_typed_command_semantics() -> None:
     assert fixing == {"phase": "execute"}
 
 
+def test_windows_python_validation_is_structured_as_validation() -> None:
+    metadata = structured_action_metadata(
+        _terminal_action(
+            r'"C:\Program Files\Python\python.exe" -m pytest -q',
+            risk=SecurityRisk.LOW,
+        )
+    )
+
+    assert metadata == {
+        "phase": "validate",
+        "evidence_kind": "validation",
+        "validation_scope": "workspace",
+    }
+
+
 def test_domain_refusal_is_failed_activity_without_workspace_validation_claims(
     tmp_path: Path,
 ) -> None:

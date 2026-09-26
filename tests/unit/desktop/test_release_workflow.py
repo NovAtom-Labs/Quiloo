@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import yaml
@@ -11,6 +12,16 @@ def load_workflow() -> dict[str, object]:
     payload = yaml.safe_load((ROOT / ".github/workflows/desktop-build.yml").read_text())
     assert isinstance(payload, dict)
     return payload
+
+
+def test_linux_package_metadata_identifies_the_project_and_maintainer() -> None:
+    package = json.loads((ROOT / "desktop" / "package.json").read_text())
+
+    assert package["homepage"] == "https://github.com/NovAtom-Labs/Quiloo"
+    assert package["author"] == {
+        "name": "NovAtom Labs",
+        "email": "admin@novatomlabs.com",
+    }
 
 
 def test_release_workflow_gates_publication_on_every_native_build() -> None:
@@ -56,8 +67,8 @@ def test_release_workflow_limits_write_permission_and_publishes_a_prerelease() -
     )
     assert "--prerelease" in commands
     assert "--verify-tag" in commands
-    assert 'Agent Kronig 0.1.0 Alpha 8' in commands
-    assert "docs/releases/v0.1.0-alpha.8.md" in commands
+    assert 'Agent Kronig 0.1.0 Alpha 9' in commands
+    assert "docs/releases/v0.1.0-alpha.9.md" in commands
     assert release["steps"][-1]["env"] == {"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}
 
 

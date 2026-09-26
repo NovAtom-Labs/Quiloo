@@ -20,7 +20,8 @@ def test_data_directory_lock_blocks_competing_backend_and_releases(tmp_path: Pat
 
 def test_data_directory_lock_context_records_current_process(tmp_path: Path) -> None:
     with DataDirectoryLock(tmp_path) as lock:
-        contents = lock.path.read_text()
+        assert lock.acquired
+    contents = lock.path.read_text(encoding="utf-8")
 
     assert contents.startswith("pid=")
     assert not lock.acquired

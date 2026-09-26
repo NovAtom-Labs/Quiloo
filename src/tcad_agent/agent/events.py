@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import re
-import shlex
 from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
@@ -39,6 +38,8 @@ from tcad_agent.agent.policy import (
     action_summary,
     approval_explanation,
     classify_action,
+    command_tokens,
+    executable_name,
     permission_category,
 )
 from tcad_agent.agent.tools import TcadDomainAction, TcadDomainObservation
@@ -91,14 +92,14 @@ def structured_action_metadata(event: ActionEvent) -> dict[str, JsonValue]:
         return metadata
     if isinstance(action, TerminalAction):
         try:
-            tokens = shlex.split(action.command)
+            tokens = command_tokens(action.command)
         except ValueError:
             tokens = []
         if len(tokens) >= 4 and tokens[0] == "cd" and tokens[2] == "&&":
             tokens = tokens[3:]
         if tokens and tokens[-1] == "2>&1":
             tokens.pop()
-        executable = Path(tokens[0]).name if tokens else ""
+        executable = executable_name(tokens[0]) if tokens else ""
         inspection_commands = {
             "cat",
             "diff",
