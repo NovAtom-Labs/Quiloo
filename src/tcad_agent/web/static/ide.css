@@ -486,43 +486,61 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 }
 .conversation-messages, .agent-activity, .agent-changes { min-height: 0; overflow-y: auto; }
 .conversation-messages { flex: 1 1 auto; padding: 0 11px; }
-.chat-timeline {
-  margin: 6px 0 10px 10px;
-  padding: 7px 0 6px 10px;
-  border-left: 2px solid #456384;
+.research-trail {
+  padding: 16px 0 17px;
+  border-bottom: 1px solid var(--border);
 }
-.chat-timeline > header {
+.research-trail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 5px;
-  color: #a9b4c0;
-  font: 0.55rem var(--font-mono);
-  letter-spacing: 0.045em;
-  text-transform: uppercase;
+  gap: 10px;
+  margin-bottom: 11px;
 }
-.chat-timeline-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; }
-.chat-timeline-entry {
+.research-trail-header strong { color: #dce1e6; font-size: 0.72rem; font-weight: 620; }
+.research-trail-header span { color: var(--muted-dim); font: 0.54rem var(--font-mono); white-space: nowrap; }
+.research-trail-current { display: flex; align-items: center; gap: 8px; margin: 0 0 11px; color: #bec6ce; }
+.research-trail-current strong { font-size: 0.67rem; font-weight: 590; }
+.research-trail-current-marker {
+  flex: 0 0 auto;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #89949e;
+}
+.research-trail-current.is-running .research-trail-current-marker { animation: thinking-pulse 1.4s ease-in-out infinite; }
+.research-trail-current.is-waiting .research-trail-current-marker { background: #a08c6b; }
+.research-trail-stages { display: grid; gap: 1px; }
+.research-trail-stage {
   display: grid;
-  grid-template-columns: 7px minmax(0, 1fr);
-  column-gap: 7px;
-  color: #aeb7c0;
-  font-size: 0.66rem;
-  line-height: 1.4;
+  grid-template-columns: minmax(68px, 0.34fr) minmax(0, 1fr);
+  gap: 9px;
+  padding: 4px 0;
 }
-.chat-timeline-entry::before { color: #66717c; content: "✓"; font: 0.58rem var(--font-mono); }
-.chat-timeline-entry.is-running::before { color: var(--blue-strong); content: "●"; animation: thinking-pulse 1.2s ease-in-out infinite; }
-.chat-timeline-entry.is-waiting::before { color: #caa05c; content: "•"; }
-.chat-timeline-entry.is-failed::before { color: var(--red); content: "×"; }
-.chat-timeline-entry strong { color: #ced4da; font-weight: 580; }
-.chat-timeline-entry small {
-  grid-column: 2;
-  overflow: hidden;
-  color: var(--muted-dim);
-  font: 0.57rem/1.35 var(--font-mono);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.research-trail-stage > span { color: #707a84; font: 0.52rem var(--font-mono); letter-spacing: 0.035em; text-transform: uppercase; }
+.research-trail-stage strong { display: block; color: #aeb7c0; font-size: 0.63rem; font-weight: 560; line-height: 1.35; }
+.research-trail-stage small { display: block; margin-top: 1px; color: var(--muted-dim); font: 0.52rem/1.35 var(--font-mono); }
+.research-trail-recovery {
+  margin: 10px 0 0;
+  padding: 7px 8px;
+  color: #929ca6;
+  border: 1px solid var(--border);
+  background: #0e1216;
+  font-size: 0.6rem;
+  line-height: 1.45;
 }
+.research-trail-activity {
+  margin-top: 10px;
+  padding: 0;
+  color: #929ca6;
+  border: 0;
+  border-bottom: 1px solid #3a434c;
+  background: transparent;
+  font-size: 0.59rem;
+  line-height: 1.45;
+}
+.research-trail-activity:hover { color: #c5ccd3; border-bottom-color: #6f7a84; }
+.research-trail-activity:focus-visible { outline: 1px solid #697681; outline-offset: 3px; }
 .jump-to-latest {
   position: absolute;
   right: 15px;
@@ -537,9 +555,7 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
   font: 0.58rem var(--font-mono);
 }
 .jump-to-latest:hover { color: var(--text-strong); border-color: var(--blue); }
-.message { padding: 13px 2px 14px 10px; border-bottom: 1px solid var(--border); border-left: 2px solid var(--border-strong); }
-.message.is-user { border-left-color: var(--blue); }
-.message.is-assistant { border-left-color: #6b8f83; }
+.message { padding: 15px 0 16px; border-bottom: 1px solid var(--border); }
 .message > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .message > header span, .message > header time { color: var(--muted-dim); font: 0.52rem var(--font-mono); letter-spacing: 0.055em; }
 .message-body { margin-top: 6px; color: #d3d8de; font-size: 0.73rem; line-height: 1.58; }

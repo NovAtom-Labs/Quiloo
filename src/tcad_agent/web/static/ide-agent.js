@@ -139,6 +139,81 @@
     return chatTimeline(snapshot).slice(-6);
   }
 
+  function researchTrail(snapshot) {
+    const state = snapshot?.runState || "idle";
+    if (state === "idle") return {visible: false, stages: [], current: null, recovery: null};
+    const steps = snapshot?.steps || [];
+    const phaseLabels = {
+      Plan: ["Approach", "Preparing the research approach", "Research approach prepared"],
+      Inspect: ["Repository", "Reviewing repository evidence", "Repository evidence reviewed"],
+      Edit: ["Workspace", "Updating workspace files", "Workspace files updated"],
+      Delegate: ["Coordination", "Coordinating a focused task", "Focused tasks coordinated"],
+      Execute: ["Execution", "Running a workspace operation", "Workspace operations completed"],
+      Validate: ["Validation", "Running validation", "Validation completed"],
+      Report: ["Results", "Preparing the research result", "Research result prepared"],
+      Unclassified: ["Research", "Working through the research task", "Research action completed"],
+    };
+    const groups = [];
+    const byPhase = new Map();
+    steps.forEach((step) => {
+      const key = phaseForStep(step);
+      if (!byPhase.has(key)) {
+        const group = {key, steps: []};
+        byPhase.set(key, group);
+        groups.push(group);
+      }
+      byPhase.get(key).steps.push(step);
+    });
+    const failedIndexes = steps
+      .map((step, index) => step.status === "failed" ? index : -1)
+      .filter((index) => index >= 0);
+    const recoveredFailures = failedIndexes.filter((failedIndex) => (
+      steps.slice(failedIndex + 1).some((step) => ["completed", "running"].includes(step.status))
+      && state !== "failed"
+    ));
+    const stages = groups.slice(-4).map((group) => {
+      const [phase, activeLabel, completedLabel] = phaseLabels[group.key] || phaseLabels.Unclassified;
+      const running = group.steps.some((step) => step.status === "running");
+      const terminalFailure = state === "failed" && group.steps.at(-1)?.status === "failed";
+      return {
+        id: `research-${group.key.toLowerCase()}`,
+        phase,
+        label: running ? activeLabel : completedLabel,
+        detail: `${group.steps.length} ${group.steps.length === 1 ? "action" : "actions"} recorded`,
+        actionCount: group.steps.length,
+        status: running ? "running" : terminalFailure ? "failed" : "completed",
+      };
+    });
+    let current = stages.find((stage) => stage.status === "running") || null;
+    const pendingApproval = (snapshot?.pendingApprovals || []).at(-1);
+    if (pendingApproval || state === "waiting_for_approval") {
+      current = {label: "Waiting for researcher approval", status: "waiting"};
+    } else if (["queued", "running"].includes(state) && !steps.length) {
+      current = {label: "Preparing the research approach", status: "running"};
+    } else if (state === "running" && !current) {
+      current = {label: "Reviewing results and choosing the next action", status: "running"};
+    }
+    const titles = {
+      completed: "Research record",
+      failed: "Research stopped",
+      blocked: "Research blocked",
+      cancelled: "Research cancelled",
+      waiting_for_approval: "Research awaiting approval",
+      paused: "Research paused",
+    };
+    return {
+      visible: true,
+      title: titles[state] || "Research in progress",
+      meta: `${steps.length} ${steps.length === 1 ? "action" : "actions"}`,
+      stages,
+      current,
+      recovery: recoveredFailures.length
+        ? "Intermediate corrections were resolved automatically. No researcher action was required."
+        : null,
+      state,
+    };
+  }
+
   function unique(values) {
     return Array.from(new Set(values.filter(Boolean)));
   }
@@ -328,6 +403,7 @@
     operationalUpdates,
     permissionView,
     phaseForStep,
+    researchTrail,
     sanitizeArguments,
   };
 })();

@@ -218,6 +218,7 @@ def test_responsive_styles_keep_agent_panel_available_as_a_drawer() -> None:
     project_root = Path(__file__).parents[3]
     source = (project_root / "src/tcad_agent/web/static/ide.css").read_text()
 
+    assert source.count("{") == source.count("}")
     assert ".toggle-agent-panel" in source
     assert ".agent-panel.is-open" in source
     assert "position: fixed" in source
@@ -227,7 +228,11 @@ def test_responsive_styles_keep_agent_panel_available_as_a_drawer() -> None:
     assert "text-overflow: ellipsis" in source
     assert ".approval-technical" in source
     assert ".is-approve-category" in source
-    assert ".chat-timeline" in source
+    assert ".research-trail" in source
+    assert ".chat-timeline" not in source
+    assert "border-left-color: var(--blue)" not in source
+    assert "border-left-color: #6b8f83" not in source
+    assert ".research-trail-current-marker" in source
     assert "height: 100%" in source
     assert re.search(
         r"\.agent-chat\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column",

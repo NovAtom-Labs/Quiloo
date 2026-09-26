@@ -81,20 +81,45 @@ assertEqual(progress[3].label, "Running validation", "active validation has a pl
 assertEqual(progress[3].detail, "pytest -q", "technical evidence stays inspectable");
 assertEqual(JSON.stringify(progress).includes("internal planning"), false, "private reasoning labels never leak into progress");
 
-const longTimeline = agent.chatTimeline({
+const researchTrail = agent.researchTrail({
   runState: "running",
   steps: Array.from({length: 8}, (_, index) => ({
     id: `step-${index}`,
     toolName: index === 3 ? "think" : "terminal",
     summary: index === 3 ? "private chain of thought" : `terminal: check-${index}`,
-    status: "completed",
+    status: index === 7 ? "running" : "completed",
     phase: index > 5 ? "validate" : "inspect",
     arguments: index === 3 ? {} : {command: `check-${index}`},
   })),
   pendingApprovals: [],
 });
-assertEqual(longTimeline.length > 6, true, "chat keeps the complete run timeline instead of truncating it");
-assertEqual(JSON.stringify(longTimeline).includes("private chain of thought"), false, "chat timeline never exposes private reasoning");
+assertEqual(researchTrail.stages.length, 2, "chat groups repeated actions into research phases");
+assertEqual(researchTrail.stages[0].phase, "Repository", "inspection is presented as repository research");
+assertEqual(researchTrail.stages[0].actionCount, 6, "grouped phase preserves its action count");
+assertEqual(researchTrail.stages[1].phase, "Validation", "validation remains a distinct research phase");
+assertEqual(researchTrail.current.label, "Running validation", "the active scientific operation is prominent");
+assertEqual(JSON.stringify(researchTrail).includes("check-7"), false, "raw commands stay out of the chat trail");
+assertEqual(JSON.stringify(researchTrail).includes("private chain of thought"), false, "chat trail never exposes private reasoning");
+
+const recoveredTrail = agent.researchTrail({
+  runState: "running",
+  steps: [
+    {id: "invalid-1", status: "failed", phase: "validate", toolName: "terminal", summary: "invalid_spec"},
+    {id: "edit-1", status: "completed", phase: "edit", toolName: "file_editor", summary: "Corrected schema"},
+    {id: "validate-1", status: "running", phase: "validate", toolName: "terminal", summary: "Retry validation"},
+  ],
+  pendingApprovals: [],
+});
+assertEqual(recoveredTrail.recovery !== null, true, "resolved intermediate failures become one neutral recovery note");
+assertEqual(recoveredTrail.recovery.includes("resolved automatically"), true, "recovery note explains that no researcher action was needed");
+assertEqual(recoveredTrail.stages.some((stage) => stage.status === "failed"), false, "recovered attempts do not look like terminal failures in chat");
+
+const queuedTrail = agent.researchTrail({
+  runState: "queued",
+  steps: [],
+  pendingApprovals: [],
+});
+assertEqual(queuedTrail.current.label, "Preparing the research approach", "a new run starts with an honest narrative state");
 
 const betweenActions = agent.operationalUpdates({
   runState: "running",

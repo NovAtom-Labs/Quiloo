@@ -77,7 +77,7 @@ const desktopSettingsModel = document.querySelector("#desktop-settings-model");
 const desktopSettingsReasoning = document.querySelector("#desktop-settings-reasoning");
 const desktopSettingsKey = document.querySelector("#desktop-settings-key");
 const desktopSettingsClear = document.querySelector("#desktop-settings-clear");
-let chatTimelineSignature = "";
+let researchTrailSignature = "";
 const desktopSettingsStorage = document.querySelector("#desktop-settings-storage");
 const desktopSettingsError = document.querySelector("#desktop-settings-error");
 const desktopSettingsCancel = document.querySelector("#desktop-settings-cancel");
@@ -707,45 +707,71 @@ function isConversationNearBottom() {
 }
 
 function renderChatProgress(snapshot, {allowFollow = true, wasNearBottom = null} = {}) {
-  const updates = window.AgentKronigAgentView.chatTimeline(snapshot);
-  const signature = JSON.stringify(updates);
-  const changed = signature !== chatTimelineSignature;
+  const trail = window.AgentKronigAgentView.researchTrail(snapshot);
+  const signature = JSON.stringify(trail);
+  const changed = signature !== researchTrailSignature;
   const nearBottom = wasNearBottom ?? isConversationNearBottom();
-  conversationMessages.querySelector("#agent-chat-timeline")?.remove();
-  chatTimelineSignature = signature;
-  if (!updates.length) {
+  conversationMessages.querySelector("#agent-research-trail")?.remove();
+  researchTrailSignature = signature;
+  if (!trail.visible) {
     jumpToLatest.classList.add("hidden");
     return;
   }
 
-  const timeline = document.createElement("section");
+  const narrative = document.createElement("section");
   const heading = document.createElement("header");
   const title = document.createElement("strong");
-  const state = document.createElement("span");
-  const list = document.createElement("ol");
-  timeline.id = "agent-chat-timeline";
-  timeline.className = "chat-timeline";
-  title.textContent = "Agent activity";
-  state.textContent = String(snapshot?.runState || "working").replaceAll("_", " ");
-  list.className = "chat-timeline-list";
-  updates.forEach((update) => {
-    const item = document.createElement("li");
+  const meta = document.createElement("span");
+  const stages = document.createElement("div");
+  narrative.id = "agent-research-trail";
+  narrative.className = "research-trail";
+  heading.className = "research-trail-header";
+  title.textContent = trail.title;
+  meta.textContent = trail.meta;
+  stages.className = "research-trail-stages";
+  if (trail.current) {
+    const current = document.createElement("div");
+    const marker = document.createElement("span");
     const label = document.createElement("strong");
-    item.className = `chat-timeline-entry is-${update.status}`;
-    label.textContent = update.label;
-    item.append(label);
-    if (update.detail) {
-      const detail = document.createElement("small");
-      detail.textContent = update.detail;
-      item.append(detail);
-    }
-    list.append(item);
+    current.className = `research-trail-current is-${trail.current.status}`;
+    marker.className = "research-trail-current-marker";
+    marker.setAttribute("aria-hidden", "true");
+    label.textContent = trail.current.label;
+    current.append(marker, label);
+    narrative.append(current);
+  }
+  trail.stages.forEach((stage) => {
+    const row = document.createElement("div");
+    const phase = document.createElement("span");
+    const description = document.createElement("div");
+    const label = document.createElement("strong");
+    const detail = document.createElement("small");
+    row.className = "research-trail-stage";
+    phase.textContent = stage.phase;
+    label.textContent = stage.label;
+    detail.textContent = stage.detail;
+    description.append(label, detail);
+    row.append(phase, description);
+    stages.append(row);
   });
-  heading.append(title, state);
-  timeline.append(heading, list);
+  heading.append(title, meta);
+  narrative.prepend(heading);
+  narrative.append(stages);
+  if (trail.recovery) {
+    const recovery = document.createElement("p");
+    recovery.className = "research-trail-recovery";
+    recovery.textContent = trail.recovery;
+    narrative.append(recovery);
+  }
+  const activityLink = document.createElement("button");
+  activityLink.type = "button";
+  activityLink.className = "research-trail-activity";
+  activityLink.textContent = "Open technical activity";
+  activityLink.addEventListener("click", () => activateAgentView("activity", {focus: true}));
+  narrative.append(activityLink);
   const latestUser = Array.from(conversationMessages.querySelectorAll('.message[data-role="user"]')).at(-1);
-  if (latestUser) latestUser.after(timeline);
-  else conversationMessages.append(timeline);
+  if (latestUser) latestUser.after(narrative);
+  else conversationMessages.append(narrative);
 
   if (!changed || !allowFollow) return;
   if (window.AgentKronigIDEState.shouldAutoFollowProgress(changed, nearBottom)) {
