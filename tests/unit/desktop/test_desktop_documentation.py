@@ -87,13 +87,13 @@ def test_readme_leads_with_native_alpha_downloads() -> None:
         "Native desktop application",
         "DEVSIM",
         "Sentaurus",
-        "v0.1.0-alpha.10/Agent-Kronig-0.1.0-alpha.10-linux-x64.AppImage",
-        "v0.1.0-alpha.10/Agent-Kronig-0.1.0-alpha.10-win-x64.exe",
-        "v0.1.0-alpha.10/Agent-Kronig-0.1.0-alpha.10-mac-x64.dmg",
-        "v0.1.0-alpha.10/Agent-Kronig-0.1.0-alpha.10-mac-arm64.dmg",
+        "v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-linux-x64.AppImage",
+        "v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-win-x64.exe",
+        "v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-mac-x64.dmg",
+        "v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-mac-arm64.dmg",
     ):
         assert phrase in readme
-        if "v0.1.0-alpha.10/" in phrase:
+        if "v0.1.0-alpha.11/" in phrase:
             assert readme.index(phrase) < source_setup
 
 
@@ -106,7 +106,7 @@ def test_readme_reports_the_repository_license() -> None:
 
 
 def test_alpha_release_and_community_documents_are_complete() -> None:
-    release_notes = (ROOT / "docs" / "releases" / "v0.1.0-alpha.10.md").read_text()
+    release_notes = (ROOT / "docs" / "releases" / "v0.1.0-alpha.11.md").read_text()
     security = (ROOT / "SECURITY.md").read_text()
     required_files = (
         ROOT / "CONTRIBUTING.md",
@@ -136,7 +136,7 @@ def test_new_public_documents_do_not_use_em_dashes() -> None:
         ROOT / "INSTALLATION.md",
         ROOT / "CONTRIBUTING.md",
         ROOT / "SECURITY.md",
-        ROOT / "docs" / "releases" / "v0.1.0-alpha.10.md",
+        ROOT / "docs" / "releases" / "v0.1.0-alpha.11.md",
         ROOT / ".github" / "PULL_REQUEST_TEMPLATE.md",
         ROOT / ".github" / "ISSUE_TEMPLATE" / "bug-report.yml",
         ROOT / ".github" / "ISSUE_TEMPLATE" / "config.yml",

@@ -97,16 +97,16 @@ def test_stage_platform_artifacts_normalizes_linux_builder_architectures(
     source = tmp_path / "dist"
     source.mkdir()
     for name in (
-        "Agent-Kronig-0.1.0-alpha.10-linux-x86_64.AppImage",
-        "Agent-Kronig-0.1.0-alpha.10-linux-amd64.deb",
+        "Agent-Kronig-0.1.0-alpha.11-linux-x86_64.AppImage",
+        "Agent-Kronig-0.1.0-alpha.11-linux-amd64.deb",
     ):
         (source / name).write_bytes(name.encode())
 
     staged = stage_platform_artifacts(source, tmp_path / "stage", "linux", "x64")
 
     assert tuple(path.name for path in staged) == (
-        "Agent-Kronig-0.1.0-alpha.10-linux-x64.AppImage",
-        "Agent-Kronig-0.1.0-alpha.10-linux-x64.deb",
+        "Agent-Kronig-0.1.0-alpha.11-linux-x64.AppImage",
+        "Agent-Kronig-0.1.0-alpha.11-linux-x64.deb",
     )
 
 

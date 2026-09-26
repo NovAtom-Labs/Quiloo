@@ -1,7 +1,7 @@
 {
   "name": "agent-kronig-desktop",
   "productName": "Agent Kronig",
-  "version": "0.1.0-alpha.10",
+  "version": "0.1.0-alpha.11",
   "private": true,
   "description": "Native desktop shell for the Agent Kronig scientific workspace",
   "homepage": "https://github.com/NovAtom-Labs/Quiloo",
@@ -13,7 +13,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "start": "electron .",
-    "test": "node --test test/*.test.js",
+    "test": "node --test",
     "pack:app": "electron-builder --config electron-builder.yml --dir",
     "dist": "electron-builder --config electron-builder.yml"
   },
