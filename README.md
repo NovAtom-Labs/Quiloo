@@ -9,13 +9,13 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/NovAtom-Labs/Quiloo/releases/tag/v0.1.0-alpha.11">Alpha release</a>
+  <a href="https://github.com/NovAtom-Labs/Quiloo/releases/tag/v0.1.0-alpha.12">Alpha release</a>
   · <a href="INSTALLATION.md">Installation</a>
   · <a href="docs/architecture.md">Architecture</a>
   · <a href="docs/operations/desktop-application.md">Desktop operations</a>
 </p>
 
-> **Alpha software:** Agent Kronig 0.1.0 Alpha 11 is an early research pilot. Packages are currently unsigned, updates are manual, and scientific output must be reviewed by a qualified researcher before it informs device, process, or fabrication decisions.
+> **Alpha software:** Agent Kronig 0.1.0 Alpha 12 is an early research pilot. Packages are currently unsigned, updates are manual, and scientific output must be reviewed by a qualified researcher before it informs device, process, or fabrication decisions.
 
 ## Download the native application
 
@@ -23,10 +23,10 @@ Agent Kronig is a self-contained Native desktop application. A release includes 
 
 | Platform | Installer | Portable package |
 | --- | --- | --- |
-| Linux x86-64 | [AppImage](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-linux-x64.AppImage) or [Debian package](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-linux-x64.deb) | AppImage is self-contained |
-| Windows x86-64 | [NSIS installer](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-win-x64.exe) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-win-x64.zip) |
-| Intel Mac | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-mac-x64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-mac-x64.zip) |
-| Apple Silicon | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-mac-arm64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.11/Agent-Kronig-0.1.0-alpha.11-mac-arm64.zip) |
+| Linux x86-64 | [AppImage](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.12/Agent-Kronig-0.1.0-alpha.12-linux-x64.AppImage) or [Debian package](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.12/Agent-Kronig-0.1.0-alpha.12-linux-x64.deb) | AppImage is self-contained |
+| Windows x86-64 | [NSIS installer](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.12/Agent-Kronig-0.1.0-alpha.12-win-x64.exe) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.12/Agent-Kronig-0.1.0-alpha.12-win-x64.zip) |
+| Intel Mac | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.12/Agent-Kronig-0.1.0-alpha.12-mac-x64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.12/Agent-Kronig-0.1.0-alpha.12-mac-x64.zip) |
+| Apple Silicon | [DMG](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.12/Agent-Kronig-0.1.0-alpha.12-mac-arm64.dmg) | [ZIP](https://github.com/NovAtom-Labs/Quiloo/releases/download/v0.1.0-alpha.12/Agent-Kronig-0.1.0-alpha.12-mac-arm64.zip) |
 
 Verify a download against `SHA256SUMS.txt` from the same release. See the [installation guide](INSTALLATION.md) for platform instructions and unsigned-package warnings.
 
@@ -198,7 +198,7 @@ Live Bedrock and licensed Sentaurus tests are opt-in. Ordinary local verificatio
 - [DEVSIM operations](docs/operations/devsim.md)
 - [Sentaurus integration](docs/operations/sentaurus-integration.md)
 - [Pilot acceptance testing](docs/testing/pilot-acceptance.md)
-- [Alpha 11 release notes](docs/releases/v0.1.0-alpha.11.md)
+- [Alpha 12 release notes](docs/releases/v0.1.0-alpha.12.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

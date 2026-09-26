@@ -109,7 +109,7 @@ jobs:
         run: pnpm --dir desktop install --frozen-lockfile
 
       - name: Verify desktop shell
-        run: pnpm --dir desktop test
+        run: python scripts/run_ci_desktop_tests.py
 
       - name: Build target-native Python sidecars
         run: python scripts/build_desktop_sidecars.py
@@ -167,8 +167,8 @@ jobs:
       - name: Publish Agent Kronig alpha
         run: |
           gh release create "${GITHUB_REF_NAME}" release-assets/* \
-            --title "Agent Kronig 0.1.0 Alpha 11" \
-            --notes-file docs/releases/v0.1.0-alpha.11.md \
+            --title "Agent Kronig 0.1.0 Alpha 12" \
+            --notes-file docs/releases/v0.1.0-alpha.12.md \
             --prerelease \
             --verify-tag
         env:

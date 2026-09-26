@@ -78,17 +78,22 @@ test("times out and terminates a silent fixture", async (context) => {
   assert.equal(supervisor.running, false);
 });
 
-test("development launch imports the current source tree without installation", () => {
+test("development launch imports the current source tree with host-native paths", () => {
+  const projectRoot = path.resolve(os.tmpdir(), "agent-kronig-development");
+  const existingPython = path.resolve(os.tmpdir(), "existing-python");
   const launch = resolveBackendLaunch({
-    projectRoot: "/opt/agent-kronig",
-    platform: "linux",
-    environment: {PYTHONPATH: "/existing/python"},
+    projectRoot,
+    platform: process.platform,
+    environment: {PYTHONPATH: existingPython},
   });
-  assert.equal(launch.command, "/opt/agent-kronig/.venv/bin/python");
+  const pythonParts = process.platform === "win32"
+    ? [".venv", "Scripts", "python.exe"]
+    : [".venv", "bin", "python"];
+  assert.equal(launch.command, path.join(projectRoot, ...pythonParts));
   assert.deepEqual(launch.args, ["-m", "tcad_agent.desktop.server"]);
   assert.equal(
     launch.environment.PYTHONPATH,
-    `/opt/agent-kronig/src${path.delimiter}/existing/python`,
+    `${path.join(projectRoot, "src")}${path.delimiter}${existingPython}`,
   );
 });
 
