@@ -148,6 +148,52 @@ def test_workspace_cd_wrapper_for_safe_command_is_low_risk(
 @pytest.mark.parametrize(
     "command",
     [
+        "cat README.md | head -20",
+        "pytest -q && python scripts/validate.py",
+        "mkdir -p outputs && touch outputs/result.txt",
+        "python -c 'import devsim; print(devsim.__version__)' 2>/dev/null",
+        "which python && python --version",
+        "pip list | head",
+        "conda list | head",
+    ],
+)
+def test_provably_safe_composed_repository_commands_are_low_risk(
+    workspace: Path, command: str
+) -> None:
+    assert classify_action(workspace, terminal_event(command)) is SecurityRisk.LOW
+
+
+def test_composed_external_reads_keep_a_narrow_grantable_category(
+    workspace: Path, tmp_path: Path
+) -> None:
+    external = tmp_path / "shared" / "reference.txt"
+    command = f'ls "{external.parent}" && cat "{external}" | head -20'
+    event = terminal_event(command)
+
+    assert classify_action(workspace, event) is SecurityRisk.HIGH
+    assert policy_module.permission_category(workspace, event).value == "external_file_access"
+
+
+@pytest.mark.parametrize(
+    "command,category",
+    [
+        ("cat README.md && curl https://example.com", "network_access"),
+        ("pytest -q; rm -rf build", "destructive_command"),
+        ("git status && git push", "git_mutation"),
+    ],
+)
+def test_composed_commands_never_hide_a_risky_segment(
+    workspace: Path, command: str, category: str
+) -> None:
+    event = terminal_event(command)
+
+    assert classify_action(workspace, event) is SecurityRisk.HIGH
+    assert policy_module.permission_category(workspace, event).value == category
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
         'cd "/tmp" && python scripts/check.py 2>&1',
         "cd . && rm -rf build",
     ],

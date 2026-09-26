@@ -127,13 +127,11 @@
             <button id="resume-run" type="button" hidden>Resume</button>
             <button id="stop-run" type="button" hidden>Stop</button>
           </div>
-          <div id="agent-progress" class="agent-progress" role="status" aria-live="polite" hidden>
-            <span id="agent-progress-text">Working</span>
-          </div>
           <p id="ide-error" class="ide-error hidden" role="alert" aria-live="assertive"></p>
           <div id="conversation-messages" class="conversation-messages" aria-live="polite">
             <p class="empty-copy">Open a workspace and start a conversation.</p>
           </div>
+          <button id="jump-to-latest" class="jump-to-latest hidden" type="button">Jump to latest</button>
           <button id="approval-launcher" class="approval-launcher hidden" type="button" aria-controls="approval-section" aria-expanded="false">
             <span><b>Approval required</b><small id="approval-launcher-summary">Review the requested action</small></span>
             <span id="approval-launcher-count">1</span>

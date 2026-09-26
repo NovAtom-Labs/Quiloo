@@ -81,6 +81,21 @@ assertEqual(progress[3].label, "Running validation", "active validation has a pl
 assertEqual(progress[3].detail, "pytest -q", "technical evidence stays inspectable");
 assertEqual(JSON.stringify(progress).includes("internal planning"), false, "private reasoning labels never leak into progress");
 
+const longTimeline = agent.chatTimeline({
+  runState: "running",
+  steps: Array.from({length: 8}, (_, index) => ({
+    id: `step-${index}`,
+    toolName: index === 3 ? "think" : "terminal",
+    summary: index === 3 ? "private chain of thought" : `terminal: check-${index}`,
+    status: "completed",
+    phase: index > 5 ? "validate" : "inspect",
+    arguments: index === 3 ? {} : {command: `check-${index}`},
+  })),
+  pendingApprovals: [],
+});
+assertEqual(longTimeline.length > 6, true, "chat keeps the complete run timeline instead of truncating it");
+assertEqual(JSON.stringify(longTimeline).includes("private chain of thought"), false, "chat timeline never exposes private reasoning");
+
 const betweenActions = agent.operationalUpdates({
   runState: "running",
   steps: [{

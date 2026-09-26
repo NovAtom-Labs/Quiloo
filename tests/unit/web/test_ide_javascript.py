@@ -197,7 +197,7 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         "shouldRefreshRepository(event.kind)",
         'conversationSelect.addEventListener("change"',
         "scrollConversationToBottom",
-        "agentProgress",
+        "renderChatProgress",
         "change-validation-link",
         "data-action-id",
         "affectedFilePaths(row, activeWorkspace?.root)",
@@ -227,7 +227,7 @@ def test_responsive_styles_keep_agent_panel_available_as_a_drawer() -> None:
     assert "text-overflow: ellipsis" in source
     assert ".approval-technical" in source
     assert ".is-approve-category" in source
-    assert ".agent-progress" in source
+    assert ".chat-timeline" in source
     assert "height: 100%" in source
     assert re.search(
         r"\.agent-chat\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column",

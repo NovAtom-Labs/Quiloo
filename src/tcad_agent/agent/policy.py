@@ -25,6 +25,7 @@ _SAFE_COMMANDS = {
     "basename",
     "cargo",
     "cat",
+    "cd",
     "cmake",
     "cp",
     "devsim",
@@ -50,36 +51,10 @@ _SAFE_COMMANDS = {
     "test",
     "touch",
     "wc",
+    "which",
+    "echo",
 }
 _SAFE_GIT_COMMANDS = {"branch", "diff", "log", "rev-parse", "show", "status"}
-_DANGEROUS_COMMANDS = {
-    "apt",
-    "apt-get",
-    "brew",
-    "chmod",
-    "chown",
-    "curl",
-    "dd",
-    "dnf",
-    "docker",
-    "git",  # Git is allowed only through the safe-subcommand branch.
-    "kill",
-    "killall",
-    "nc",
-    "npm",
-    "npx",
-    "pip",
-    "pip3",
-    "pkill",
-    "podman",
-    "rm",
-    "scp",
-    "ssh",
-    "sudo",
-    "uv",
-    "wget",
-    "yum",
-}
 _KNOWN_TOOL_NAMES = {
     "file_editor",
     "finish",
@@ -89,12 +64,18 @@ _KNOWN_TOOL_NAMES = {
     "terminal",
     "think",
 }
-_SHELL_CONTROL = re.compile(r"(?:&&|\|\||[;|`$]|>|<)")
+_SHELL_CONTROL = re.compile(r"(?:&&|\|\||[;|]|>|<)")
+_SHELL_EXPANSION = re.compile(r"[`$]")
 _PACKAGE_COMMANDS = {"apt", "apt-get", "brew", "dnf", "npm", "npx", "pip", "pip3", "uv", "yum"}
 _NETWORK_COMMANDS = {"curl", "nc", "wget"}
 _REMOTE_COMMANDS = {"scp", "ssh"}
 _DESTRUCTIVE_COMMANDS = {"dd", "kill", "killall", "pkill", "rm"}
 _SYSTEM_COMMANDS = {"chmod", "chown", "docker", "podman", "sudo"}
+_READ_ONLY_PACKAGE_COMMANDS = {
+    "pip": {"check", "freeze", "list", "show"},
+    "pip3": {"check", "freeze", "list", "show"},
+    "conda": {"info", "list"},
+}
 _WINDOWS_EXECUTABLE = re.compile(r'^(?:"?[A-Za-z]:\\)')
 
 
@@ -122,21 +103,119 @@ def _inside_workspace(workspace: Path, candidate: Path) -> bool:
     return resolved == root or root in resolved.parents
 
 
-def _workspace_wrapped_command(workspace: Path, command: str) -> str | None:
+def _shell_segments(command: str) -> list[list[str]] | None:
+    """Parse a bounded shell composition without evaluating expansions."""
+
+    if _SHELL_EXPANSION.search(command):
+        return None
+    if _WINDOWS_EXECUTABLE.match(command) and not _SHELL_CONTROL.search(command):
+        try:
+            return [command_tokens(command)]
+        except ValueError:
+            return None
     try:
-        tokens = command_tokens(command)
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>")
+        lexer.whitespace_split = True
+        lexer.commenters = ""
+        tokens = list(lexer)
     except ValueError:
         return None
-    if len(tokens) < 4 or tokens[0] != "cd" or tokens[2] != "&&":
+    segments: list[list[str]] = []
+    current: list[str] = []
+    for token in tokens:
+        if token in {"&&", "||", ";", "|"}:
+            if not current:
+                return None
+            segments.append(current)
+            current = []
+        else:
+            current.append(token)
+    if not current:
         return None
-    if not _inside_workspace(workspace, Path(tokens[1])):
+    segments.append(current)
+    return segments
+
+
+def _normalized_segment(tokens: list[str]) -> tuple[list[str], list[str]] | None:
+    """Separate a simple command from bounded file redirections."""
+
+    command: list[str] = []
+    redirects: list[str] = []
+    index = 0
+    while index < len(tokens):
+        token = tokens[index]
+        if token.isdigit() and index + 1 < len(tokens) and tokens[index + 1] in {
+            ">", ">>", "<", "<<", ">&", "<&",
+        }:
+            index += 1
+            token = tokens[index]
+        if token in {">", ">>", "<", "<<", ">&", "<&"}:
+            if index + 1 >= len(tokens):
+                return None
+            target = tokens[index + 1]
+            if token not in {">&", "<&"} and target != "/dev/null":
+                redirects.append(target)
+            elif token in {">&", "<&"} and not target.isdigit():
+                return None
+            index += 2
+            continue
+        command.append(token)
+        index += 1
+    return (command, redirects) if command else None
+
+
+def _segment_categories(workspace: Path, raw: list[str]) -> set[PermissionCategory] | None:
+    normalized = _normalized_segment(raw)
+    if normalized is None:
         return None
-    body = tokens[3:]
-    if body and body[-1] == "2>&1":
-        body.pop()
-    if not body:
+    tokens, redirects = normalized
+    executable = executable_name(tokens[0])
+    categories: set[PermissionCategory] = set()
+    if executable in _READ_ONLY_PACKAGE_COMMANDS:
+        if len(tokens) < 2 or tokens[1] not in _READ_ONLY_PACKAGE_COMMANDS[executable]:
+            categories.add(PermissionCategory.PACKAGE_INSTALLATION)
+    elif executable in _PACKAGE_COMMANDS:
+        categories.add(PermissionCategory.PACKAGE_INSTALLATION)
+    elif executable in _NETWORK_COMMANDS:
+        categories.add(PermissionCategory.NETWORK_ACCESS)
+    elif executable in _REMOTE_COMMANDS:
+        categories.add(PermissionCategory.REMOTE_EXECUTION)
+    elif executable in _DESTRUCTIVE_COMMANDS:
+        categories.add(PermissionCategory.DESTRUCTIVE_COMMAND)
+    elif executable == "git":
+        git_arguments = tokens[1:]
+        if git_arguments and git_arguments[0] == "--no-pager":
+            git_arguments = git_arguments[1:]
+        if not git_arguments or git_arguments[0] not in _SAFE_GIT_COMMANDS:
+            categories.add(PermissionCategory.GIT_MUTATION)
+    elif executable in _SYSTEM_COMMANDS:
+        categories.add(PermissionCategory.SYSTEM_CHANGE)
+    elif executable not in _SAFE_COMMANDS:
+        categories.add(PermissionCategory.UNRECOGNIZED_ACTION)
+
+    path_tokens = [*tokens[1:], *redirects]
+    for token in path_tokens:
+        if token.startswith("-") or token.isdigit():
+            continue
+        candidate = Path(token)
+        if is_credential_path(candidate):
+            categories.add(PermissionCategory.SENSITIVE_FILE_ACCESS)
+        if ".." in candidate.parts or not _inside_workspace(workspace, candidate):
+            categories.add(PermissionCategory.EXTERNAL_FILE_ACCESS)
+    return categories
+
+
+def _command_categories(workspace: Path, command: str) -> set[PermissionCategory] | None:
+    segments = _shell_segments(command)
+    if segments is None:
         return None
-    return shlex.join(body)
+    categories: set[PermissionCategory] = set()
+    for segment in segments:
+        segment_categories = _segment_categories(workspace, segment)
+        if segment_categories is None:
+            return None
+        categories.update(segment_categories)
+    return categories
 
 
 def _terminal_risk(workspace: Path, action: TerminalAction) -> SecurityRisk:
@@ -145,42 +224,8 @@ def _terminal_risk(workspace: Path, action: TerminalAction) -> SecurityRisk:
         return SecurityRisk.MEDIUM
     if not command:
         return SecurityRisk.HIGH
-    if _SHELL_CONTROL.search(command):
-        wrapped = _workspace_wrapped_command(workspace, command)
-        if wrapped is None:
-            return SecurityRisk.HIGH
-        command = wrapped
-    if _SHELL_CONTROL.search(command):
-        return SecurityRisk.HIGH
-    try:
-        tokens = command_tokens(command)
-    except ValueError:
-        return SecurityRisk.HIGH
-    if not tokens:
-        return SecurityRisk.HIGH
-
-    executable = executable_name(tokens[0])
-    if executable == "git":
-        git_arguments = tokens[1:]
-        if git_arguments and git_arguments[0] == "--no-pager":
-            git_arguments = git_arguments[1:]
-        if not git_arguments or git_arguments[0] not in _SAFE_GIT_COMMANDS:
-            return SecurityRisk.HIGH
-    elif executable in _DANGEROUS_COMMANDS or executable not in _SAFE_COMMANDS:
-        return SecurityRisk.HIGH
-
-    for token in tokens[1:]:
-        if token.startswith("-"):
-            continue
-        candidate = Path(token)
-        if ".." in candidate.parts:
-            return SecurityRisk.HIGH
-        expanded = candidate.expanduser()
-        if not _inside_workspace(workspace, expanded):
-            return SecurityRisk.HIGH
-        if is_credential_path(candidate):
-            return SecurityRisk.HIGH
-    return SecurityRisk.LOW
+    categories = _command_categories(workspace, command)
+    return SecurityRisk.LOW if categories == set() else SecurityRisk.HIGH
 
 
 def classify_action(workspace: Path, event: ActionEvent) -> SecurityRisk:
@@ -208,48 +253,9 @@ def classify_action(workspace: Path, event: ActionEvent) -> SecurityRisk:
 def _terminal_permission_category(
     workspace: Path, action: TerminalAction
 ) -> PermissionCategory:
-    command = action.command.strip()
-    if _SHELL_CONTROL.search(command):
-        wrapped = _workspace_wrapped_command(workspace, command)
-        if wrapped is None or _SHELL_CONTROL.search(wrapped):
-            return PermissionCategory.COMPLEX_SHELL
-        command = wrapped
-    try:
-        tokens = command_tokens(command)
-    except ValueError:
+    categories = _command_categories(workspace, action.command.strip())
+    if categories is None:
         return PermissionCategory.COMPLEX_SHELL
-    if not tokens:
-        return PermissionCategory.UNRECOGNIZED_ACTION
-
-    categories: set[PermissionCategory] = set()
-    executable = executable_name(tokens[0])
-    if executable in _PACKAGE_COMMANDS:
-        categories.add(PermissionCategory.PACKAGE_INSTALLATION)
-    elif executable in _NETWORK_COMMANDS:
-        categories.add(PermissionCategory.NETWORK_ACCESS)
-    elif executable in _REMOTE_COMMANDS:
-        categories.add(PermissionCategory.REMOTE_EXECUTION)
-    elif executable in _DESTRUCTIVE_COMMANDS:
-        categories.add(PermissionCategory.DESTRUCTIVE_COMMAND)
-    elif executable == "git":
-        git_arguments = tokens[1:]
-        if git_arguments and git_arguments[0] == "--no-pager":
-            git_arguments = git_arguments[1:]
-        if not git_arguments or git_arguments[0] not in _SAFE_GIT_COMMANDS:
-            categories.add(PermissionCategory.GIT_MUTATION)
-    elif executable in _SYSTEM_COMMANDS:
-        categories.add(PermissionCategory.SYSTEM_CHANGE)
-    elif executable not in _SAFE_COMMANDS:
-        categories.add(PermissionCategory.UNRECOGNIZED_ACTION)
-
-    for token in tokens[1:]:
-        if token.startswith("-"):
-            continue
-        candidate = Path(token)
-        if is_credential_path(candidate):
-            categories.add(PermissionCategory.SENSITIVE_FILE_ACCESS)
-        if ".." in candidate.parts or not _inside_workspace(workspace, candidate):
-            categories.add(PermissionCategory.EXTERNAL_FILE_ACCESS)
     if len(categories) == 1:
         return categories.pop()
     return PermissionCategory.UNRECOGNIZED_ACTION

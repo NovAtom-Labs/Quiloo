@@ -175,7 +175,7 @@ class AgentSupervisor:
         approval = self.services.store.resolve_approval(
             approval_id, expected_revision, ApprovalDecision.APPROVE
         )
-        return self._continue(approval.run_id)
+        return self._continue_if_ready(approval.run_id)
 
     def approve_category(
         self, approval_id: UUID, expected_revision: int
@@ -184,17 +184,25 @@ class AgentSupervisor:
             approval_id, expected_revision
         )
         self._grants_for(approval.run_id).add(approval.permission_category)
-        return self._continue(approval.run_id)
+        return self._continue_if_ready(approval.run_id)
 
     def deny(
         self, approval_id: UUID, expected_revision: int, reason: str
     ) -> AgentRunRecord:
-        approval = self.services.store.resolve_approval(
+        approvals = self.services.store.resolve_approval_batch(
             approval_id, expected_revision, ApprovalDecision.DENY
         )
+        approval = approvals[0]
         runtime = self._runtime_for(approval.run_id)
         runtime.reject_pending_actions(safe_event_text(reason))
         return self._continue(approval.run_id, runtime=runtime)
+
+    def _continue_if_ready(self, run_id: UUID) -> AgentRunRecord:
+        run = self.services.store.get_run(run_id)
+        pending = self.services.store.list_pending_approvals(run.conversation_id)
+        if any(approval.run_id == run_id for approval in pending):
+            return run
+        return self._continue(run_id)
 
     def pause(self, run_id: UUID) -> AgentRunRecord:
         runtime = self._runtime_for(run_id)

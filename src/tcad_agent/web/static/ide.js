@@ -19,8 +19,7 @@ const conversationForm = document.querySelector("#conversation-form");
 const conversationTitleInput = document.querySelector("#conversation-title-input");
 const cancelConversation = document.querySelector("#cancel-conversation");
 const conversationMessages = document.querySelector("#conversation-messages");
-const agentProgress = document.querySelector("#agent-progress");
-const agentProgressText = document.querySelector("#agent-progress-text");
+const jumpToLatest = document.querySelector("#jump-to-latest");
 const agentTabs = Array.from(document.querySelectorAll("[data-agent-view]"));
 const agentViews = Array.from(document.querySelectorAll("[data-agent-panel]"));
 const agentActivity = document.querySelector("#agent-activity");
@@ -78,6 +77,7 @@ const desktopSettingsModel = document.querySelector("#desktop-settings-model");
 const desktopSettingsReasoning = document.querySelector("#desktop-settings-reasoning");
 const desktopSettingsKey = document.querySelector("#desktop-settings-key");
 const desktopSettingsClear = document.querySelector("#desktop-settings-clear");
+let chatTimelineSignature = "";
 const desktopSettingsStorage = document.querySelector("#desktop-settings-storage");
 const desktopSettingsError = document.querySelector("#desktop-settings-error");
 const desktopSettingsCancel = document.querySelector("#desktop-settings-cancel");
@@ -679,6 +679,7 @@ function appendMessage(message) {
   const content = document.createElement("div");
   article.className = `message is-${message.role}`;
   article.dataset.messageId = message.id;
+  article.dataset.role = message.role;
   role.textContent = message.role.toUpperCase();
   if (message.created_at) {
     time.dateTime = message.created_at;
@@ -705,6 +706,56 @@ function isConversationNearBottom() {
   return remaining <= 48;
 }
 
+function renderChatProgress(snapshot, {allowFollow = true, wasNearBottom = null} = {}) {
+  const updates = window.AgentKronigAgentView.chatTimeline(snapshot);
+  const signature = JSON.stringify(updates);
+  const changed = signature !== chatTimelineSignature;
+  const nearBottom = wasNearBottom ?? isConversationNearBottom();
+  conversationMessages.querySelector("#agent-chat-timeline")?.remove();
+  chatTimelineSignature = signature;
+  if (!updates.length) {
+    jumpToLatest.classList.add("hidden");
+    return;
+  }
+
+  const timeline = document.createElement("section");
+  const heading = document.createElement("header");
+  const title = document.createElement("strong");
+  const state = document.createElement("span");
+  const list = document.createElement("ol");
+  timeline.id = "agent-chat-timeline";
+  timeline.className = "chat-timeline";
+  title.textContent = "Agent activity";
+  state.textContent = String(snapshot?.runState || "working").replaceAll("_", " ");
+  list.className = "chat-timeline-list";
+  updates.forEach((update) => {
+    const item = document.createElement("li");
+    const label = document.createElement("strong");
+    item.className = `chat-timeline-entry is-${update.status}`;
+    label.textContent = update.label;
+    item.append(label);
+    if (update.detail) {
+      const detail = document.createElement("small");
+      detail.textContent = update.detail;
+      item.append(detail);
+    }
+    list.append(item);
+  });
+  heading.append(title, state);
+  timeline.append(heading, list);
+  const latestUser = Array.from(conversationMessages.querySelectorAll('.message[data-role="user"]')).at(-1);
+  if (latestUser) latestUser.after(timeline);
+  else conversationMessages.append(timeline);
+
+  if (!changed || !allowFollow) return;
+  if (window.AgentKronigIDEState.shouldAutoFollowProgress(changed, nearBottom)) {
+    scrollConversationToBottom();
+    jumpToLatest.classList.add("hidden");
+  } else {
+    jumpToLatest.classList.remove("hidden");
+  }
+}
+
 function renderMessages(messages, {forceScroll = false} = {}) {
   const previousLastId = conversationMessages.querySelector(".message:last-of-type")?.dataset.messageId;
   const previousScrollTop = conversationMessages.scrollTop;
@@ -724,25 +775,12 @@ function renderMessages(messages, {forceScroll = false} = {}) {
   messages.forEach((message) => {
     appendMessage(message);
   });
+  renderChatProgress(runPresentation.snapshot(selectedRunId), {
+    allowFollow: false,
+    wasNearBottom,
+  });
   if (shouldFollow) scrollConversationToBottom();
   else requestAnimationFrame(() => { conversationMessages.scrollTop = previousScrollTop; });
-}
-
-function renderRunIndicator() {
-  const controls = window.AgentKronigIDEState.controlsForState(activeRun?.state);
-  agentProgress.hidden = controls.send || !activeRun;
-  if (agentProgress.hidden) return;
-  const presentation = runPresentation.snapshot(activeRun?.id || selectedRunId);
-  const current = window.AgentKronigAgentView.operationalUpdates(presentation)
-    .filter((update) => ["running", "waiting"].includes(update.status))
-    .at(-1);
-  agentProgressText.textContent = activeRun.state === "waiting_for_approval"
-    ? "Waiting for your approval"
-    : activeRun.state === "paused"
-      ? "Run paused"
-      : current
-        ? `${current.phase}: ${current.label}`
-        : "Working";
 }
 
 async function refreshMessages(conversationId = activeConversation?.id, options = {}) {
@@ -750,7 +788,6 @@ async function refreshMessages(conversationId = activeConversation?.id, options 
   const messages = await api(`/api/conversations/${conversationId}/messages`);
   if (activeConversation?.id !== conversationId) return;
   renderMessages(messages, options);
-  renderRunIndicator();
 }
 
 async function synchronizeConversation(conversationId) {
@@ -800,7 +837,6 @@ function setRun(run) {
   sendMessage.disabled = messageInput.disabled;
   sendMessage.textContent = sendingPrompt ? "Starting…" : "Send";
   refreshConversation.disabled = !activeConversation;
-  renderRunIndicator();
 }
 
 function activateAgentView(name, {focus = false} = {}) {
@@ -967,10 +1003,10 @@ function renderActivity(snapshot) {
 
 function renderAgentPresentation() {
   const snapshot = runPresentation.snapshot(selectedRunId);
+  renderChatProgress(snapshot);
   renderRunSummary(snapshot);
   renderReasoning(snapshot);
   renderActivity(snapshot);
-  renderRunIndicator();
 }
 
 function renderChanges(changeSet) {
@@ -1537,6 +1573,13 @@ async function controlRun(action) {
 pauseRun.addEventListener("click", () => void controlRun("pause"));
 resumeRun.addEventListener("click", () => void controlRun("resume"));
 stopRun.addEventListener("click", () => void controlRun("stop"));
+jumpToLatest.addEventListener("click", () => {
+  scrollConversationToBottom();
+  jumpToLatest.classList.add("hidden");
+});
+conversationMessages.addEventListener("scroll", () => {
+  if (isConversationNearBottom()) jumpToLatest.classList.add("hidden");
+}, {passive: true});
 approvalLauncher.addEventListener("click", () => setApprovalDrawerOpen(true));
 minimizeApproval.addEventListener("click", () => setApprovalDrawerOpen(false, {restoreFocus: true}));
 previousApproval.addEventListener("click", () => {

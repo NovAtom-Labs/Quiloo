@@ -638,20 +638,28 @@ class SqliteIDEStore:
                 raise IDEStoreError(
                     f"permission category cannot be granted for a run: {category.value}"
                 )
+            matching_rows = connection.execute(
+                """
+                SELECT id FROM approval_requests
+                WHERE run_id = ? AND permission_category = ? AND decision IS NULL
+                ORDER BY created_at ASC, id ASC
+                """,
+                (row["run_id"], row["permission_category"]),
+            ).fetchall()
             cursor = connection.execute(
                 """
                 UPDATE approval_requests
                 SET decision = ?, revision = revision + 1, resolved_at = ?
-                WHERE id = ? AND revision = ? AND decision IS NULL
+                WHERE run_id = ? AND permission_category = ? AND decision IS NULL
                 """,
                 (
                     ApprovalDecision.APPROVE.value,
                     now.isoformat(),
-                    str(approval_id),
-                    expected_revision,
+                    row["run_id"],
+                    row["permission_category"],
                 ),
             )
-            if cursor.rowcount != 1:
+            if cursor.rowcount != len(matching_rows):
                 raise IDEStoreError(f"stale approval revision for {approval_id}")
             connection.execute(
                 """
@@ -680,17 +688,79 @@ class SqliteIDEStore:
                 "scope": "run",
             },
         )
-        self.append_event(
-            run.conversation_id,
-            "approval_resolved",
-            {
-                "approval_id": str(approval.id),
-                "decision": ApprovalDecision.APPROVE.value,
-                "permission_category": approval.permission_category.value,
-                "run_id": str(run.id),
-            },
-        )
+        for matching in matching_rows:
+            self.append_event(
+                run.conversation_id,
+                "approval_resolved",
+                {
+                    "approval_id": matching["id"],
+                    "decision": ApprovalDecision.APPROVE.value,
+                    "permission_category": approval.permission_category.value,
+                    "run_id": str(run.id),
+                },
+            )
         return approval
+
+    def resolve_approval_batch(
+        self,
+        approval_id: UUID,
+        expected_revision: int,
+        decision: ApprovalDecision,
+    ) -> tuple[ApprovalRequestRecord, ...]:
+        """Resolve the complete pending SDK action batch anchored by one approval."""
+
+        now = datetime.now(UTC)
+        connection = self._connect()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            anchor = connection.execute(
+                "SELECT * FROM approval_requests WHERE id = ?",
+                (str(approval_id),),
+            ).fetchone()
+            if (
+                anchor is None
+                or anchor["revision"] != expected_revision
+                or anchor["decision"] is not None
+            ):
+                raise IDEStoreError(f"stale approval revision for {approval_id}")
+            rows = connection.execute(
+                """
+                SELECT id FROM approval_requests
+                WHERE run_id = ? AND decision IS NULL
+                ORDER BY created_at ASC, id ASC
+                """,
+                (anchor["run_id"],),
+            ).fetchall()
+            cursor = connection.execute(
+                """
+                UPDATE approval_requests
+                SET decision = ?, revision = revision + 1, resolved_at = ?
+                WHERE run_id = ? AND decision IS NULL
+                """,
+                (decision.value, now.isoformat(), anchor["run_id"]),
+            )
+            if cursor.rowcount != len(rows):
+                raise IDEStoreError(f"stale approval batch for {approval_id}")
+            connection.commit()
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+        approvals = tuple(self.get_approval(UUID(row["id"])) for row in rows)
+        run = self.get_run(approvals[0].run_id)
+        for approval in approvals:
+            self.append_event(
+                run.conversation_id,
+                "approval_resolved",
+                {
+                    "approval_id": str(approval.id),
+                    "decision": decision.value,
+                    "run_id": str(run.id),
+                },
+            )
+        return approvals
 
     def get_approval(self, approval_id: UUID) -> ApprovalRequestRecord:
         with self._connect() as connection:

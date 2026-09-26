@@ -52,7 +52,7 @@
     }));
   }
 
-  function operationalUpdates(snapshot) {
+  function chatTimeline(snapshot) {
     const state = snapshot?.runState || "idle";
     if (state === "idle") return [];
     const steps = snapshot?.steps || [];
@@ -132,7 +132,11 @@
         status: "running",
       });
     }
-    return updates.slice(-6);
+    return updates;
+  }
+
+  function operationalUpdates(snapshot) {
+    return chatTimeline(snapshot).slice(-6);
   }
 
   function unique(values) {
@@ -317,6 +321,7 @@
     activityRows,
     approvalDeck,
     approvalKeyAction,
+    chatTimeline,
     durationText,
     moveApproval,
     outcomeSummary,

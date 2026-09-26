@@ -159,6 +159,16 @@ assertEqual(
   "a new message preserves the reader's position when they scrolled up",
 );
 assertEqual(
+  globalThis.AgentKronigIDEState.shouldAutoFollowProgress(true, true),
+  true,
+  "live progress follows when the reader is already near the bottom",
+);
+assertEqual(
+  globalThis.AgentKronigIDEState.shouldAutoFollowProgress(true, false),
+  false,
+  "live progress does not steal the reader's scroll position",
+);
+assertEqual(
   globalThis.AgentKronigIDEState.shouldAutoFollowChat("message-2", "message-2", true, false),
   false,
   "unchanged polling data does not force a scroll",

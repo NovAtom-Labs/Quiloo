@@ -295,6 +295,108 @@ def test_approve_category_grants_only_the_current_run(services) -> None:
     assert services.store.list_run_permission_grants(run.id) == ("git_mutation",)
 
 
+def test_approve_once_keeps_batch_waiting_until_every_action_is_decided(services) -> None:
+    runtime = ScriptedRuntimeFactory(
+        [], status=ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+    )
+    supervisor = AgentSupervisor(services, runtime)
+    run = supervisor.start(services.conversation.id, "Inspect external references")
+    supervisor.join(run.id, timeout=2)
+    first = services.store.create_approval(
+        run.id,
+        "action-1",
+        "terminal",
+        "HIGH",
+        "Read the first reference",
+        {"command": "cat /shared/first.txt"},
+        permission_category="external_file_access",
+    )
+    second = services.store.create_approval(
+        run.id,
+        "action-2",
+        "terminal",
+        "HIGH",
+        "Read the second reference",
+        {"command": "cat /shared/second.txt"},
+        permission_category="external_file_access",
+    )
+
+    still_waiting = supervisor.approve(first.id, first.revision)
+
+    assert still_waiting.state is RunState.WAITING_FOR_APPROVAL
+    remaining = services.store.list_pending_approvals(services.conversation.id)
+    assert [item.id for item in remaining] == [second.id]
+    assert len(runtime.created) == 1
+
+    supervisor.approve(second.id, second.revision)
+    supervisor.join(run.id, timeout=2)
+    assert len(runtime.created) == 1
+
+
+def test_approve_category_resolves_every_matching_action_in_current_batch(services) -> None:
+    runtime = ScriptedRuntimeFactory(
+        [], status=ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+    )
+    supervisor = AgentSupervisor(services, runtime)
+    run = supervisor.start(services.conversation.id, "Inspect external references")
+    supervisor.join(run.id, timeout=2)
+    approvals = [
+        services.store.create_approval(
+            run.id,
+            f"action-{index}",
+            "terminal",
+            "HIGH",
+            f"Read reference {index}",
+            {"command": f"cat /shared/{index}.txt"},
+            permission_category="external_file_access",
+        )
+        for index in range(1, 3)
+    ]
+
+    supervisor.approve_category(approvals[0].id, approvals[0].revision)
+    supervisor.join(run.id, timeout=2)
+
+    assert services.store.list_pending_approvals(services.conversation.id) == ()
+    assert all(
+        services.store.get_approval(item.id).decision is ApprovalDecision.APPROVE
+        for item in approvals
+    )
+    assert services.store.list_run_permission_grants(run.id) == (
+        "external_file_access",
+    )
+
+
+def test_denial_rejects_runtime_batch_and_clears_every_pending_record(services) -> None:
+    runtime = ScriptedRuntimeFactory(
+        [], status=ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
+    )
+    supervisor = AgentSupervisor(services, runtime)
+    run = supervisor.start(services.conversation.id, "Request several risky actions")
+    supervisor.join(run.id, timeout=2)
+    approvals = [
+        services.store.create_approval(
+            run.id,
+            f"action-{index}",
+            "terminal",
+            "HIGH",
+            f"Risky action {index}",
+            {"command": f"git push origin branch-{index}"},
+            permission_category="git_mutation",
+        )
+        for index in range(1, 3)
+    ]
+
+    supervisor.deny(approvals[0].id, approvals[0].revision, "Do not run this batch")
+    supervisor.join(run.id, timeout=2)
+
+    assert services.store.list_pending_approvals(services.conversation.id) == ()
+    assert all(
+        services.store.get_approval(item.id).decision is ApprovalDecision.DENY
+        for item in approvals
+    )
+    assert runtime.created[0].rejections == ["Do not run this batch"]
+
+
 def test_stop_cancels_pending_approval(services) -> None:
     runtime = ScriptedRuntimeFactory(
         [], status=ConversationExecutionStatus.WAITING_FOR_CONFIRMATION

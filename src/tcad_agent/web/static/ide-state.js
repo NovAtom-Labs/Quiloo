@@ -153,6 +153,10 @@
     return Boolean(nextLastId && nextLastId !== previousLastId && wasNearBottom);
   }
 
+  function shouldAutoFollowProgress(changed, wasNearBottom) {
+    return Boolean(changed && wasNearBottom);
+  }
+
   function shouldRefreshRepository(eventKind) {
     return [
       "tool_call_completed",
@@ -213,6 +217,7 @@
     createSubmissionTracker,
     isActiveState,
     shouldAutoFollowChat,
+    shouldAutoFollowProgress,
     shouldRefreshRepository,
     workspaceContext,
   };
