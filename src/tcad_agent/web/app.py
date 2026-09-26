@@ -237,9 +237,6 @@ def create_app(
         active_states = {
             RunState.QUEUED,
             RunState.RUNNING,
-            RunState.WAITING_FOR_APPROVAL,
-            RunState.WAITING_FOR_USER,
-            RunState.PAUSED,
         }
         return bool(ide_services.store.list_runs_in_states(active_states)) or bool(
             getattr(service, "has_active_work", lambda: False)()

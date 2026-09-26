@@ -2,6 +2,7 @@ import socket
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from fastapi.testclient import TestClient
 
 from tcad_agent.control.models import RequestState, ResearchRequest
@@ -79,6 +80,66 @@ def test_desktop_status_reports_active_run_state(tmp_path: Path) -> None:
 
     store.transition_run(run.id, run.revision, RunState.COMPLETED)
     assert client.get("/api/desktop/status").json() == {"active": False}
+
+
+@pytest.mark.parametrize(
+    "quiescent_state",
+    [
+        RunState.WAITING_FOR_APPROVAL,
+        RunState.WAITING_FOR_USER,
+        RunState.PAUSED,
+    ],
+)
+def test_desktop_status_does_not_block_on_persisted_quiescent_run(
+    tmp_path: Path, quiescent_state: RunState
+) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    events = EventFeed(store)
+    services = IDEServices(
+        workspaces=WorkspaceManager(store),
+        conversations=ConversationService(store, events),
+        events=events,
+    )
+    client = TestClient(create_app(ide=services))
+    root = tmp_path / "repo"
+    root.mkdir()
+    workspace = services.workspaces.open(root)
+    conversation = services.conversations.create(workspace.id, "Persisted run")
+    run = store.create_run(conversation.id, uuid4())
+    if quiescent_state is RunState.PAUSED:
+        run = store.transition_run(run.id, run.revision, RunState.RUNNING)
+    store.transition_run(run.id, run.revision, quiescent_state)
+
+    assert client.get("/api/desktop/status").json() == {"active": False}
+
+
+def test_desktop_shutdown_allows_persisted_approval_wait(tmp_path: Path) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    events = EventFeed(store)
+    services = IDEServices(
+        workspaces=WorkspaceManager(store),
+        conversations=ConversationService(store, events),
+        events=events,
+    )
+    token = "desktop-token-" + "w" * 32
+    client = TestClient(
+        create_app(ide=services, desktop_auth=DesktopAuth(token)),
+        follow_redirects=False,
+    )
+    root = tmp_path / "repo"
+    root.mkdir()
+    workspace = services.workspaces.open(root)
+    conversation = services.conversations.create(workspace.id, "Approval wait")
+    run = store.create_run(conversation.id, uuid4())
+    store.transition_run(run.id, run.revision, RunState.WAITING_FOR_APPROVAL)
+
+    response = client.post(
+        "/api/desktop/prepare-shutdown",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ready": True}
 
 
 def test_desktop_status_includes_active_simulation_request(tmp_path: Path) -> None:
