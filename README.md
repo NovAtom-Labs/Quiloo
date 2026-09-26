@@ -165,15 +165,13 @@ Prerequisites are Python 3.13, Node.js 24, pnpm 11.19, Git, and a graphical desk
 ```bash
 git clone git@github.com:NovAtom-Labs/Quiloo.git
 cd Quiloo
-python3.13 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m pip install . --no-deps
-pnpm --dir desktop install --frozen-lockfile
+python3.13 scripts/bootstrap_dev.py
 scripts/run_desktop_dev.sh
 ```
 
-The launcher loads an ignored local `.env`, starts Electron, and lets Electron supervise the authenticated private backend. Credentials, proprietary Sentaurus material, private signing keys, and licensed examples must never be committed.
+On Windows, replace the last two commands with `py -3.13 scripts\bootstrap_dev.py` and `.\scripts\run_desktop_dev.ps1`. The bootstrap creates isolated application and DEVSIM environments, installs desktop dependencies, and caches dependency fingerprints so unchanged reruns finish quickly. Configure Bedrock through Settings after launch.
+
+The launcher loads an ignored local `.env` when present, starts Electron, and lets Electron supervise the authenticated private backend. Credentials, proprietary Sentaurus material, private signing keys, and licensed examples must never be committed.
 
 For the full setup, DEVSIM environment, Bedrock configuration, validation, and test-workspace procedure, follow [INSTALLATION.md](INSTALLATION.md).
 

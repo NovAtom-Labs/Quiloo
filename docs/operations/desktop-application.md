@@ -64,14 +64,16 @@ Source development and installed releases both use the Electron application. The
 
 ## Supported developer launch
 
-Developers need Python 3.13, the project virtual environment, Node.js 24, pnpm 11.19, and installed desktop dependencies. From the repository root:
+Developers need Python 3.13, Node.js 24, pnpm 11.19, and Git. From the repository root on macOS or Linux:
 
 ```bash
-pnpm --dir desktop install --frozen-lockfile
+python3.13 scripts/bootstrap_dev.py
 scripts/run_desktop_dev.sh
 ```
 
-`scripts/run_desktop_dev.sh` checks the required local environment, loads an ignored `.env` without printing it, assigns a desktop-specific workspace when `TCAD_WORKSPACE` is unset, and starts Electron. The private backend is supervised by Electron and is stopped when the application exits.
+On Windows PowerShell, run `py -3.13 scripts\bootstrap_dev.py` followed by `.\scripts\run_desktop_dev.ps1`. The bootstrap creates isolated application and DEVSIM environments, installs desktop dependencies, and skips stages whose dependency fingerprints are already current.
+
+Both wrappers delegate to `scripts/run_desktop_dev.py`. It loads an ignored `.env` without evaluating shell code or printing values, assigns a desktop-specific workspace when `TCAD_WORKSPACE` is unset, and starts Electron. The private backend is supervised by Electron and is stopped when the application exits.
 
 ## Build release artifacts
 

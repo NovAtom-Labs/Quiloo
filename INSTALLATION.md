@@ -62,104 +62,54 @@ tmux -V
 
 Python must report version 3.13.x. The project intentionally rejects other minor Python versions so the tested OpenHands and scientific dependency set remains reproducible.
 
-## 3. Clone Agent Kronig
+## 3. Clone and bootstrap Agent Kronig
+
+On macOS or Linux:
 
 ```bash
-git clone <organization-approved-repository-url> agent-kronig
-cd agent-kronig
+git clone git@github.com:NovAtom-Labs/Quiloo.git
+cd Quiloo
+python3.13 scripts/bootstrap_dev.py
 ```
+
+On Windows PowerShell:
+
+```powershell
+git clone git@github.com:NovAtom-Labs/Quiloo.git
+cd Quiloo
+py -3.13 scripts\bootstrap_dev.py
+```
+
+The bootstrap checks every prerequisite before changing the checkout. It then:
+
+- creates the repository `.venv` and installs Agent Kronig in editable mode
+- creates a separate sibling `devsim/.venv` with DEVSIM 2.9.1
+- installs the locked Electron dependencies
+- records dependency fingerprints in ignored `.tcad-agent-dev/bootstrap.json`
+- prints the correct launch command for the current operating system
+
+No credential is requested, copied, printed, or stored by the bootstrap. If all fingerprints and outputs are unchanged, rerunning the command skips all three installation stages. Use `--force` to rebuild them deliberately.
 
 For an internal or private deployment, use the organization-approved clone URL and authentication method. Do not place personal access tokens in shell history or repository files.
 
-## 4. Create the Agent Kronig environment
+`requirements.txt` is the supported installer entry point. `requirements.lock` records the complete development environment used to verify the checkout. Edit dependency constraints only in `pyproject.toml`; the requirements files are generated artifacts.
 
-```bash
-python3.13 -m venv .venv
-.venv/bin/python -m pip install --upgrade pip
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m pip install . --no-deps
-```
+## 4. Configure model access
 
-`requirements.txt` is the supported Linux installer entry point. It pins the direct runtime, OpenHands, knowledge, and verification dependencies while allowing pip to select platform-compatible transitive packages. `requirements.lock` records the complete development environment used to verify this checkout. Edit dependency constraints only in `pyproject.toml`; the two requirements files are generated artifacts.
+Launch Agent Kronig and open Settings. Enter the approved Bedrock API key, AWS region, model identifier, and reasoning effort. The key is stored through the operating system's protected credential mechanism when available.
 
-After changing dependencies, regenerate both files on Linux with Python 3.13:
-
-```bash
-.venv/bin/python scripts/sync_requirements.py
-```
-
-The full refresh deliberately refuses other operating systems and Python minor versions so a developer's machine cannot silently replace the canonical Linux lock. This read-only check is safe on every supported checkout and does not access the network:
-
-```bash
-.venv/bin/python scripts/sync_requirements.py --check
-```
-
-Confirm the command is installed:
-
-```bash
-.venv/bin/tcad-agent --help
-```
-
-## 5. Install DEVSIM separately
-
-Keep DEVSIM in a separate environment so simulator packages cannot silently alter the application dependency graph. The default layout places it beside the Agent Kronig repository:
-
-```text
-parent-directory/
-  agent-kronig/
-  devsim/
-    .venv/
-```
-
-From the Agent Kronig repository:
-
-```bash
-mkdir -p ../devsim
-python3.13 -m venv ../devsim/.venv
-../devsim/.venv/bin/python -m pip install --upgrade pip
-../devsim/.venv/bin/python -m pip install "devsim==2.9.1" numpy
-```
-
-Confirm the simulator import and version:
-
-```bash
-../devsim/.venv/bin/python -c \
-  "import devsim; print('DEVSIM_VERSION=' + devsim.__version__)"
-```
-
-Expected output:
-
-```text
-DEVSIM_VERSION=2.9.1
-```
-
-If DEVSIM is installed elsewhere, record its absolute interpreter path in `TCAD_DEVSIM_PYTHON`. Agent Kronig invokes that interpreter directly and never executes arbitrary simulator shell text.
-
-## 6. Create the local configuration
-
-Copy the configuration template:
+An ignored `.env` remains available for developers who need CLI configuration or advanced runner overrides:
 
 ```bash
 cp .env.example .env
 chmod 600 .env
 ```
 
-Edit `.env` and set at least:
-
-```dotenv
-AWS_BEARER_TOKEN_BEDROCK=your_local_bedrock_key
-AWS_REGION_NAME=ap-south-1
-LLM_MODEL=bedrock/global.anthropic.claude-sonnet-4-6
-TCAD_REASONING_EFFORT=medium
-TCAD_WORKSPACE=.tcad-agent
-TCAD_DEVSIM_PYTHON=/absolute/path/to/devsim/.venv/bin/python
-```
-
-The model identifier must be available to the configured Bedrock account and region. If the account uses another approved inference profile, replace `LLM_MODEL` with that exact LiteLLM-compatible Bedrock identifier.
-
 Never commit `.env`, credentials, private signing keys, proprietary Sentaurus documents, or licensed examples. Rotate any credential that appears in a prompt, terminal transcript, report, or commit.
 
-The scientific CLI does not implicitly parse `.env`. Load it into the process environment before invoking model-dependent commands:
+## 5. Optional CLI environment
+
+The desktop launcher reads `.env` safely without evaluating it as shell code. The scientific CLI does not load it implicitly. On macOS or Linux, load it before model-dependent CLI commands with:
 
 ```bash
 set -a
@@ -167,9 +117,7 @@ source .env
 set +a
 ```
 
-Run these three commands again in every new shell unless an approved service manager or environment loader supplies the variables.
-
-## 7. Verify the installation
+## 6. Verify the installation
 
 Run the local checks first:
 
@@ -194,18 +142,23 @@ Verify the DEVSIM execution path:
 
 The run must produce a completed evidence bundle whose validation status is `passed`.
 
-## 8. Start the native development application
+## 7. Start the native development application
 
-Install the desktop dependencies once and launch Electron from the repository:
+On macOS or Linux:
 
 ```bash
-pnpm --dir desktop install --frozen-lockfile
 scripts/run_desktop_dev.sh
 ```
 
-The launcher loads the ignored `.env`, starts Electron, and lets Electron supervise the authenticated private backend. It never opens or prints a browser URL. The application stores SQLite databases, OpenHands conversation state, event records, compiled jobs, and result bundles in its local application-data directory. Close Agent Kronig before copying that directory for backup.
+On Windows PowerShell:
 
-## 9. Verify the repository agent
+```powershell
+.\scripts\run_desktop_dev.ps1
+```
+
+Both wrappers use the same Python launcher. It loads the ignored `.env` when present without evaluating shell commands, starts the platform-native Electron binary, and lets Electron supervise the authenticated private backend. It never opens or prints a browser URL. The application stores SQLite databases, OpenHands conversation state, event records, compiled jobs, and result bundles in its local application-data directory. Close Agent Kronig before copying that directory for backup.
+
+## 8. Verify the repository agent
 
 Create a disposable scientific repository:
 
@@ -239,7 +192,7 @@ Read AGENTS.md and RESEARCH_TASK.md, then complete the research task end to end.
 
 Expected evidence includes five passing tests, corrected source code, generated JSON and Markdown artifacts, unchanged researcher-owned inputs, a delegated review result, and a grader score of 100. The run-scoped Changes view should list exactly `src/junction_lab/physics.py`, `src/junction_lab/report.py`, and `src/junction_lab/validation.py` for the deterministic repair scenario.
 
-## 10. Verify the TCAD agent workflow
+## 9. Verify the TCAD agent workflow
 
 Open a repository workspace, create an Agent conversation, and paste the prompt in
 `examples/prompts/al-pn-al-equilibrium.md`. Ask the agent to inspect the request, prepare the
@@ -254,7 +207,7 @@ The full request is represented by `examples/al-pn-al-equilibrium.yaml` for the 
 Licensed execution must remain unavailable until the remote host passes the Sentaurus integration
 and conformance checklist.
 
-## 11. Optional Bedrock smoke test
+## 10. Optional Bedrock smoke test
 
 Run this only after loading a valid local credential:
 
@@ -266,13 +219,13 @@ OPENHANDS_SUPPRESS_BANNER=1 .venv/bin/pytest \
 
 A model configuration error usually means the credential, region, or inference profile does not match. Provider details are deliberately excluded from researcher-facing error messages so secrets are not leaked.
 
-## 12. Sentaurus connection
+## 11. Sentaurus connection
 
 Do not install Sentaurus into the Agent Kronig application environment. Follow `docs/operations/sentaurus-integration.md` on the licensed machine. The connection requires an approved HTTPS endpoint, exact release identity, reviewed structure generation, native-result extraction, signing keys, quotas, and cross-backend conformance cases.
 
 Agent Kronig must continue to refuse licensed execution until that integration is explicitly configured and verified.
 
-## 13. Troubleshooting
+## 12. Troubleshooting
 
 ### Native folder picker does not open
 
@@ -298,16 +251,14 @@ Select Resume. Conversation state and events are persisted, but interrupted work
 
 This is the safe default. Compilation can be inspected locally, but execution requires the separately licensed and verified remote host.
 
-## 14. Upgrade procedure
+## 13. Upgrade procedure
 
 Before upgrading, close Agent Kronig and back up `.env` and the application-data directory outside the repository. Then:
 
 ```bash
 git pull --ff-only
-.venv/bin/python scripts/sync_requirements.py --check
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m pip install . --no-deps
+python3.13 scripts/bootstrap_dev.py
 OPENHANDS_SUPPRESS_BANNER=1 .venv/bin/pytest -q
 ```
 
-Restart the native application only after the verification suite passes. Do not weaken dependency pins or validation checks to force an upgrade through.
+On Windows, use `py -3.13 scripts\bootstrap_dev.py`. Unchanged dependency stages are skipped. Restart the native application only after the verification suite passes. Do not weaken dependency pins or validation checks to force an upgrade through.

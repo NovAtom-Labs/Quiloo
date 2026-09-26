@@ -6,18 +6,19 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def test_desktop_launcher_is_executable_and_uses_the_supported_entrypoint() -> None:
+def test_desktop_launchers_delegate_to_the_shared_native_entrypoint() -> None:
     launcher = ROOT / "scripts" / "run_desktop_dev.sh"
+    windows_launcher = ROOT / "scripts" / "run_desktop_dev.ps1"
 
     assert launcher.exists()
     assert os.access(launcher, os.X_OK)
     source = launcher.read_text()
-    assert 'ELECTRON_DISTRIBUTION="$REPOSITORY_ROOT/desktop/node_modules/electron/dist"' in source
-    assert "Electron.app/Contents/MacOS/Electron" in source
-    assert 'ELECTRON_EXECUTABLE="$ELECTRON_DISTRIBUTION/electron"' in source
-    assert 'exec "$ELECTRON_EXECUTABLE" .' in source
-    assert "TCAD_WORKSPACE" in source
-    assert "source \"$REPOSITORY_ROOT/.env\"" in source
+    assert '"$REPOSITORY_ROOT/.venv/bin/python"' in source
+    assert '"$REPOSITORY_ROOT/scripts/run_desktop_dev.py"' in source
+    assert windows_launcher.exists()
+    windows_source = windows_launcher.read_text()
+    assert ".venv\\Scripts\\python.exe" in windows_source
+    assert "scripts\\run_desktop_dev.py" in windows_source
 
 
 def test_desktop_operations_guide_covers_supported_distribution_contract() -> None:

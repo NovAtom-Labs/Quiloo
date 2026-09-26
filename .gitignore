@@ -18,6 +18,7 @@ runs/
 compiled/
 .tcad-agent/
 .tcad-agent-desktop/
+.tcad-agent-dev/
 knowledge-sources/index/
 .env
 .env.*

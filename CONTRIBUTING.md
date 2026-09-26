@@ -15,12 +15,21 @@ Agent Kronig combines a native repository agent with a deterministic scientific 
 
 ## Development setup
 
-Use Python 3.13, Node.js 24, pnpm 11.19, and Git. Complete the source setup in [INSTALLATION.md](INSTALLATION.md), then launch the native development application with:
+Use Python 3.13, Node.js 24, pnpm 11.19, and Git. On macOS or Linux, prepare and launch the native development application with:
 
 ```bash
-pnpm --dir desktop install --frozen-lockfile
+python3.13 scripts/bootstrap_dev.py
 scripts/run_desktop_dev.sh
 ```
+
+On Windows PowerShell:
+
+```powershell
+py -3.13 scripts\bootstrap_dev.py
+.\scripts\run_desktop_dev.ps1
+```
+
+The bootstrap is safe to rerun. It skips application, DEVSIM, and desktop dependency stages whose input fingerprints and outputs are unchanged. Use `--force` only when intentionally rebuilding every development environment. See [INSTALLATION.md](INSTALLATION.md) for prerequisites and troubleshooting.
 
 Source development uses Electron. Do not add a standalone browser launcher or expose the private loopback backend as a network service.
 
