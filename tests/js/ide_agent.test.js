@@ -201,3 +201,54 @@ assertEqual(
   false,
   "broad shell permission cannot be approved for the run",
 );
+
+const approvalQueue = [
+  {id: "approval-1", summary: "Read a reference file"},
+  {id: "approval-2", summary: "Run a combined validation command"},
+  {id: "approval-3", summary: "Contact the licensed simulator"},
+];
+const selectedApproval = agent.approvalDeck(approvalQueue, "approval-2");
+assertEqual(selectedApproval.active.id, "approval-2", "the selected approval remains visible after refresh");
+assertEqual(selectedApproval.position, 2, "approval position is one based for researchers");
+assertEqual(selectedApproval.total, 3, "approval count includes the full pending queue");
+assertEqual(selectedApproval.canPrevious, true, "middle approvals can navigate backward");
+assertEqual(selectedApproval.canNext, true, "middle approvals can navigate forward");
+assertEqual(
+  agent.approvalDeck(approvalQueue, "approval-missing").active.id,
+  "approval-1",
+  "a resolved approval falls back to the first pending decision",
+);
+assertEqual(agent.approvalDeck([], null).active, null, "an empty queue closes the approval drawer");
+assertEqual(agent.moveApproval(1, 3, -1), 0, "previous approval navigation is bounded");
+assertEqual(agent.moveApproval(1, 3, 1), 2, "next approval navigation is bounded");
+assertEqual(agent.moveApproval(0, 3, -1), 0, "navigation never wraps unexpectedly");
+assertEqual(
+  agent.approvalKeyAction({key: "Escape"}),
+  "minimize",
+  "escape minimizes rather than approving or denying",
+);
+assertEqual(
+  agent.approvalKeyAction({key: "Tab", shiftKey: true, atFirst: true}),
+  "focus-last",
+  "reverse tab stays inside the approval drawer",
+);
+assertEqual(
+  agent.approvalKeyAction({key: "Tab", atLast: true}),
+  "focus-first",
+  "forward tab stays inside the approval drawer",
+);
+assertEqual(
+  agent.approvalKeyAction({key: "Tab", atFirst: false, atLast: false}),
+  "none",
+  "ordinary tab order remains native inside the drawer",
+);
+assertEqual(
+  agent.approvalKeyAction({key: "Tab", shiftKey: true, atContainer: true}),
+  "focus-last",
+  "reverse tab from the drawer container cannot escape into dimmed chat",
+);
+assertEqual(
+  agent.approvalKeyAction({key: "Tab", atContainer: true}),
+  "focus-first",
+  "forward tab from the drawer container starts at its first control",
+);

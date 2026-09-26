@@ -134,9 +134,31 @@
           <div id="conversation-messages" class="conversation-messages" aria-live="polite">
             <p class="empty-copy">Open a workspace and start a conversation.</p>
           </div>
-          <section id="approval-section" class="approval-section hidden" aria-label="Pending approvals">
-            <div class="activity-heading"><span>APPROVAL REQUIRED</span><span>USER DECISION</span></div>
-            <div id="pending-approvals" class="pending-approvals"></div>
+          <button id="approval-launcher" class="approval-launcher hidden" type="button" aria-controls="approval-section" aria-expanded="false">
+            <span><b>Approval required</b><small id="approval-launcher-summary">Review the requested action</small></span>
+            <span id="approval-launcher-count">1</span>
+          </button>
+          <section id="approval-section" class="approval-drawer hidden" role="dialog" aria-modal="false" aria-labelledby="approval-drawer-title" tabindex="-1">
+            <header class="approval-drawer-header">
+              <div>
+                <span>APPROVAL REQUIRED</span>
+                <h2 id="approval-drawer-title">Review requested action</h2>
+              </div>
+              <div class="approval-drawer-tools">
+                <span id="approval-position">1 of 1</span>
+                <button id="minimize-approval" type="button" aria-label="Minimize approval">Minimize</button>
+              </div>
+            </header>
+            <div class="approval-drawer-body">
+              <div id="pending-approvals" class="pending-approvals"></div>
+            </div>
+            <footer class="approval-drawer-footer">
+              <div class="approval-navigation" aria-label="Pending approval navigation">
+                <button id="previous-approval" type="button">Previous</button>
+                <button id="next-approval" type="button">Next</button>
+              </div>
+              <div id="approval-actions" class="approval-actions"></div>
+            </footer>
           </section>
           <form id="message-form" class="message-form">
             <label for="message-input">Message the agent</label>

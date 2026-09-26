@@ -266,10 +266,59 @@
     };
   }
 
+  function approvalDeck(approvals, selectedId) {
+    const queue = Array.isArray(approvals) ? approvals : [];
+    if (!queue.length) {
+      return {
+        active: null,
+        index: 0,
+        position: 0,
+        total: 0,
+        canPrevious: false,
+        canNext: false,
+      };
+    }
+    const selectedIndex = queue.findIndex(
+      (approval) => String(approval?.id || "") === String(selectedId || ""),
+    );
+    const index = selectedIndex >= 0 ? selectedIndex : 0;
+    return {
+      active: queue[index],
+      index,
+      position: index + 1,
+      total: queue.length,
+      canPrevious: index > 0,
+      canNext: index < queue.length - 1,
+    };
+  }
+
+  function moveApproval(index, total, direction) {
+    const maximum = Math.max(0, Number(total || 0) - 1);
+    return Math.min(maximum, Math.max(0, Number(index || 0) + Number(direction || 0)));
+  }
+
+  function approvalKeyAction({
+    key,
+    shiftKey = false,
+    atContainer = false,
+    atFirst = false,
+    atLast = false,
+  }) {
+    if (key === "Escape") return "minimize";
+    if (key !== "Tab") return "none";
+    if (atContainer) return shiftKey ? "focus-last" : "focus-first";
+    if (shiftKey && atFirst) return "focus-last";
+    if (!shiftKey && atLast) return "focus-first";
+    return "none";
+  }
+
   globalThis.AgentKronigAgentView = {
     affectedFilePaths,
     activityRows,
+    approvalDeck,
+    approvalKeyAction,
     durationText,
+    moveApproval,
     outcomeSummary,
     operationalUpdates,
     permissionView,

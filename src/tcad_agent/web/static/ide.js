@@ -35,8 +35,18 @@ const runControls = document.querySelector("#run-controls");
 const pauseRun = document.querySelector("#pause-run");
 const resumeRun = document.querySelector("#resume-run");
 const stopRun = document.querySelector("#stop-run");
+const agentChat = document.querySelector("#agent-view-chat");
+const approvalLauncher = document.querySelector("#approval-launcher");
+const approvalLauncherSummary = document.querySelector("#approval-launcher-summary");
+const approvalLauncherCount = document.querySelector("#approval-launcher-count");
 const approvalSection = document.querySelector("#approval-section");
+const approvalDrawerTitle = document.querySelector("#approval-drawer-title");
+const approvalPosition = document.querySelector("#approval-position");
+const minimizeApproval = document.querySelector("#minimize-approval");
 const pendingApprovals = document.querySelector("#pending-approvals");
+const previousApproval = document.querySelector("#previous-approval");
+const nextApproval = document.querySelector("#next-approval");
+const approvalActions = document.querySelector("#approval-actions");
 const messageForm = document.querySelector("#message-form");
 const messageInput = document.querySelector("#message-input");
 const sendMessage = document.querySelector("#send-message");
@@ -86,6 +96,11 @@ let editingFile = null;
 let fileRequestGeneration = 0;
 let selectedRunId = null;
 let activeChangeSet = null;
+let pendingApprovalQueue = [];
+let selectedApprovalId = null;
+let approvalQueueSignature = "";
+let approvalDrawerMinimized = false;
+let approvalPreviousFocus = null;
 const navigationGuard = window.AgentKronigIDEState.createNavigationGuard();
 const repositoryRequests = window.AgentKronigIDEState.createRepositoryRequestCoordinator();
 const submissions = window.AgentKronigIDEState.createSubmissionTracker();
@@ -1078,13 +1093,11 @@ function selectRun(runId, {refresh = false} = {}) {
   return true;
 }
 
-function approvalTarget(approval) {
-  const payload = approval.payload || {};
-  return payload.path || payload.command || payload.operation || "Review the requested action";
-}
-
 async function decideApproval(approval, decision) {
   showError();
+  Array.from(approvalActions.querySelectorAll("button")).forEach((button) => {
+    button.disabled = true;
+  });
   try {
     let endpoint = `/api/approvals/${approval.id}/deny`;
     if (decision === "approve") endpoint = `/api/approvals/${approval.id}/approve`;
@@ -1100,6 +1113,10 @@ async function decideApproval(approval, decision) {
   } catch (error) {
     showError(error.message);
     await loadApprovals();
+  } finally {
+    Array.from(approvalActions.querySelectorAll("button")).forEach((button) => {
+      button.disabled = false;
+    });
   }
 }
 
@@ -1107,67 +1124,158 @@ function permissionCategoryLabel(value) {
   return String(value || "unrecognized action").replaceAll("_", " ");
 }
 
-function canApproveCategory(value) {
-  return !["complex_shell", "unrecognized_action"].includes(value);
+function approvalSignature(approvals) {
+  return JSON.stringify(approvals.map((approval) => ({
+    id: approval.id,
+    revision: approval.revision,
+    summary: approval.summary,
+    permission_category: approval.permission_category,
+    payload: approval.payload,
+  })));
+}
+
+function restoreApprovalFocus() {
+  const target = approvalPreviousFocus;
+  approvalPreviousFocus = null;
+  requestAnimationFrame(() => {
+    if (target?.isConnected && !target.disabled && !target.inert) {
+      target.focus();
+    } else if (!conversationSelect.disabled) {
+      conversationSelect.focus();
+    }
+  });
+}
+
+function setApprovalDrawerOpen(open, {focus = true, restoreFocus = false} = {}) {
+  const hasApprovals = pendingApprovalQueue.length > 0;
+  const shouldOpen = Boolean(open && hasApprovals);
+  if (shouldOpen && !approvalSection.contains(document.activeElement)) {
+    approvalPreviousFocus = document.activeElement;
+  }
+  approvalDrawerMinimized = hasApprovals && !shouldOpen;
+  approvalSection.classList.toggle("hidden", !shouldOpen);
+  approvalLauncher.classList.toggle("hidden", !hasApprovals || shouldOpen);
+  approvalLauncher.setAttribute("aria-expanded", String(shouldOpen));
+  agentChat.classList.toggle("has-approval-open", shouldOpen);
+  conversationMessages.inert = shouldOpen;
+  messageForm.inert = shouldOpen;
+  if (shouldOpen && focus) requestAnimationFrame(() => approvalSection.focus());
+  if (!shouldOpen && restoreFocus) restoreApprovalFocus();
+}
+
+function renderActiveApproval({focus = false, technicalOpen = false} = {}) {
+  const deck = window.AgentKronigAgentView.approvalDeck(
+    pendingApprovalQueue,
+    selectedApprovalId,
+  );
+  clearNode(pendingApprovals);
+  clearNode(approvalActions);
+  if (!deck.active) return;
+
+  const approval = deck.active;
+  const view = window.AgentKronigAgentView.permissionView(approval);
+  selectedApprovalId = approval.id;
+  approvalDrawerTitle.textContent = view.explanation;
+  approvalPosition.textContent = `${deck.position} of ${deck.total}`;
+  approvalLauncherSummary.textContent = view.explanation;
+  approvalLauncherCount.textContent = String(deck.total);
+  previousApproval.disabled = !deck.canPrevious;
+  nextApproval.disabled = !deck.canNext;
+
+  const card = document.createElement("article");
+  const plainHeading = document.createElement("h3");
+  const plainExplanation = document.createElement("p");
+  const targetHeading = document.createElement("span");
+  const target = document.createElement("code");
+  const reversibility = document.createElement("p");
+  const technical = document.createElement("details");
+  const technicalLabel = document.createElement("summary");
+  const technicalBody = document.createElement("div");
+  const toolDetail = document.createElement("span");
+  const categoryDetail = document.createElement("span");
+  const riskDetail = document.createElement("span");
+  const argumentsDetail = document.createElement("code");
+  const deny = document.createElement("button");
+  const approve = document.createElement("button");
+  const approveCategory = document.createElement("button");
+
+  card.className = "approval-card";
+  plainHeading.textContent = "What Agent Kronig is asking to do";
+  plainExplanation.className = "approval-explanation";
+  plainExplanation.textContent = view.explanation;
+  targetHeading.className = "approval-target-label";
+  targetHeading.textContent = "Target";
+  target.className = "approval-target";
+  target.textContent = view.target;
+  reversibility.className = "approval-reversibility";
+  reversibility.textContent = `Reversibility: ${view.reversibility}`;
+  technical.className = "approval-technical";
+  technical.open = technicalOpen;
+  technicalLabel.textContent = "Technical details";
+  toolDetail.textContent = `Tool: ${view.toolName}`;
+  categoryDetail.textContent = `Permission type: ${permissionCategoryLabel(view.permissionCategory)}`;
+  riskDetail.textContent = `Risk level: ${view.risk}`;
+  argumentsDetail.textContent = view.technicalArguments;
+  technicalBody.append(toolDetail, categoryDetail, riskDetail, argumentsDetail);
+  technical.append(technicalLabel, technicalBody);
+  card.append(plainHeading, plainExplanation, targetHeading, target, reversibility, technical);
+  pendingApprovals.append(card);
+
+  deny.type = "button";
+  deny.className = "is-deny";
+  deny.textContent = "Deny";
+  approve.type = "button";
+  approve.className = "is-approve";
+  approve.textContent = "Approve once";
+  approveCategory.type = "button";
+  approveCategory.className = "is-approve-category";
+  approveCategory.textContent = "Approve all like this";
+  approveCategory.title = "Allow this permission type for the rest of this run only";
+  deny.addEventListener("click", () => void decideApproval(approval, "deny"));
+  approve.addEventListener("click", () => void decideApproval(approval, "approve"));
+  approvalActions.append(deny, approve);
+  if (view.canApproveCategory) {
+    approveCategory.addEventListener("click", () => void decideApproval(approval, "approve-category"));
+    approvalActions.append(approveCategory);
+  }
+  if (focus) requestAnimationFrame(() => approvalSection.focus());
 }
 
 function renderApprovals(approvals) {
-  clearNode(pendingApprovals);
-  approvalSection.classList.toggle("hidden", approvals.length === 0);
-  approvals.forEach((approval) => {
-    const view = window.AgentKronigAgentView.permissionView(approval);
-    const card = document.createElement("article");
-    const heading = document.createElement("div");
-    const tool = document.createElement("strong");
-    const risk = document.createElement("span");
-    const summary = document.createElement("p");
-    const technical = document.createElement("details");
-    const technicalLabel = document.createElement("summary");
-    const technicalBody = document.createElement("div");
-    const toolDetail = document.createElement("span");
-    const categoryDetail = document.createElement("span");
-    const riskDetail = document.createElement("span");
-    const reversibility = document.createElement("span");
-    const argumentsDetail = document.createElement("code");
-    const actions = document.createElement("div");
-    const deny = document.createElement("button");
-    const approve = document.createElement("button");
-    const approveCategory = document.createElement("button");
-    card.className = "approval-card";
-    tool.textContent = "Permission required";
-    risk.textContent = "Needs approval";
-    heading.append(tool, risk);
-    summary.textContent = view.explanation;
-    technical.className = "approval-technical";
-    technicalLabel.textContent = "Technical details";
-    toolDetail.textContent = `Tool: ${view.toolName}`;
-    categoryDetail.textContent = `Permission type: ${permissionCategoryLabel(view.permissionCategory)}`;
-    riskDetail.textContent = `Risk level: ${view.risk}`;
-    reversibility.textContent = `Reversibility: ${view.reversibility}`;
-    argumentsDetail.textContent = view.technicalArguments;
-    technicalBody.append(toolDetail, categoryDetail, riskDetail, reversibility, argumentsDetail);
-    technical.append(technicalLabel, technicalBody);
-    deny.type = "button";
-    deny.className = "is-deny";
-    deny.textContent = "Deny";
-    approve.type = "button";
-    approve.className = "is-approve";
-    approve.textContent = "Approve";
-    approveCategory.type = "button";
-    approveCategory.className = "is-approve-category";
-    approveCategory.textContent = "Approve all like this";
-    approveCategory.title = "Allow this permission type for the rest of this run only";
-    deny.addEventListener("click", () => void decideApproval(approval, "deny"));
-    approve.addEventListener("click", () => void decideApproval(approval, "approve"));
-    if (view.canApproveCategory) {
-      approveCategory.addEventListener("click", () => void decideApproval(approval, "approve-category"));
-      actions.append(deny, approve, approveCategory);
-    } else {
-      actions.append(deny, approve);
-    }
-    card.append(heading, summary, technical, actions);
-    pendingApprovals.append(card);
-  });
+  const nextQueue = Array.isArray(approvals) ? approvals : [];
+  const previousIds = new Set(pendingApprovalQueue.map((approval) => String(approval.id)));
+  const hadApprovals = pendingApprovalQueue.length > 0;
+  const nextSignature = approvalSignature(nextQueue);
+  const signatureChanged = approvalQueueSignature !== nextSignature;
+  const technicalOpen = !signatureChanged && Boolean(
+    pendingApprovals.querySelector(".approval-technical")?.open,
+  );
+  pendingApprovalQueue = nextQueue;
+  approvalQueueSignature = nextSignature;
+
+  if (!pendingApprovalQueue.length) {
+    selectedApprovalId = null;
+    clearNode(pendingApprovals);
+    clearNode(approvalActions);
+    setApprovalDrawerOpen(false, {restoreFocus: hadApprovals});
+    approvalLauncher.classList.add("hidden");
+    return;
+  }
+
+  const containsNewApproval = pendingApprovalQueue.some(
+    (approval) => !previousIds.has(String(approval.id)),
+  );
+  const deck = window.AgentKronigAgentView.approvalDeck(
+    pendingApprovalQueue,
+    selectedApprovalId,
+  );
+  selectedApprovalId = deck.active.id;
+  if (signatureChanged) renderActiveApproval({technicalOpen});
+  if (!hadApprovals || containsNewApproval || !approvalDrawerMinimized) {
+    setApprovalDrawerOpen(true, {focus: !hadApprovals || containsNewApproval});
+  } else {
+    setApprovalDrawerOpen(false);
+  }
 }
 
 async function loadApprovals(conversationId = activeConversation?.id) {
@@ -1429,6 +1537,48 @@ async function controlRun(action) {
 pauseRun.addEventListener("click", () => void controlRun("pause"));
 resumeRun.addEventListener("click", () => void controlRun("resume"));
 stopRun.addEventListener("click", () => void controlRun("stop"));
+approvalLauncher.addEventListener("click", () => setApprovalDrawerOpen(true));
+minimizeApproval.addEventListener("click", () => setApprovalDrawerOpen(false, {restoreFocus: true}));
+previousApproval.addEventListener("click", () => {
+  const deck = window.AgentKronigAgentView.approvalDeck(
+    pendingApprovalQueue,
+    selectedApprovalId,
+  );
+  const index = window.AgentKronigAgentView.moveApproval(deck.index, deck.total, -1);
+  selectedApprovalId = pendingApprovalQueue[index]?.id || selectedApprovalId;
+  renderActiveApproval({focus: true});
+});
+nextApproval.addEventListener("click", () => {
+  const deck = window.AgentKronigAgentView.approvalDeck(
+    pendingApprovalQueue,
+    selectedApprovalId,
+  );
+  const index = window.AgentKronigAgentView.moveApproval(deck.index, deck.total, 1);
+  selectedApprovalId = pendingApprovalQueue[index]?.id || selectedApprovalId;
+  renderActiveApproval({focus: true});
+});
+approvalSection.addEventListener("keydown", (event) => {
+  const focusable = Array.from(approvalSection.querySelectorAll(
+    "button:not([disabled]), summary, [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])",
+  )).filter((element) => !element.hidden && element.offsetParent !== null);
+  const action = window.AgentKronigAgentView.approvalKeyAction({
+    key: event.key,
+    shiftKey: event.shiftKey,
+    atContainer: approvalSection === document.activeElement,
+    atFirst: focusable[0] === document.activeElement,
+    atLast: focusable.at(-1) === document.activeElement,
+  });
+  if (action === "minimize") {
+    event.preventDefault();
+    setApprovalDrawerOpen(false, {restoreFocus: true});
+  } else if (action === "focus-first" && focusable.length) {
+    event.preventDefault();
+    focusable[0].focus();
+  } else if (action === "focus-last" && focusable.length) {
+    event.preventDefault();
+    focusable.at(-1).focus();
+  }
+});
 refreshConversation.addEventListener("click", () => void requestConversationRefresh());
 conversationSelect.addEventListener("change", () => {
   if (!conversationSelect.value || !activeWorkspace) return;

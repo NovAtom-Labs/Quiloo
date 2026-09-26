@@ -105,6 +105,7 @@ body { overflow: hidden; background: var(--background); }
   grid-row: 2;
   display: grid;
   grid-template-rows: 31px minmax(0, 1fr);
+  container-type: inline-size;
 }
 .pane-resizer {
   position: absolute;
@@ -464,7 +465,7 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
   background: #0d1014;
 }
 .run-controls[hidden] { display: none; }
-.run-controls button, .approval-card button {
+.run-controls button, .approval-drawer button, .approval-launcher {
   padding: 5px 9px;
   color: #b8c1ca;
   border: 1px solid var(--border-strong);
@@ -518,23 +519,164 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .message-body pre code { padding: 0; border: 0; background: transparent; white-space: pre; }
 .message-body blockquote { padding-left: 9px; color: #aab3bd; border-left: 2px solid var(--border-strong); }
 .message-body a { color: var(--blue-strong); }
-.approval-section { max-height: 250px; overflow-y: auto; border-top: 1px solid var(--border); background: rgba(202, 160, 92, 0.035); }
-.pending-approvals { padding: 0 9px 9px; }
-.approval-card { padding: 9px; border: 1px solid rgba(202, 160, 92, 0.28); border-radius: var(--radius-small); background: #0d1014; }
-.approval-card + .approval-card { margin-top: 7px; }
-.approval-card > div:first-child { display: flex; justify-content: space-between; gap: 10px; }
-.approval-card strong { color: #d4d9df; font: 0.65rem var(--font-mono); }
-.approval-card > div:first-child span { color: var(--amber); font: 0.58rem var(--font-mono); }
-.approval-card p { margin: 7px 0; color: #bbc3cc; font-size: 0.68rem; line-height: 1.4; }
-.approval-technical { margin: 8px 0; color: #8e99a4; font-size: 0.62rem; }
-.approval-technical > summary { cursor: pointer; color: #9fa9b3; user-select: none; }
-.approval-technical > div { display: grid; gap: 5px; margin-top: 7px; padding: 7px; border: 1px solid var(--border); background: #090b0e; }
+.agent-chat { position: relative; }
+.agent-chat.has-approval-open .conversation-messages,
+.agent-chat.has-approval-open .message-form {
+  opacity: 0.25;
+  filter: saturate(0.65);
+  transition: opacity 120ms ease, filter 120ms ease;
+}
+.approval-launcher {
+  position: absolute;
+  right: 9px;
+  bottom: 9px;
+  left: 9px;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 45px;
+  padding: 7px 9px;
+  overflow: hidden;
+  color: #d7dce2;
+  border-color: rgba(202, 160, 92, 0.52);
+  background: rgba(20, 18, 15, 0.97);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.38);
+  text-align: left;
+}
+.approval-launcher.hidden, .approval-drawer.hidden { display: none; }
+.approval-launcher > span:first-child { display: grid; min-width: 0; gap: 2px; }
+.approval-launcher b { color: #e0c898; font-size: 0.66rem; }
+.approval-launcher small {
+  overflow: hidden;
+  color: #aeb5bd;
+  font-size: 0.59rem;
+  font-weight: 450;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.approval-launcher > span:last-child {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  color: #17130c;
+  border-radius: 50%;
+  background: #caa05c;
+  font: 700 0.58rem var(--font-mono);
+}
+.approval-drawer {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  z-index: 25;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  height: min(65%, 560px);
+  min-height: min(310px, calc(100% - 16px));
+  overflow: hidden;
+  border: 1px solid rgba(202, 160, 92, 0.5);
+  border-radius: 7px;
+  outline: 0;
+  background: rgba(13, 16, 20, 0.985);
+  box-shadow: 0 18px 54px rgba(0, 0, 0, 0.56), 0 0 0 1px rgba(255, 255, 255, 0.025) inset;
+}
+.approval-drawer:focus-visible { border-color: rgba(202, 160, 92, 0.72); }
+.approval-drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 58px;
+  padding: 10px 11px;
+  border-bottom: 1px solid var(--border);
+  background: #111419;
+}
+.approval-drawer-header > div:first-child { display: grid; min-width: 0; gap: 3px; }
+.approval-drawer-header span { color: #caa05c; font: 650 0.53rem var(--font-mono); letter-spacing: 0.075em; }
+.approval-drawer-header h2 {
+  margin: 0;
+  overflow: hidden;
+  color: #e0e4e8;
+  font-size: 0.75rem;
+  font-weight: 620;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.approval-drawer-tools { display: flex; flex: 0 0 auto; align-items: center; gap: 7px; }
+.approval-drawer-tools #approval-position { color: #99a2ac; letter-spacing: 0; white-space: nowrap; }
+.approval-drawer-tools button { padding: 4px 7px; }
+.approval-drawer-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.pending-approvals { padding: 12px; }
+.approval-card { min-width: 0; }
+.approval-card h3 { margin: 0 0 7px; color: #d5dbe1; font-size: 0.69rem; font-weight: 640; }
+.approval-card p { color: #bbc3cc; font-size: 0.68rem; line-height: 1.48; }
+.approval-explanation { margin: 0 0 13px; }
+.approval-target-label { display: block; margin-bottom: 5px; color: #8e99a4; font: 600 0.54rem var(--font-mono); letter-spacing: 0.055em; text-transform: uppercase; }
+.approval-target {
+  display: block;
+  max-height: 5.2em;
+  overflow: auto;
+  padding: 8px 9px;
+  color: #c8d0d9;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: #080a0d;
+  font: 0.61rem/1.45 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.approval-reversibility { margin: 10px 0 0; padding-left: 8px; border-left: 2px solid rgba(202, 160, 92, 0.38); }
+.approval-technical { margin: 12px 0 0; color: #8e99a4; font-size: 0.62rem; }
+.approval-technical > summary { cursor: pointer; color: #aab3bc; user-select: none; }
+.approval-technical > div { display: grid; gap: 5px; margin-top: 7px; padding: 8px; border: 1px solid var(--border); background: #090b0e; }
 .approval-technical span { color: #8e99a4; font: 0.58rem var(--font-mono); }
 .approval-technical code { display: block; overflow-x: auto; padding: 6px 7px; color: #aeb8c2; background: #07090b; font-size: 0.6rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-.approval-card > div:last-child { display: flex; justify-content: flex-end; gap: 6px; margin-top: 8px; }
-.approval-card button.is-approve { color: #d8e2ec; border-color: #617fae; background: #516f9d; }
-.approval-card button.is-approve-category { color: #d8e2ec; border-color: #567c70; background: #45695f; }
-.approval-card button.is-deny { color: #d4a8aa; }
+.approval-drawer-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 10px;
+  border-top: 1px solid var(--border);
+  background: #111419;
+}
+.approval-navigation, .approval-actions { display: flex; align-items: center; gap: 6px; }
+.approval-navigation button { padding: 5px 7px; color: #aab3bc; background: transparent; }
+.approval-drawer button:disabled { cursor: default; opacity: 0.35; }
+.approval-actions { justify-content: flex-end; }
+.approval-actions button { white-space: nowrap; }
+.approval-actions button.is-approve { color: #eef2f6; border-color: #617fae; background: #516f9d; }
+.approval-actions button.is-approve-category { color: #e2ebe8; border-color: #567c70; background: #45695f; }
+.approval-actions button.is-deny { color: #d4a8aa; background: transparent; }
+
+@container (max-width: 370px) {
+  .approval-drawer-header h2 {
+    display: -webkit-box;
+    overflow: hidden;
+    white-space: normal;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  .approval-drawer-footer { align-items: stretch; }
+  .approval-navigation { order: 2; }
+  .approval-actions { width: 100%; }
+  .approval-actions button { flex: 1 1 auto; }
+}
+
+@media (max-height: 680px) {
+  .approval-drawer { height: calc(100% - 16px); }
+}
 .activity-section { display: grid; grid-template-rows: 31px auto auto minmax(0, 1fr); min-height: 0; }
 .changes-section { display: grid; grid-template-rows: 31px minmax(0, 1fr); min-height: 0; }
 .activity-heading { align-items: center; min-height: 31px; padding: 0 11px; border-bottom: 1px solid var(--border); }
