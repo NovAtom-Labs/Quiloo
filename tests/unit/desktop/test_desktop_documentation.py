@@ -9,6 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 def test_desktop_launchers_delegate_to_the_shared_native_entrypoint() -> None:
     launcher = ROOT / "scripts" / "run_desktop_dev.sh"
     windows_launcher = ROOT / "scripts" / "run_desktop_dev.ps1"
+    mac_click_launcher = ROOT / "Launch Agent Kronig Dev.command"
 
     assert launcher.exists()
     assert os.access(launcher, os.X_OK)
@@ -19,6 +20,12 @@ def test_desktop_launchers_delegate_to_the_shared_native_entrypoint() -> None:
     windows_source = windows_launcher.read_text()
     assert ".venv\\Scripts\\python.exe" in windows_source
     assert "scripts\\run_desktop_dev.py" in windows_source
+    assert mac_click_launcher.exists()
+    assert os.access(mac_click_launcher, os.X_OK)
+    mac_source = mac_click_launcher.read_text()
+    assert 'SCRIPT_DIRECTORY="$(cd -- "$(dirname -- "$0")" && pwd)"' in mac_source
+    assert 'exec "$SCRIPT_DIRECTORY/scripts/run_desktop_dev.sh"' in mac_source
+    assert str(ROOT) not in mac_source
 
 
 def test_desktop_operations_guide_covers_supported_distribution_contract() -> None:
