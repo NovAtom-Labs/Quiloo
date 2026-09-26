@@ -51,10 +51,32 @@ def test_release_workflow_builds_all_supported_native_targets() -> None:
         (row["runner"], row["platform"], row["arch"])
         for row in rows
     } == {
-        ("ubuntu-latest", "linux", "x64"),
+        ("ubuntu-24.04", "linux", "x64"),
         ("windows-latest", "win", "x64"),
         ("macos-15-intel", "mac", "x64"),
         ("macos-15", "mac", "arm64"),
+    }
+
+
+def test_release_workflow_uses_node_24_generation_actions_and_pinned_linux() -> None:
+    workflow = load_workflow()
+    jobs = workflow["jobs"]
+    uses = {
+        step["uses"]
+        for job in jobs.values()
+        for step in job["steps"]
+        if "uses" in step
+    }
+
+    assert jobs["validate"]["runs-on"] == "ubuntu-24.04"
+    assert jobs["release"]["runs-on"] == "ubuntu-24.04"
+    assert uses == {
+        "actions/checkout@v7",
+        "actions/setup-python@v7",
+        "pnpm/action-setup@v6",
+        "actions/setup-node@v7",
+        "actions/upload-artifact@v7",
+        "actions/download-artifact@v7",
     }
 
 
