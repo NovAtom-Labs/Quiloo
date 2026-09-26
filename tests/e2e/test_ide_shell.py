@@ -10,7 +10,7 @@ from tcad_agent.web.app import create_app
 from tcad_agent.web.ide_routes import IDEServices
 
 
-def test_workspace_conversation_route_restores_persisted_activity(
+def test_workspace_route_restores_current_process_session_activity(
     tmp_path: Path,
 ) -> None:
     store = SqliteIDEStore(tmp_path / "ide.sqlite3")
@@ -28,24 +28,16 @@ def test_workspace_conversation_route_restores_persisted_activity(
     (root / "experiment.yaml").write_text("name: reference\n")
 
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
-    conversation = web.post(
-        f"/api/workspaces/{workspace['id']}/conversations",
-        json={"title": "Inspect experiment"},
-    ).json()
+    session_url = f"/api/workspaces/{workspace['id']}/session"
+    web.post(session_url)
     posted = web.post(
-        f"/api/conversations/{conversation['id']}/messages",
+        f"{session_url}/messages",
         json={"content": "Inspect the experiment definition"},
     )
 
-    restored_page = web.get(
-        f"/workspaces/{workspace['id']}/conversations/{conversation['id']}"
-    )
-    restored_messages = web.get(
-        f"/api/conversations/{conversation['id']}/messages"
-    ).json()
-    restored_events = web.get(
-        f"/api/conversations/{conversation['id']}/events?follow=false"
-    ).text
+    restored_page = web.get(f"/workspaces/{workspace['id']}")
+    restored_messages = web.get(f"{session_url}/messages").json()
+    restored_events = web.get(f"{session_url}/events?follow=false").text
 
     assert posted.status_code == 201
     assert restored_page.status_code == 200

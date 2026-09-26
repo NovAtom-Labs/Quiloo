@@ -91,6 +91,14 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert "No workspace open" not in page.text
 
 
+def test_conversation_page_route_is_removed(tmp_path: Path) -> None:
+    response = client(tmp_path).get(
+        f"/workspaces/{uuid4()}/conversations/{uuid4()}"
+    )
+
+    assert response.status_code == 404
+
+
 def test_workspace_header_separates_product_and_company_branding(tmp_path: Path) -> None:
     page = client(tmp_path).get("/").text
 

@@ -17,7 +17,8 @@ from openhands.tools.terminal.definition import TerminalAction
 from tcad_agent.agent.supervisor import AgentSupervisor
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
-from tcad_agent.ide.store import SqliteIDEStore
+from tcad_agent.ide.models import RunState
+from tcad_agent.ide.store import ConversationNotFoundError, SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
 from tcad_agent.web import ide_routes
 from tcad_agent.web.app import create_app
@@ -110,42 +111,31 @@ def test_agent_run_and_approval_api_lifecycle(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     root.mkdir()
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
-    conversation = web.post(
-        f"/api/workspaces/{workspace['id']}/conversations",
-        json={"title": "Approval workflow"},
-    ).json()
+    session_url = f"/api/workspaces/{workspace['id']}/session"
+    conversation = web.post(session_url).json()
     message = web.post(
-        f"/api/conversations/{conversation['id']}/messages",
+        f"{session_url}/messages",
         json={"content": "Inspect, edit, test, and push only if I approve"},
     ).json()
 
     started = web.post(
-        f"/api/conversations/{conversation['id']}/runs",
+        f"{session_url}/runs",
         json={"message_id": message["id"]},
     )
     assert started.status_code == 202
     run = started.json()
     supervisor.join(UUID(run["id"]), timeout=2)
 
-    active = web.get(
-        f"/api/conversations/{conversation['id']}/runs/active"
-    )
-    workspace_active = web.get(
-        f"/api/workspaces/{workspace['id']}/runs/active"
-    )
-    approvals = web.get(
-        f"/api/conversations/{conversation['id']}/approvals"
-    )
+    active = web.get(f"{session_url}/runs/active")
+    approvals = web.get(f"{session_url}/approvals")
     duplicate = web.post(
-        f"/api/conversations/{conversation['id']}/runs",
+        f"{session_url}/runs",
         json={"message_id": message["id"]},
     )
 
     assert active.status_code == 200
     assert active.json()["state"] == "waiting_for_approval"
-    assert workspace_active.status_code == 200
-    assert workspace_active.json()["id"] == run["id"]
-    assert workspace_active.json()["conversation_id"] == conversation["id"]
+    assert active.json()["conversation_id"] == conversation["id"]
     assert approvals.status_code == 200
     approval = approvals.json()[0]
     assert approval["payload"] == {"command": "git push"}
@@ -163,9 +153,7 @@ def test_agent_run_and_approval_api_lifecycle(tmp_path: Path) -> None:
     )
     supervisor.join(UUID(run["id"]), timeout=2)
 
-    messages = web.get(
-        f"/api/conversations/{conversation['id']}/messages"
-    ).json()
+    messages = web.get(f"{session_url}/messages").json()
     stale = web.post(
         f"/api/approvals/{approval['id']}/approve-category",
         json={"expected_revision": approval["revision"]},
@@ -195,17 +183,15 @@ def test_run_changes_endpoint_compares_against_starting_workspace(
     existing.write_text("already dirty\n")
     untouched.write_text("pre-existing\n")
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
-    conversation = web.post(
-        f"/api/workspaces/{workspace['id']}/conversations",
-        json={"title": "Change attribution"},
-    ).json()
+    session_url = f"/api/workspaces/{workspace['id']}/session"
+    conversation = web.post(session_url).json()
     message = web.post(
-        f"/api/conversations/{conversation['id']}/messages",
+        f"{session_url}/messages",
         json={"content": "Inspect the repository"},
     ).json()
 
     started = web.post(
-        f"/api/conversations/{conversation['id']}/runs",
+        f"{session_url}/runs",
         json={"message_id": message["id"]},
     )
     assert started.status_code == 202
@@ -274,8 +260,7 @@ def test_run_changes_endpoint_handles_legacy_run_without_baseline(
     root.mkdir()
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
     conversation = web.post(
-        f"/api/workspaces/{workspace['id']}/conversations",
-        json={"title": "Legacy run"},
+        f"/api/workspaces/{workspace['id']}/session"
     ).json()
     run = store.create_run(UUID(conversation["id"]), uuid4())
 
@@ -289,7 +274,7 @@ def test_run_changes_endpoint_handles_legacy_run_without_baseline(
     assert "before change tracking was available" in payload["manifest_warning"]
 
 
-def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:
+def test_workspace_session_and_tree_api(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "README.md").write_text("# Research\n", encoding="utf-8", newline="\n")
@@ -306,18 +291,92 @@ def test_workspace_conversation_and_tree_api(tmp_path: Path) -> None:
         {"path": "README.md", "name": "README.md", "kind": "file", "size": 11}
     ]
 
-    created = web.post(
-        f"/api/workspaces/{workspace['id']}/conversations",
-        json={"title": "Inspect this repository"},
-    )
-    assert created.status_code == 201
-    conversation = created.json()
+    session_url = f"/api/workspaces/{workspace['id']}/session"
+    created = web.post(session_url)
+    assert created.status_code == 200
     sent = web.post(
-        f"/api/conversations/{conversation['id']}/messages",
+        f"{session_url}/messages",
         json={"content": "Find the simulation entrypoint"},
     )
     assert sent.status_code == 201
     assert sent.json()["role"] == "user"
+
+
+def test_workspace_session_api_is_idempotent_and_conversation_routes_are_removed(
+    tmp_path: Path,
+) -> None:
+    web = ide_client(tmp_path)
+    root = tmp_path / "session-repository"
+    root.mkdir()
+    workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
+    session_url = f"/api/workspaces/{workspace['id']}/session"
+
+    first = web.post(session_url)
+    second = web.post(session_url)
+    message = web.post(
+        f"{session_url}/messages", json={"content": "Inspect the repository"}
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json() == first.json()
+    assert message.status_code == 201
+    assert web.get(f"{session_url}/messages").json()[0]["content"] == (
+        "Inspect the repository"
+    )
+    removed_routes = (
+        ("post", f"/api/workspaces/{workspace['id']}/conversations"),
+        ("get", f"/api/workspaces/{workspace['id']}/conversations"),
+        ("get", f"/api/conversations/{first.json()['id']}"),
+        ("get", f"/api/conversations/{first.json()['id']}/messages"),
+        ("post", f"/api/conversations/{first.json()['id']}/runs"),
+        ("get", f"/api/conversations/{first.json()['id']}/approvals"),
+        ("get", f"/api/conversations/{first.json()['id']}/events"),
+    )
+    for method, url in removed_routes:
+        assert getattr(web, method)(url).status_code == 404
+
+
+def test_workspace_session_switch_refuses_live_run_then_releases_terminal_state(
+    tmp_path: Path,
+) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    events = EventFeed(store)
+    services = IDEServices(
+        workspaces=WorkspaceManager(store),
+        conversations=ConversationService(store, events),
+        events=events,
+    )
+    web = TestClient(create_app(ide=services))
+    first_root = tmp_path / "first-repository"
+    second_root = tmp_path / "second-repository"
+    first_root.mkdir()
+    second_root.mkdir()
+    first_workspace = web.post(
+        "/api/workspaces", json={"path": str(first_root)}
+    ).json()
+    second_workspace = web.post(
+        "/api/workspaces", json={"path": str(second_root)}
+    ).json()
+    first_url = f"/api/workspaces/{first_workspace['id']}/session"
+    first_session = web.post(first_url).json()
+    run = store.create_run(UUID(first_session["id"]), UUID(first_session["id"]))
+
+    busy = web.post(f"/api/workspaces/{second_workspace['id']}/session")
+
+    assert busy.status_code == 409
+    assert busy.json()["code"] == "workspace_session_busy"
+    terminal = store.transition_run(run.id, run.revision, RunState.COMPLETED)
+    assert terminal.state is RunState.COMPLETED
+
+    second = web.post(f"/api/workspaces/{second_workspace['id']}/session")
+
+    assert second.status_code == 200
+    assert second.json()["workspace_id"] == second_workspace["id"]
+    with pytest.raises(ConversationNotFoundError):
+        store.get_conversation(UUID(first_session["id"]))
+    assert web.get(f"{first_url}/approvals").status_code == 404
+    assert web.get(f"{first_url}/events?follow=false").status_code == 404
 
 
 def test_workspace_file_preview_classifies_and_formats_supported_text(
@@ -660,21 +719,17 @@ def test_sse_reconnect_honors_last_event_id_without_duplicates(
     root = tmp_path / "repo"
     root.mkdir()
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
-    conversation = web.post(
-        f"/api/workspaces/{workspace['id']}/conversations",
-        json={"title": "Reference"},
-    ).json()
+    session_url = f"/api/workspaces/{workspace['id']}/session"
+    web.post(session_url)
     web.post(
-        f"/api/conversations/{conversation['id']}/messages",
+        f"{session_url}/messages",
         json={"content": "Inspect files"},
     )
-    all_events = web.get(
-        f"/api/conversations/{conversation['id']}/events?follow=false"
-    )
+    all_events = web.get(f"{session_url}/events?follow=false")
     first_id = int(all_events.text.splitlines()[0].removeprefix("id: "))
 
     resumed = web.get(
-        f"/api/conversations/{conversation['id']}/events?follow=false",
+        f"{session_url}/events?follow=false",
         headers={"Last-Event-ID": str(first_id)},
     )
 
@@ -694,10 +749,8 @@ def test_finite_sse_response_returns_complete_event_history(tmp_path: Path) -> N
     root = tmp_path / "repo"
     root.mkdir()
     workspace = web.post("/api/workspaces", json={"path": str(root)}).json()
-    conversation = web.post(
-        f"/api/workspaces/{workspace['id']}/conversations",
-        json={"title": "Long activity history"},
-    ).json()
+    session_url = f"/api/workspaces/{workspace['id']}/session"
+    conversation = web.post(session_url).json()
     for sequence in range(205):
         events.append(
             conversation_id=conversation["id"],
@@ -706,7 +759,7 @@ def test_finite_sse_response_returns_complete_event_history(tmp_path: Path) -> N
         )
 
     response = web.get(
-        f"/api/conversations/{conversation['id']}/events?follow=false"
+        f"{session_url}/events?follow=false"
     )
 
     assert response.status_code == 200

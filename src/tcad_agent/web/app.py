@@ -118,6 +118,7 @@ def create_app(
     active_supervisor = agent_supervisor or AgentSupervisor(
         ide_services, OpenHandsRuntimeFactory(ide_services.runtime_root)
     )
+    ide_services.sessions.bind_supervisor(active_supervisor)
     active_runtime_id = runtime_id or runtime_fingerprint()
     package_root = Path(__file__).parent
     templates = Jinja2Templates(directory=package_root / "templates")
@@ -260,6 +261,7 @@ def create_app(
                     "message": "Desktop lifecycle authentication failed.",
                 },
             )
+        ide_services.sessions.shutdown()
         if not shutdown_gate.commit_if_idle(has_active_work):
             return JSONResponse(
                 status_code=409,
@@ -288,13 +290,6 @@ def create_app(
     @app.get("/workspaces/{workspace_id}")
     def workspace_page(request: Request, workspace_id: UUID) -> Response:
         del workspace_id
-        return templates.TemplateResponse(request, "ide.html", {})
-
-    @app.get("/workspaces/{workspace_id}/conversations/{conversation_id}")
-    def conversation_page(
-        request: Request, workspace_id: UUID, conversation_id: UUID
-    ) -> Response:
-        del workspace_id, conversation_id
         return templates.TemplateResponse(request, "ide.html", {})
 
     @app.get("/simulate")

@@ -24,19 +24,19 @@ from tcad_agent.ide.models import (
     AgentRunRecord,
     ApprovalRequestRecord,
     ConversationMessage,
-    ConversationRecord,
     RunState,
     WorkspaceChangeSet,
     WorkspaceEntry,
     WorkspaceFilePreview,
     WorkspaceRecord,
+    WorkspaceSessionRecord,
     WorkspaceTextFile,
 )
 from tcad_agent.ide.repository import WorkspaceFileConflictError
+from tcad_agent.ide.sessions import WorkspaceSessionBusyError, WorkspaceSessionService
 from tcad_agent.ide.store import IDEStoreError, MessageNotFoundError, SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
 from tcad_agent.web.schemas import (
-    CreateConversationRequest,
     CreateMessageRequest,
     DenyAgentApprovalRequest,
     OpenWorkspaceRequest,
@@ -68,10 +68,20 @@ class IDEServices:
     changes: WorkspaceChangeTracker = field(default_factory=WorkspaceChangeTracker)
     store: SqliteIDEStore = field(init=False)
     runtime_root: Path = field(init=False)
+    sessions: WorkspaceSessionService = field(init=False)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "store", self.conversations.store)
         object.__setattr__(self, "runtime_root", self.conversations.store.path.parent)
+        object.__setattr__(
+            self,
+            "sessions",
+            WorkspaceSessionService(
+                self.workspaces,
+                self.conversations,
+                self.conversations.store.path.parent,
+            ),
+        )
 
 
 def build_default_ide_services() -> IDEServices:
@@ -213,21 +223,6 @@ def build_ide_router(
     def get_workspace(workspace_id: UUID) -> WorkspaceRecord:
         return services.workspaces.get(workspace_id)
 
-    @router.get("/workspaces/{workspace_id}/runs/active")
-    def active_workspace_run(workspace_id: UUID) -> AgentRunRecord | None:
-        active_states = {
-            RunState.QUEUED,
-            RunState.RUNNING,
-            RunState.WAITING_FOR_APPROVAL,
-            RunState.WAITING_FOR_USER,
-            RunState.PAUSED,
-        }
-        runs = services.store.list_runs_for_workspace(workspace_id)
-        return next(
-            (run for run in reversed(runs) if run.state in active_states),
-            None,
-        )
-
     @router.get("/workspaces/{workspace_id}/entries")
     def workspace_entries(
         workspace_id: UUID, path: str = "."
@@ -288,51 +283,63 @@ def build_ide_router(
                 "The file changed after it was opened. Refresh before saving.",
             ) from exc
 
-    @router.post("/workspaces/{workspace_id}/conversations", status_code=201)
-    def create_conversation(
-        workspace_id: UUID, payload: CreateConversationRequest
-    ) -> ConversationRecord:
-        return services.conversations.create(workspace_id, payload.title)
+    def current_session(workspace_id: UUID) -> WorkspaceSessionRecord:
+        session = services.sessions.current()
+        if session is None or session.workspace_id != workspace_id:
+            raise AgentAPIError(
+                404,
+                "workspace_session_not_found",
+                "Open this workspace session before using the agent.",
+            )
+        return session
 
-    @router.get("/workspaces/{workspace_id}/conversations")
-    def list_conversations(workspace_id: UUID) -> tuple[ConversationRecord, ...]:
-        return services.conversations.list(workspace_id)
+    @router.post("/workspaces/{workspace_id}/session")
+    def open_workspace_session(workspace_id: UUID) -> WorkspaceSessionRecord:
+        try:
+            return services.sessions.open(workspace_id)
+        except WorkspaceSessionBusyError as exc:
+            raise AgentAPIError(
+                409,
+                "workspace_session_busy",
+                "Finish or stop the active agent run before changing repositories.",
+            ) from exc
 
-    @router.get("/conversations/{conversation_id}")
-    def get_conversation(conversation_id: UUID) -> ConversationRecord:
-        return services.conversations.get(conversation_id)
-
-    @router.get("/conversations/{conversation_id}/messages")
-    def list_messages(
-        conversation_id: UUID,
+    @router.get("/workspaces/{workspace_id}/session/messages")
+    def list_session_messages(
+        workspace_id: UUID,
     ) -> tuple[ConversationMessage, ...]:
-        return services.conversations.messages(conversation_id)
+        session = current_session(workspace_id)
+        return services.conversations.messages(session.id)
 
-    @router.post("/conversations/{conversation_id}/messages", status_code=201)
-    def create_message(
-        conversation_id: UUID, payload: CreateMessageRequest
+    @router.post(
+        "/workspaces/{workspace_id}/session/messages", status_code=201
+    )
+    def create_session_message(
+        workspace_id: UUID, payload: CreateMessageRequest
     ) -> ConversationMessage:
-        return services.conversations.add_user_message(conversation_id, payload.content)
+        session = current_session(workspace_id)
+        return services.conversations.add_user_message(session.id, payload.content)
 
-    @router.post("/conversations/{conversation_id}/runs", status_code=202)
+    @router.post("/workspaces/{workspace_id}/session/runs", status_code=202)
     def start_agent_run(
-        conversation_id: UUID, payload: StartAgentRunRequest
+        workspace_id: UUID, payload: StartAgentRunRequest
     ) -> AgentRunRecord:
+        session = current_session(workspace_id)
         try:
             message = services.store.get_message(payload.message_id)
         except MessageNotFoundError as exc:
             raise AgentAPIError(
                 404, "message_not_found", "The message was not found."
             ) from exc
-        if message.conversation_id != conversation_id or message.role != "user":
+        if message.conversation_id != session.id or message.role != "user":
             raise AgentAPIError(
                 400,
                 "invalid_run_message",
-                "The run must reference a user message in this conversation.",
+                "The run must reference a user message in this workspace session.",
             )
         try:
             return supervisor.start(
-                conversation_id, message.content, persist_message=False
+                session.id, message.content, persist_message=False
             )
         except AgentRunConflictError as exc:
             raise AgentAPIError(
@@ -341,17 +348,10 @@ def build_ide_router(
                 "This workspace already has an active agent run.",
             ) from exc
 
-    @router.get("/conversations/{conversation_id}/runs/active")
-    def active_agent_run(conversation_id: UUID) -> AgentRunRecord | None:
-        active_states = {
-            RunState.QUEUED,
-            RunState.RUNNING,
-            RunState.WAITING_FOR_APPROVAL,
-            RunState.WAITING_FOR_USER,
-            RunState.PAUSED,
-        }
-        runs = services.store.list_runs(conversation_id)
-        return next((run for run in reversed(runs) if run.state in active_states), None)
+    @router.get("/workspaces/{workspace_id}/session/runs/active")
+    def active_agent_run(workspace_id: UUID) -> AgentRunRecord | None:
+        current_session(workspace_id)
+        return supervisor.active_run_for_workspace(workspace_id)
 
     @router.get("/runs/{run_id}/changes")
     def run_changes(run_id: UUID) -> WorkspaceChangeSet:
@@ -414,11 +414,12 @@ def build_ide_router(
     def stop_agent_run(run_id: UUID) -> AgentRunRecord:
         return supervisor.stop(run_id)
 
-    @router.get("/conversations/{conversation_id}/approvals")
+    @router.get("/workspaces/{workspace_id}/session/approvals")
     def pending_approvals(
-        conversation_id: UUID,
+        workspace_id: UUID,
     ) -> tuple[ApprovalRequestRecord, ...]:
-        return services.store.list_pending_approvals(conversation_id)
+        session = current_session(workspace_id)
+        return services.store.list_pending_approvals(session.id)
 
     def resolve_approval_error(exc: IDEStoreError) -> AgentAPIError:
         detail = str(exc).lower()
@@ -468,15 +469,16 @@ def build_ide_router(
         except IDEStoreError as exc:
             raise resolve_approval_error(exc) from exc
 
-    @router.get("/conversations/{conversation_id}/events")
-    async def conversation_events(
-        conversation_id: UUID,
+    @router.get("/workspaces/{workspace_id}/session/events")
+    async def session_events(
+        workspace_id: UUID,
         request: Request,
         after: int = Query(default=0, ge=0),
         follow: bool = True,
     ) -> StreamingResponse:
         cursor = _event_cursor(request, after)
-        services.conversations.get(conversation_id)
+        session = current_session(workspace_id)
+        conversation_id = session.id
 
         if not follow:
             rows = services.events.iter_after(conversation_id, cursor)

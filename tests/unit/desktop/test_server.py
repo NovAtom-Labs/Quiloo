@@ -1,6 +1,6 @@
 import socket
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -19,8 +19,8 @@ from tcad_agent.desktop.server import (
 )
 from tcad_agent.ide.conversations import ConversationService
 from tcad_agent.ide.events import EventFeed
-from tcad_agent.ide.models import RunState
-from tcad_agent.ide.store import SqliteIDEStore
+from tcad_agent.ide.models import AgentRunRecord, ApprovalDecision, RunState
+from tcad_agent.ide.store import IDEStoreError, SqliteIDEStore
 from tcad_agent.ide.workspaces import WorkspaceManager
 from tcad_agent.model_gateway.base import ScriptedModelGateway
 from tcad_agent.web.app import create_app
@@ -302,7 +302,7 @@ def test_desktop_status_includes_active_simulation_request(tmp_path: Path) -> No
     assert response.json() == {"active": True}
 
 
-def test_desktop_shutdown_refuses_active_agent_run(tmp_path: Path) -> None:
+def test_desktop_shutdown_cancels_active_workspace_session(tmp_path: Path) -> None:
     store = SqliteIDEStore(tmp_path / "ide.sqlite3")
     events = EventFeed(store)
     services = IDEServices(
@@ -311,17 +311,102 @@ def test_desktop_shutdown_refuses_active_agent_run(tmp_path: Path) -> None:
         events=events,
     )
     token = "desktop-token-" + "e" * 32
+
+    class ShutdownSupervisor:
+        def __init__(self) -> None:
+            self.denied: list[ApprovalDecision] = []
+
+        def active_run_for_workspace(
+            self, workspace_id: UUID
+        ) -> AgentRunRecord | None:
+            return next(
+                (
+                    run
+                    for run in store.list_runs_for_workspace(workspace_id)
+                    if run.state
+                    in {
+                        RunState.QUEUED,
+                        RunState.RUNNING,
+                        RunState.WAITING_FOR_APPROVAL,
+                    }
+                ),
+                None,
+            )
+
+        def stop(self, run_id: UUID) -> AgentRunRecord:
+            run = store.get_run(run_id)
+            for approval in store.list_pending_approvals(run.conversation_id):
+                resolved = store.resolve_approval(
+                    approval.id, approval.revision, ApprovalDecision.DENY
+                )
+                assert resolved.decision is not None
+                self.denied.append(resolved.decision)
+            current = store.get_run(run_id)
+            return store.transition_run(
+                run_id, current.revision, RunState.CANCELLED
+            )
+
+        def join(self, run_id: UUID, timeout: float | None = None) -> None:
+            del run_id, timeout
+
+    supervisor = ShutdownSupervisor()
     client = TestClient(
-        create_app(ide=services, desktop_auth=DesktopAuth(token)),
+        create_app(
+            ide=services,
+            agent_supervisor=supervisor,  # type: ignore[arg-type]
+            desktop_auth=DesktopAuth(token),
+        ),
         follow_redirects=False,
     )
     root = tmp_path / "repo"
     root.mkdir()
     workspace = services.workspaces.open(root)
-    conversation = services.conversations.create(workspace.id, "Active run")
-    store.create_run(conversation.id, uuid4())
+    session = services.sessions.open(workspace.id)
+    run = store.create_run(session.id, session.id)
+    approval = store.create_approval(
+        run.id,
+        "action-1",
+        "terminal",
+        "HIGH",
+        "Send changes to a remote repository",
+        {"command": "git push"},
+    )
 
     response = client.post(
+        "/api/desktop/prepare-shutdown",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"ready": True}
+    assert supervisor.denied == [ApprovalDecision.DENY]
+    assert services.sessions.current() is None
+    with pytest.raises(IDEStoreError):
+        store.get_approval(approval.id)
+
+
+def test_desktop_shutdown_still_refuses_active_simulation_request(
+    tmp_path: Path,
+) -> None:
+    request_store = SqliteRequestStore(tmp_path / "requests.sqlite3")
+    record = request_store.create(ResearchRequest(prompt="Run the reviewed experiment"))
+    for state in (
+        RequestState.SPEC_DRAFTED,
+        RequestState.SPEC_VALIDATED,
+        RequestState.USER_CONFIRMATION_REQUIRED,
+        RequestState.COMPILED,
+        RequestState.RUNNING,
+    ):
+        record = request_store.transition(record.id, record.revision, state, {})
+    control = ControlService(
+        store=request_store,
+        gateway=ScriptedModelGateway(()),
+        workspace=tmp_path / "workspace",
+    )
+    token = "desktop-token-" + "s" * 32
+    response = TestClient(
+        create_app(control=control, desktop_auth=DesktopAuth(token))
+    ).post(
         "/api/desktop/prepare-shutdown",
         headers={"Authorization": f"Bearer {token}"},
     )

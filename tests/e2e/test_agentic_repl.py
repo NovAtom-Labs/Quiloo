@@ -181,16 +181,14 @@ def _start_through_http(
     web: TestClient, repository: Path
 ) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     workspace = web.post("/api/workspaces", json={"path": str(repository)}).json()
-    conversation = web.post(
-        f"/api/workspaces/{workspace['id']}/conversations",
-        json={"title": "Repair junction validation"},
-    ).json()
+    session_url = f"/api/workspaces/{workspace['id']}/session"
+    conversation = web.post(session_url).json()
     message = web.post(
-        f"/api/conversations/{conversation['id']}/messages",
+        f"{session_url}/messages",
         json={"content": ACCEPTANCE_PROMPT},
     ).json()
     response = web.post(
-        f"/api/conversations/{conversation['id']}/runs",
+        f"{session_url}/runs",
         json={"message_id": message["id"]},
     )
     assert response.status_code == 202, response.text
@@ -223,9 +221,7 @@ def test_repository_agent_repairs_validates_and_delegates_end_to_end(
 
     completed = services.store.get_run(run_id)
     baseline = services.store.get_run_baseline(run_id)
-    messages = web.get(
-        f"/api/conversations/{conversation['id']}/messages"
-    ).json()
+    messages = web.get(f"/api/workspaces/{_workspace['id']}/session/messages").json()
     changes_response = web.get(f"/api/runs/{run_id}/changes")
     assert changes_response.status_code == 200
     changes = changes_response.json()
