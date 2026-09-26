@@ -44,6 +44,7 @@ from tcad_agent.events.models import RunEvent
 from tcad_agent.ide.conversations import ConversationInputError
 from tcad_agent.ide.models import RunState
 from tcad_agent.ide.paths import WorkspacePathError
+from tcad_agent.ide.sessions import WorkspaceSessionBusyError
 from tcad_agent.ide.store import ConversationNotFoundError, WorkspaceNotFoundError
 from tcad_agent.model_gateway.base import AgentContextPacket, AgentProposal, ModelGateway
 from tcad_agent.model_gateway.openhands import (
@@ -261,7 +262,16 @@ def create_app(
                     "message": "Desktop lifecycle authentication failed.",
                 },
             )
-        ide_services.sessions.shutdown()
+        try:
+            ide_services.sessions.shutdown()
+        except WorkspaceSessionBusyError as exc:
+            return JSONResponse(
+                status_code=409,
+                content={
+                    "code": "desktop_work_active",
+                    "message": str(exc),
+                },
+            )
         if not shutdown_gate.commit_if_idle(has_active_work):
             return JSONResponse(
                 status_code=409,

@@ -252,10 +252,14 @@ class AgentSupervisor:
         )
         return next(active, None)
 
-    def join(self, run_id: UUID, timeout: float | None = None) -> None:
-        thread = self._threads.get(run_id)
+    def join(self, run_id: UUID, timeout: float | None = None) -> bool:
+        """Wait for one runtime thread and report whether it has stopped."""
+
+        with self._guard:
+            thread = self._threads.get(run_id)
         if thread is not None:
             thread.join(timeout=timeout)
+        return thread is None or not thread.is_alive()
 
     def _continue(
         self, run_id: UUID, *, runtime: RuntimeConversation | None = None

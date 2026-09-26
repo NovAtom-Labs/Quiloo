@@ -23,7 +23,7 @@ class SessionSupervisor(Protocol):
 
     def stop(self, run_id: UUID) -> AgentRunRecord: ...
 
-    def join(self, run_id: UUID, timeout: float | None = None) -> None: ...
+    def join(self, run_id: UUID, timeout: float | None = None) -> bool: ...
 
 
 class WorkspaceSessionService:
@@ -41,6 +41,7 @@ class WorkspaceSessionService:
         self.runtime_root = runtime_root.resolve()
         self._current: WorkspaceSessionRecord | None = None
         self._supervisor: SessionSupervisor | None = None
+        self._stopping_run_ids: set[UUID] = set()
 
     def bind_supervisor(self, supervisor: SessionSupervisor) -> None:
         if self._supervisor is not None and self._supervisor is not supervisor:
@@ -84,7 +85,18 @@ class WorkspaceSessionService:
         if active is not None:
             supervisor = self._require_supervisor()
             supervisor.stop(active.id)
-            supervisor.join(active.id, timeout=5)
+            self._stopping_run_ids.add(active.id)
+        supervisor = self._require_supervisor()
+        stopped = {
+            run_id
+            for run_id in self._stopping_run_ids
+            if supervisor.join(run_id, timeout=5)
+        }
+        self._stopping_run_ids.difference_update(stopped)
+        if self._stopping_run_ids:
+            raise WorkspaceSessionBusyError(
+                "The agent run is still stopping. Try closing Agent Kronig again."
+            )
         self._delete_current(current)
 
     def _active_run(self, workspace_id: UUID) -> AgentRunRecord | None:
@@ -96,12 +108,19 @@ class WorkspaceSessionService:
         return self._supervisor
 
     def _delete_current(self, current: WorkspaceSessionRecord) -> None:
-        self.store.delete_conversation_tree(current.id)
         self._remove_openhands_state(current.id)
+        self.store.delete_conversation_tree(current.id)
         self._current = None
 
     def _remove_openhands_state(self, session_id: UUID) -> None:
-        root = (self.runtime_root / "openhands").resolve()
+        openhands = self.runtime_root / "openhands"
+        if openhands.is_symlink():
+            raise RuntimeError("OpenHands session path escaped runtime storage")
+        root = openhands.resolve()
+        try:
+            root.relative_to(self.runtime_root)
+        except ValueError as exc:
+            raise RuntimeError("OpenHands session path escaped runtime storage") from exc
         for directory_name in (session_id.hex, str(session_id)):
             target = root / directory_name
             if target.is_symlink():

@@ -346,8 +346,9 @@ def test_desktop_shutdown_cancels_active_workspace_session(tmp_path: Path) -> No
                 run_id, current.revision, RunState.CANCELLED
             )
 
-        def join(self, run_id: UUID, timeout: float | None = None) -> None:
+        def join(self, run_id: UUID, timeout: float | None = None) -> bool:
             del run_id, timeout
+            return True
 
     supervisor = ShutdownSupervisor()
     client = TestClient(
@@ -383,6 +384,61 @@ def test_desktop_shutdown_cancels_active_workspace_session(tmp_path: Path) -> No
     assert services.sessions.current() is None
     with pytest.raises(IDEStoreError):
         store.get_approval(approval.id)
+
+
+def test_desktop_shutdown_refuses_to_delete_session_while_runtime_stops(
+    tmp_path: Path,
+) -> None:
+    store = SqliteIDEStore(tmp_path / "ide.sqlite3")
+    events = EventFeed(store)
+    services = IDEServices(
+        workspaces=WorkspaceManager(store),
+        conversations=ConversationService(store, events),
+        events=events,
+    )
+    token = "desktop-token-" + "t" * 32
+
+    class SlowShutdownSupervisor:
+        def active_run_for_workspace(
+            self, workspace_id: UUID
+        ) -> AgentRunRecord | None:
+            return next(iter(store.list_runs_for_workspace(workspace_id)), None)
+
+        def stop(self, run_id: UUID) -> AgentRunRecord:
+            run = store.get_run(run_id)
+            return store.transition_run(
+                run_id, run.revision, RunState.CANCELLED
+            )
+
+        def join(self, run_id: UUID, timeout: float | None = None) -> bool:
+            del run_id, timeout
+            return False
+
+    client = TestClient(
+        create_app(
+            ide=services,
+            agent_supervisor=SlowShutdownSupervisor(),  # type: ignore[arg-type]
+            desktop_auth=DesktopAuth(token),
+        )
+    )
+    root = tmp_path / "repo"
+    root.mkdir()
+    workspace = services.workspaces.open(root)
+    session = services.sessions.open(workspace.id)
+    store.create_run(session.id, session.id)
+
+    response = client.post(
+        "/api/desktop/prepare-shutdown",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "code": "desktop_work_active",
+        "message": "The agent run is still stopping. Try closing Agent Kronig again.",
+    }
+    assert services.sessions.current() == session
+    assert store.get_conversation(session.id).id == session.id
 
 
 def test_desktop_shutdown_still_refuses_active_simulation_request(

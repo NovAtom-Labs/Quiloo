@@ -16,6 +16,7 @@ class RecordingSupervisor:
         self.store = store
         self.stopped: list[UUID] = []
         self.denied_before_delete: list[ApprovalDecision] = []
+        self.joined = True
 
     def active_run_for_workspace(self, workspace_id: UUID) -> AgentRunRecord | None:
         active = {
@@ -49,8 +50,9 @@ class RecordingSupervisor:
         self.stopped.append(run_id)
         return cancelled
 
-    def join(self, run_id: UUID, timeout: float | None = None) -> None:
+    def join(self, run_id: UUID, timeout: float | None = None) -> bool:
         del run_id, timeout
+        return self.joined
 
 
 def _services(
@@ -180,6 +182,31 @@ def test_release_clears_terminal_session_and_openhands_state(
         store.get_conversation(session.id)
 
 
+def test_release_rejects_symlinked_openhands_root_without_external_deletion(
+    tmp_path: Path,
+) -> None:
+    store, workspaces, _conversations, sessions, _supervisor = _services(tmp_path)
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    workspace = workspaces.open(repository)
+    session = sessions.open(workspace.id)
+    external = tmp_path / "external-openhands"
+    external_session = external / session.id.hex
+    external_session.mkdir(parents=True)
+    sentinel = external_session / "events.jsonl"
+    sentinel.write_text("preserve", encoding="utf-8")
+    (tmp_path / "runtime" / "openhands").symlink_to(
+        external, target_is_directory=True
+    )
+
+    with pytest.raises(RuntimeError, match="escaped runtime storage"):
+        sessions.release()
+
+    assert sentinel.read_text(encoding="utf-8") == "preserve"
+    assert sessions.current() == session
+    assert store.get_conversation(session.id).id == session.id
+
+
 def test_shutdown_denies_approvals_cancels_nonterminal_run_and_clears_state(
     tmp_path: Path,
 ) -> None:
@@ -205,6 +232,32 @@ def test_shutdown_denies_approvals_cancels_nonterminal_run_and_clears_state(
     assert sessions.current() is None
     with pytest.raises(IDEStoreError):
         store.get_approval(approval.id)
+    with pytest.raises(IDEStoreError):
+        store.get_conversation(session.id)
+
+
+def test_shutdown_keeps_session_until_cancelled_runtime_thread_stops(
+    tmp_path: Path,
+) -> None:
+    store, workspaces, _conversations, sessions, supervisor = _services(tmp_path)
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    workspace = workspaces.open(repository)
+    session = sessions.open(workspace.id)
+    run = store.create_run(session.id, session.id)
+    supervisor.joined = False
+
+    with pytest.raises(WorkspaceSessionBusyError, match="still stopping"):
+        sessions.shutdown()
+
+    assert supervisor.stopped == [run.id]
+    assert sessions.current() == session
+    assert store.get_conversation(session.id).id == session.id
+
+    supervisor.joined = True
+    sessions.shutdown()
+
+    assert sessions.current() is None
     with pytest.raises(IDEStoreError):
         store.get_conversation(session.id)
 
