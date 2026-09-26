@@ -213,6 +213,21 @@ def build_ide_router(
     def get_workspace(workspace_id: UUID) -> WorkspaceRecord:
         return services.workspaces.get(workspace_id)
 
+    @router.get("/workspaces/{workspace_id}/runs/active")
+    def active_workspace_run(workspace_id: UUID) -> AgentRunRecord | None:
+        active_states = {
+            RunState.QUEUED,
+            RunState.RUNNING,
+            RunState.WAITING_FOR_APPROVAL,
+            RunState.WAITING_FOR_USER,
+            RunState.PAUSED,
+        }
+        runs = services.store.list_runs_for_workspace(workspace_id)
+        return next(
+            (run for run in reversed(runs) if run.state in active_states),
+            None,
+        )
+
     @router.get("/workspaces/{workspace_id}/entries")
     def workspace_entries(
         workspace_id: UUID, path: str = "."

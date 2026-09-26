@@ -117,7 +117,10 @@ async function api(path, options = {}) {
     const detail = data.detail && typeof data.detail === "object"
       ? data.detail.message
       : data.detail;
-    throw new Error(data.message || detail || "Request failed");
+    const error = new Error(data.message || detail || "Request failed");
+    error.code = data.code || null;
+    error.payload = data;
+    throw error;
   }
   return data;
 }
@@ -1430,6 +1433,24 @@ async function loadConversation(conversationId, routeToken) {
   connectEvents(conversationId);
 }
 
+async function redirectToWorkspaceRun(workspaceId, conversationId = null, {notice = true} = {}) {
+  const run = await api(`/api/workspaces/${workspaceId}/runs/active`);
+  if (!run) return false;
+  if (run.conversation_id === conversationId) {
+    await refreshCoordinator.request(conversationId);
+    await loadApprovals(conversationId);
+  } else {
+    navigate(`/workspaces/${workspaceId}/conversations/${run.conversation_id}`);
+  }
+  if (notice) {
+    const message = run.state === "waiting_for_approval"
+      ? "An earlier run is waiting for approval. Agent Kronig opened that research session."
+      : "Agent Kronig opened the research session that is already active in this workspace.";
+    showError(message);
+  }
+  return true;
+}
+
 function clearConversation() {
   activeConversation = null;
   activeRun = null;
@@ -1468,8 +1489,13 @@ async function restoreRoute() {
     renderWorkspace(workspace);
     await loadEntries(".", routeToken);
     if (!navigationGuard.isCurrent(routeToken)) return;
-    if (route.conversationId) await loadConversation(route.conversationId, routeToken);
-    else clearConversation();
+    if (route.conversationId) {
+      await loadConversation(route.conversationId, routeToken);
+    } else if (await redirectToWorkspaceRun(route.workspaceId, null, {notice: false})) {
+      return;
+    } else {
+      clearConversation();
+    }
     if (!navigationGuard.isCurrent(routeToken)) return;
     const conversations = await api(`/api/workspaces/${route.workspaceId}/conversations`);
     if (!navigationGuard.isCurrent(routeToken)) return;
@@ -1545,11 +1571,12 @@ messageForm.addEventListener("submit", async (event) => {
   if (!draft || !activeConversation || sendingPrompt) return;
   if (!window.AgentKronigIDEState.controlsForState(activeRun?.state).send) return;
   const conversationId = activeConversation.id;
-  const submission = submissions.begin(conversationId, draft);
   sendingPrompt = true;
   setRun(activeRun);
   showError();
   try {
+    if (await redirectToWorkspaceRun(activeWorkspace.id, conversationId)) return;
+    const submission = submissions.begin(conversationId, draft);
     let messageId = submission.messageId;
     if (!messageId) {
       const message = await api(`/api/conversations/${conversationId}/messages`, {
@@ -1571,6 +1598,13 @@ messageForm.addEventListener("submit", async (event) => {
     messageInput.value = "";
     setRun(run);
   } catch (error) {
+    if (error.code === "agent_run_conflict" && activeWorkspace) {
+      try {
+        if (await redirectToWorkspaceRun(activeWorkspace.id, conversationId)) return;
+      } catch {
+        // Keep the original conflict message when recovery lookup fails.
+      }
+    }
     if (activeConversation?.id === conversationId) showError(error.message);
   } finally {
     sendingPrompt = false;

@@ -130,6 +130,9 @@ def test_agent_run_and_approval_api_lifecycle(tmp_path: Path) -> None:
     active = web.get(
         f"/api/conversations/{conversation['id']}/runs/active"
     )
+    workspace_active = web.get(
+        f"/api/workspaces/{workspace['id']}/runs/active"
+    )
     approvals = web.get(
         f"/api/conversations/{conversation['id']}/approvals"
     )
@@ -140,6 +143,9 @@ def test_agent_run_and_approval_api_lifecycle(tmp_path: Path) -> None:
 
     assert active.status_code == 200
     assert active.json()["state"] == "waiting_for_approval"
+    assert workspace_active.status_code == 200
+    assert workspace_active.json()["id"] == run["id"]
+    assert workspace_active.json()["conversation_id"] == conversation["id"]
     assert approvals.status_code == 200
     approval = approvals.json()[0]
     assert approval["payload"] == {"command": "git push"}
