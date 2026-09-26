@@ -212,6 +212,7 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         assert required in source or required in permission_source
 
     assert ".slice(0, 12_000)" not in source
+    assert "await redirectToWorkspaceRun(route.workspaceId" not in source
     assert "Working in the repository" not in source
     assert "Run active. Waiting for the next recorded action." not in source
     assert 'addEventListener("keydown"' in source

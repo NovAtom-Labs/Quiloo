@@ -391,26 +391,34 @@ class AgentSupervisor:
         return self.services.store.transition_run(run_id, current.revision, state)
 
     def _recover_interrupted_runs(self) -> None:
-        for run in self.services.store.list_runs_in_states({RunState.QUEUED}):
-            failed = self.services.store.transition_run(
-                run.id, run.revision, RunState.FAILED
+        for run in self.services.store.list_runs_in_states(_ACTIVE_STATES):
+            pending = tuple(
+                approval
+                for approval in self.services.store.list_pending_approvals(
+                    run.conversation_id
+                )
+                if approval.run_id == run.id
+            )
+            if pending:
+                anchor = pending[0]
+                self.services.store.resolve_approval_batch(
+                    anchor.id,
+                    anchor.revision,
+                    ApprovalDecision.DENY,
+                )
+            if run.state is not RunState.QUEUED:
+                self._persist_change_manifest(run.id)
+            current = self.services.store.get_run(run.id)
+            cancelled = self.services.store.transition_run(
+                run.id, current.revision, RunState.CANCELLED
             )
             self.services.events.append(
-                failed.conversation_id,
-                "run_failed",
+                cancelled.conversation_id,
+                "run_cancelled",
                 {
                     "run_id": str(run.id),
                     "detail": (
-                        "The run did not finish starting before the previous service stopped."
+                        "The run ended because the previous application session ended."
                     ),
                 },
-            )
-        for run in self.services.store.list_runs_in_states({RunState.RUNNING}):
-            paused = self.services.store.transition_run(
-                run.id, run.revision, RunState.PAUSED
-            )
-            self.services.events.append(
-                paused.conversation_id,
-                "run_recovered_paused",
-                {"run_id": str(run.id)},
             )

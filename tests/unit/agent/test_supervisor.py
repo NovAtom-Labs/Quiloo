@@ -420,7 +420,7 @@ def test_stop_cancels_pending_approval(services) -> None:
     assert services.store.list_pending_approvals(services.conversation.id) == ()
 
 
-def test_restart_recovery_pauses_interrupted_running_run(services) -> None:
+def test_restart_recovery_cancels_interrupted_running_run(services) -> None:
     run = services.store.create_run(
         services.conversation.id, services.conversation.id
     )
@@ -428,21 +428,41 @@ def test_restart_recovery_pauses_interrupted_running_run(services) -> None:
 
     AgentSupervisor(services, ScriptedRuntimeFactory([]))
 
-    assert services.store.get_run(run.id).state is RunState.PAUSED
+    assert services.store.get_run(run.id).state is RunState.CANCELLED
 
 
-def test_restart_recovery_fails_run_that_never_finished_starting(services) -> None:
+def test_restart_recovery_cancels_run_that_never_finished_starting(services) -> None:
     run = services.store.create_run(
         services.conversation.id, services.conversation.id
     )
 
     AgentSupervisor(services, ScriptedRuntimeFactory([]))
 
-    assert services.store.get_run(run.id).state is RunState.FAILED
+    assert services.store.get_run(run.id).state is RunState.CANCELLED
     events = services.events.iter_after(services.conversation.id, 0)
     assert any(
-        event.kind == "run_failed"
+        event.kind == "run_cancelled"
         and event.payload["run_id"] == str(run.id)
-        and "previous service stopped" in str(event.payload["detail"])
+        and "previous application session ended" in str(event.payload["detail"])
         for event in events
     )
+
+
+def test_restart_recovery_cancels_pending_approval_instead_of_resuming(services) -> None:
+    run = services.store.create_run(
+        services.conversation.id, services.conversation.id
+    )
+    approval = services.store.create_approval(
+        run.id,
+        "action-1",
+        "terminal",
+        "HIGH",
+        "terminal: git push",
+        {"command": "git push"},
+    )
+
+    AgentSupervisor(services, ScriptedRuntimeFactory([]))
+
+    assert services.store.get_run(run.id).state is RunState.CANCELLED
+    assert services.store.get_approval(approval.id).decision is ApprovalDecision.DENY
+    assert services.store.list_pending_approvals(services.conversation.id) == ()

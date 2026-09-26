@@ -1489,13 +1489,8 @@ async function restoreRoute() {
     renderWorkspace(workspace);
     await loadEntries(".", routeToken);
     if (!navigationGuard.isCurrent(routeToken)) return;
-    if (route.conversationId) {
-      await loadConversation(route.conversationId, routeToken);
-    } else if (await redirectToWorkspaceRun(route.workspaceId, null, {notice: false})) {
-      return;
-    } else {
-      clearConversation();
-    }
+    if (route.conversationId) await loadConversation(route.conversationId, routeToken);
+    else clearConversation();
     if (!navigationGuard.isCurrent(routeToken)) return;
     const conversations = await api(`/api/workspaces/${route.workspaceId}/conversations`);
     if (!navigationGuard.isCurrent(routeToken)) return;
