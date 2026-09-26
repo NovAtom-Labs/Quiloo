@@ -35,7 +35,7 @@ Verify a download against `SHA256SUMS.txt` from the same release. See the [insta
 Agent Kronig combines an agentic repository IDE with a constrained scientific execution system:
 
 - Opens a local Git or non-Git repository and edits its real files.
-- Maintains persistent conversations, task state, approvals, activity, and run-scoped changes.
+- Creates one temporary agent session for the open repository and clears its chat, run, approval, and activity state when the application exits or another repository is opened.
 - Reads, previews, and safely edits code, text, Markdown, JSON, CSV, TSV, images, and PDFs.
 - Runs allowlisted repository commands and deterministic validation inside the selected workspace.
 - Delegates bounded analysis or review to registered specialist agents while one primary agent owns the final write sequence.
@@ -85,7 +85,7 @@ The language model interprets intent and operates tools. It is not the authority
 | Area | Alpha capability |
 | --- | --- |
 | Workspace | Native three-pane repository, file, chat, activity, and changes interface |
-| Agent runtime | Persistent OpenHands execution, repository file tools, bounded terminal commands, tasks, approvals, and delegated agents |
+| Agent runtime | Process-scoped OpenHands execution, repository file tools, bounded terminal commands, tasks, approvals, and delegated agents |
 | Scientific contract | Strict one-dimensional `ExperimentSpec` with dimensional quantities and unknown-field rejection |
 | Geometry | Ordered, contiguous silicon regions described as data, without named-device branches |
 | Doping | Constant donor and acceptor profiles |
@@ -126,6 +126,7 @@ This alpha is for workflow evaluation and small exploratory drift-diffusion stud
 - Windows and macOS can warn about unsigned alpha packages.
 - Updates are manual for this alpha.
 - Repository commands run as the current operating-system user. The alpha does not provide a VM or per-researcher OS sandbox.
+- Agent chat and activity are intentionally ephemeral. Repository files and generated artifacts persist, but reopening a repository starts a clean agent session without cross-session repository memory.
 
 Adding a new material, model, profile, contact, study, or observable requires a schema decision, capability declaration, deterministic adapter mapping, normalization, validation, and tests. A new structure that already fits the portable concepts should require only data, not a named product path.
 
@@ -143,7 +144,7 @@ The stable product boundary is the experiment and evidence workflow. DEVSIM and 
 | `validation` | Numerical, physical, conservation, provenance, and completeness checks |
 | `bundles` | Atomic reports, manifests, artifacts, and SHA-256 hashes |
 | `agent` | OpenHands tools, repository policy, normalized events, and bounded delegation |
-| `ide` | Workspaces, conversations, runs, approvals, messages, activity, and changes |
+| `ide` | Workspaces, temporary sessions, runs, approvals, messages, activity, and changes |
 | `desktop` | Electron-owned native window, authenticated private loopback backend, and packaged sidecars |
 
 Every simulator adapter implements the same conceptual boundary:

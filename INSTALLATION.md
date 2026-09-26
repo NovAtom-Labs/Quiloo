@@ -156,7 +156,7 @@ On Windows PowerShell:
 .\scripts\run_desktop_dev.ps1
 ```
 
-Both wrappers use the same Python launcher. It loads the ignored `.env` when present without evaluating shell commands, starts the platform-native Electron binary, and lets Electron supervise the authenticated private backend. It never opens or prints a browser URL. The application stores SQLite databases, OpenHands conversation state, event records, compiled jobs, and result bundles in its local application-data directory. Close Agent Kronig before copying that directory for backup.
+Both wrappers use the same Python launcher. It loads the ignored `.env` when present without evaluating shell commands, starts the platform-native Electron binary, and lets Electron supervise the authenticated private backend. It never opens or prints a browser URL. Agent chat, activity, approvals, and OpenHands runtime state live in a process-scoped session directory and are deleted when the application exits. Settings, protected credentials, request records, repository files, compiled outputs, and result bundles persist. Close Agent Kronig before copying persistent application data for backup.
 
 ## 8. Verify the repository agent
 
@@ -171,15 +171,15 @@ To test approval-gated access outside the selected repository, add `--include-ex
 In Agent Kronig:
 
 1. Select `Open folder` and choose `test-workspaces/pn-junction-research`.
-2. Create a conversation.
-3. Send this prompt:
+2. The application creates the temporary workspace session automatically.
+3. Send this prompt in Chat:
 
 ```text
 Read AGENTS.md and RESEARCH_TASK.md, then complete the research task end to end. Inspect and explain the execution path, run the failing checks, fix root causes only in src/junction_lab, rerun all checks, generate the requested artifacts, review the diff, and delegate one independent read-only physics review before finishing. Stay inside this repository. Do not use network services or git mutations. Do not edit tests, experiment.toml, or reference data.
 ```
 
 4. Confirm the three-pane layout. At desktop width, resize both dividers and double-click each one to restore its default. At tablet width, open Repository as a drawer. At narrow width, open Agent as a drawer.
-5. Use Chat for the conversation and approval decisions. Inspect the plain-language explanation before opening Technical details. Approve all like this applies only to the displayed permission category and expires when the run ends.
+5. Use Chat for the current workspace session and approval decisions. Inspect the plain-language explanation before opening Technical details. Approve all like this applies only to the displayed permission category and expires when the run ends.
 6. Use Activity to inspect one expandable row per tool action, including phase, delegated ownership, duration, commands, and output. Current-operation summaries are derived from tool events. Raw provider reasoning is never stored or displayed.
 7. Use Changes to confirm that only the files attributable to this run appear. Select a changed text file and verify that its unified diff opens in the central workspace.
 8. Open a safe text file, select Edit, make a disposable change, and save it. Restore that manual edit before grading so it is not confused with agent work.
@@ -194,7 +194,7 @@ Expected evidence includes five passing tests, corrected source code, generated 
 
 ## 9. Verify the TCAD agent workflow
 
-Open a repository workspace, create an Agent conversation, and paste the prompt in
+Open a repository workspace and paste the prompt in
 `examples/prompts/al-pn-al-equilibrium.md`. Ask the agent to inspect the request, prepare the
 portable specification, check DEVSIM capabilities, run only the explicit supported subset, and
 report the generated evidence.
@@ -206,6 +206,8 @@ mobility output, and recombination output remain visible as unsupported local ca
 The full request is represented by `examples/al-pn-al-equilibrium.yaml` for the Sentaurus adapter.
 Licensed execution must remain unavailable until the remote host passes the Sentaurus integration
 and conformance checklist.
+
+Closing Agent Kronig or opening another repository clears the agent chat and activity trail. The repository and every generated file remain on disk, so a later session can inspect the artifacts without restoring earlier chat history.
 
 ## 10. Optional Bedrock smoke test
 

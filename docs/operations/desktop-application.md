@@ -22,7 +22,7 @@ Install only an artifact produced by the project release workflow and verify it 
 2. The application starts a private backend on an operating-system-selected `127.0.0.1` port. The port is not exposed to other machines.
 3. Select `Open folder`. The native operating-system folder dialog appears.
 4. Choose a local repository. Agent Kronig operates directly on those files. It does not copy the repository to a remote service.
-5. Create a conversation and send a task. Repository edits appear on disk and in the file tree.
+5. Send a task in Chat. The temporary workspace session is created automatically, and repository edits appear on disk and in the file tree.
 
 Only one Agent Kronig window can own its local application data at a time. Starting a second copy brings the existing window forward. A repository remains ordinary local data and can be opened with other tools when Agent Kronig is not writing to it.
 
@@ -36,9 +36,9 @@ At minimum, online agent operation needs a valid Bedrock credential, region, and
 
 The packaged DEVSIM runner is fixed and reviewed. It accepts a compiler-produced job manifest, verifies paths and hashes, and does not execute arbitrary shell text. Sentaurus is not bundled. Licensed Sentaurus execution remains a separate restricted integration and must stay disabled until its host, exact simulator release, extractor, signing, quotas, and conformance tests are approved.
 
-## Local data and logs
+## Local data and session lifecycle
 
-Agent Kronig keeps conversations, run state, approvals, compiled jobs, evidence bundles, and startup logs in the normal per-user application-data directory:
+Agent Kronig keeps settings, protected credentials, update configuration, request records, and startup logs in the normal per-user application-data directory:
 
 | System | Default application-data location |
 | --- | --- |
@@ -46,7 +46,9 @@ Agent Kronig keeps conversations, run state, approvals, compiled jobs, evidence 
 | Windows | `%APPDATA%\Agent Kronig` |
 | macOS | `~/Library/Application Support/Agent Kronig` |
 
-Repositories are never stored inside that directory unless the researcher explicitly selected a repository there. Back up the application-data directory only while Agent Kronig is closed so its SQLite files are consistent.
+Agent chat, run state, approvals, activity events, and OpenHands runtime state are not durable user data. Every launch creates a locked process-scoped directory under `sessions/`. Closing the application cancels active agent work, denies pending approvals, and removes that directory. Opening another repository after the current run finishes also clears the current session. After a crash, the next launch removes any stale session directory before opening a workspace.
+
+Repositories are never stored inside the application-data directory unless the researcher explicitly selected a repository there. Repository files, compiled outputs, reports, and evidence bundles written into the selected repository remain ordinary persistent files. Backing up the application-data directory does not preserve or restore chat history. Copy persistent data only while Agent Kronig is closed so its remaining SQLite files are consistent.
 
 Startup failures are shown in a small recovery window with Retry and Quit actions. The diagnostic log contains bounded, sanitized backend output and removes values labelled as tokens, passwords, secrets, and API keys. The exact log directory follows the operating system's Electron log location.
 
@@ -104,6 +106,6 @@ If the application does not start:
 2. Start it again and use Retry if the recovery window appears.
 3. Inspect the sanitized startup log shown in that window.
 4. Confirm that security software has not quarantined a signed sidecar.
-5. Preserve the application-data directory before attempting repair.
+5. Preserve the application-data directory before attempting repair if settings, protected credentials, or request records are needed.
 
-Uninstall the application through the operating system package manager or by removing the application bundle. Uninstallation does not delete a selected repository. It also does not automatically delete the per-user application-data directory, so conversations and evidence can be preserved across reinstallations. Remove that directory separately only when its contents are no longer needed and a backup has been taken.
+Uninstall the application through the operating system package manager or by removing the application bundle. Uninstallation does not delete a selected repository or artifacts stored inside it. It also does not automatically delete persistent per-user settings and credentials. Agent chat and activity cannot be restored across launches or reinstallations because they are intentionally ephemeral. Remove the application-data directory separately only when its persistent contents are no longer needed and a backup has been taken.

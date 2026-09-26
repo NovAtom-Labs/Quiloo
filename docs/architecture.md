@@ -26,7 +26,7 @@ Retrieval supports specification and explanation, but it cannot override the sch
 The primary application shell is an Electron desktop application for Linux, Windows, and macOS.
 Electron owns a private authenticated FastAPI service on an operating-system-selected loopback
 port and renders the interface inside the native window. There is no supported standalone browser
-launcher. Repository paths, Git inspection, conversations, event history, simulator execution,
+launcher. Repository paths, Git inspection, simulator execution,
 knowledge, and credentials remain on the researcher's machine.
 
 The repository IDE establishes these contracts:
@@ -34,21 +34,30 @@ The repository IDE establishes these contracts:
 ```text
 repository path
   -> canonical WorkspaceRecord
-  -> persistent ConversationRecord
-  -> ordered ConversationMessage and IDEEvent records
-  -> HTTP resources and resumable Server-Sent Events
+  -> one process-scoped WorkspaceSessionRecord
+  -> temporary ordered message and IDEEvent records
+  -> workspace-scoped HTTP resources and Server-Sent Events
   -> three-panel native workspace
 ```
 
 `WorkspaceManager` accepts Git and non-Git directories. It canonicalizes each path before using it
 as workspace identity, reports Git branch and dirty state when available, and lists directory
 entries without traversing external symlinks. Reopening the same canonical path reuses its stable
-workspace UUID.
+workspace UUID, but not an earlier agent session.
 
-One local SQLite database stores workspaces, conversations, messages, and monotonically ordered
-IDE events. Conversation pages use stable URLs. An SSE client resumes strictly after its last
-event identifier, so browser reconnection does not duplicate earlier activity. State is persisted
-before it is streamed.
+Each application process creates a locked runtime root containing a temporary SQLite database and
+OpenHands state. Exactly one agent session belongs to the currently open workspace. The public IDE
+routes are workspace-scoped and expose no conversation list, conversation selector, or restoration
+endpoint. An SSE client resumes strictly after its last event identifier during that live session,
+so renderer reconnection does not duplicate earlier activity.
+
+Opening a different repository is refused while the current session has an active run. After a run
+finishes, switching repositories deletes the current chat, approvals, events, run records, and
+OpenHands state before creating a clean session for the next workspace. Graceful shutdown cancels
+active agent work, denies pending approvals, and deletes the process runtime root. If the process
+crashes, the next launch removes the stale runtime root before opening a workspace. Settings,
+protected credentials, update configuration, repository files, and generated repository artifacts
+remain outside this lifecycle and persist normally.
 
 The authenticated root route serves only the Electron-owned renderer. The underlying typed request
 and simulator APIs remain available to the agent, CLI, and approved integrations. They are not a
@@ -58,7 +67,7 @@ The IDE exposes repository-confined OpenHands file operations, search, bounded t
 typed TCAD tools, and delegated subagents. Eligible UTF-8 text files can also be edited directly in
 the central workspace through atomic, hash-checked saves. External-path access, package or network
 commands, destructive actions, Git mutation, and remote mutation stop at an auditable approval
-request. Conversation refresh is available manually and resynchronizes automatically after stream
+request. Session refresh is available manually and resynchronizes automatically after stream
 reconnection, browser visibility changes, and during active runs.
 
 ## Stable contracts
@@ -116,9 +125,9 @@ Reports read structured data only. Logs remain evidence, not a source of numeric
 
 OpenHands receives eight small skills for specification, capability checks, DEVSIM compilation, recovery, validation, citation, reporting, and Sentaurus policy. Its custom `tcad_domain` tool exposes typed actions only. The production profile does not expose a terminal. The agent may propose a plan, but execution remains approval-gated.
 
-The repository IDE does not weaken this existing boundary. The planned workspace-agent profile
-will add file, search, terminal, Git, and approval-broker tools around the same OpenHands
-conversation runtime. Supported TCAD studies will still pass through `ExperimentSpec`, capability
+The repository IDE does not weaken this existing boundary. Its workspace-agent profile adds file,
+search, terminal, Git, and approval-broker tools around a process-scoped OpenHands runtime.
+Supported TCAD studies still pass through `ExperimentSpec`, capability
 checks, deterministic adapters, canonical results, and validation rather than directly executing
 model-written simulator syntax.
 
