@@ -43,6 +43,7 @@ test("starts from one valid readiness line and keeps secrets out of argv", async
   assert.equal(supervisor.spawnArguments.includes("t".repeat(43)), false);
   assert.equal(supervisor.spawnEnvironment.AGENT_KRONIG_DESKTOP_TOKEN, "t".repeat(43));
   assert.equal(supervisor.spawnEnvironment.AGENT_KRONIG_DATA_DIR, directory);
+  assert.equal(supervisor.spawnEnvironment.PYTHONUTF8, "1");
   await supervisor.stop();
   await supervisor.stop();
 });

@@ -95,6 +95,18 @@ _NETWORK_COMMANDS = {"curl", "nc", "wget"}
 _REMOTE_COMMANDS = {"scp", "ssh"}
 _DESTRUCTIVE_COMMANDS = {"dd", "kill", "killall", "pkill", "rm"}
 _SYSTEM_COMMANDS = {"chmod", "chown", "docker", "podman", "sudo"}
+_WINDOWS_EXECUTABLE = re.compile(r'^(?:"?[A-Za-z]:\\)')
+
+
+def _command_tokens(command: str) -> list[str]:
+    windows_style = bool(_WINDOWS_EXECUTABLE.match(command))
+    tokens = shlex.split(command, posix=not windows_style)
+    return [token.strip('"') for token in tokens]
+
+
+def _executable_name(token: str) -> str:
+    name = re.split(r"[\\/]", token)[-1].lower()
+    return name.removesuffix(".exe")
 
 
 def _inside_workspace(workspace: Path, candidate: Path) -> bool:
@@ -108,7 +120,7 @@ def _inside_workspace(workspace: Path, candidate: Path) -> bool:
 
 def _workspace_wrapped_command(workspace: Path, command: str) -> str | None:
     try:
-        tokens = shlex.split(command)
+        tokens = _command_tokens(command)
     except ValueError:
         return None
     if len(tokens) < 4 or tokens[0] != "cd" or tokens[2] != "&&":
@@ -137,13 +149,13 @@ def _terminal_risk(workspace: Path, action: TerminalAction) -> SecurityRisk:
     if _SHELL_CONTROL.search(command):
         return SecurityRisk.HIGH
     try:
-        tokens = shlex.split(command)
+        tokens = _command_tokens(command)
     except ValueError:
         return SecurityRisk.HIGH
     if not tokens:
         return SecurityRisk.HIGH
 
-    executable = Path(tokens[0]).name
+    executable = _executable_name(tokens[0])
     if executable == "git":
         git_arguments = tokens[1:]
         if git_arguments and git_arguments[0] == "--no-pager":
@@ -199,14 +211,14 @@ def _terminal_permission_category(
             return PermissionCategory.COMPLEX_SHELL
         command = wrapped
     try:
-        tokens = shlex.split(command)
+        tokens = _command_tokens(command)
     except ValueError:
         return PermissionCategory.COMPLEX_SHELL
     if not tokens:
         return PermissionCategory.UNRECOGNIZED_ACTION
 
     categories: set[PermissionCategory] = set()
-    executable = Path(tokens[0]).name
+    executable = _executable_name(tokens[0])
     if executable in _PACKAGE_COMMANDS:
         categories.add(PermissionCategory.PACKAGE_INSTALLATION)
     elif executable in _NETWORK_COMMANDS:

@@ -104,6 +104,7 @@ class BackendSupervisor extends EventEmitter {
       AGENT_KRONIG_DESKTOP_TOKEN: token,
       AGENT_KRONIG_DATA_DIR: this.dataDir,
       PYTHONUNBUFFERED: "1",
+      PYTHONUTF8: "1",
     };
     if (this.devsimRunner) environment.AGENT_KRONIG_DEVSIM_RUNNER = this.devsimRunner;
     this.spawnArguments = [...this.args];

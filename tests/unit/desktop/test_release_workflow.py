@@ -56,15 +56,18 @@ def test_release_workflow_limits_write_permission_and_publishes_a_prerelease() -
     )
     assert "--prerelease" in commands
     assert "--verify-tag" in commands
-    assert 'Agent Kronig 0.1.0 Alpha 7' in commands
-    assert "docs/releases/v0.1.0-alpha.7.md" in commands
+    assert 'Agent Kronig 0.1.0 Alpha 8' in commands
+    assert "docs/releases/v0.1.0-alpha.8.md" in commands
     assert release["steps"][-1]["env"] == {"GH_TOKEN": "${{ secrets.GITHUB_TOKEN }}"}
 
 
 def test_signing_secrets_are_scoped_to_the_steps_and_platforms_that_need_them() -> None:
     workflow = load_workflow()
     build = workflow["jobs"]["build"]
-    assert build["env"] == {"OPENHANDS_SUPPRESS_BANNER": "1"}
+    assert build["env"] == {
+        "OPENHANDS_SUPPRESS_BANNER": "1",
+        "PYTHONUTF8": "1",
+    }
 
     steps = {step.get("name"): step for step in build["steps"] if "name" in step}
     installer_env = steps["Build native installers"]["env"]
@@ -80,6 +83,17 @@ def test_signing_secrets_are_scoped_to_the_steps_and_platforms_that_need_them() 
     assert steps["Sign Linux update artifact"]["env"] == {
         "DESKTOP_LINUX_SIGNING_PRIVATE_KEY": "${{ secrets.DESKTOP_LINUX_SIGNING_PRIVATE_KEY }}"
     }
+
+
+def test_native_build_forces_utf8_and_uses_the_signing_safe_builder_wrapper() -> None:
+    workflow = load_workflow()
+    build = workflow["jobs"]["build"]
+    steps = {step.get("name"): step for step in build["steps"] if "name" in step}
+
+    assert build["env"]["PYTHONUTF8"] == "1"
+    assert steps["Build native installers"]["run"].startswith(
+        "python scripts/build_native_installers.py"
+    )
 
 
 def test_native_build_fetches_the_exact_public_devsim_knowledge_revision() -> None:

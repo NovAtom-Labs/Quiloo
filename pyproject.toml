@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "novatom-tcad-agent"
-version = "0.1.0-alpha.7"
+version = "0.1.0-alpha.8"
 description = "Simulator-neutral TCAD research agent foundation"
 readme = "README.md"
 requires-python = ">=3.13"

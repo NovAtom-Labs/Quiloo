@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 
 import pytest
 
 from tcad_agent.desktop.devsim_runner import (
+    configure_bundled_math_runtime,
     execute_manifest,
     main,
     write_compiled_job_manifest,
@@ -38,6 +40,38 @@ def _manifest(tmp_path: Path) -> tuple[Path, str]:
         )
     )
     return manifest, runtime_digest
+
+
+def test_windows_sidecar_uses_its_bundled_mkl_runtime(tmp_path: Path) -> None:
+    runtime_directory = tmp_path / "math-runtime"
+    runtime_directory.mkdir()
+    runtime = runtime_directory / "mkl_rt.2.dll"
+    runtime.write_bytes(b"fixture")
+    environment: dict[str, str] = {}
+    registered: list[Path] = []
+
+    configure_bundled_math_runtime(
+        tmp_path,
+        platform_name="win32",
+        environment=environment,
+        add_dll_directory=lambda path: registered.append(Path(path)),
+    )
+
+    assert environment["DEVSIM_MATH_LIBS"] == str(runtime)
+    assert registered == [runtime_directory]
+
+
+def test_non_windows_sidecar_leaves_math_environment_unchanged(tmp_path: Path) -> None:
+    environment = {"PATH": os.environ.get("PATH", "")}
+
+    configure_bundled_math_runtime(
+        tmp_path,
+        platform_name="darwin",
+        environment=environment,
+        add_dll_directory=lambda _path: None,
+    )
+
+    assert set(environment) == {"PATH"}
 
 
 def test_execute_manifest_invokes_fixed_runtime_contract(tmp_path: Path) -> None:

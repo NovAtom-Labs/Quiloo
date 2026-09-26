@@ -9,7 +9,7 @@ import os
 import subprocess
 import sys
 import time
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +17,35 @@ from tcad_agent.adapters.devsim import runtime
 from tcad_agent.runners.models import CompiledJob, NativeRunResult, RunBudget
 
 _MANIFEST_NAME = "compiled-job.json"
+_DLL_DIRECTORY_HANDLES: list[object] = []
+
+
+def configure_bundled_math_runtime(
+    bundle_root: Path | None,
+    *,
+    platform_name: str = sys.platform,
+    environment: MutableMapping[str, str] = os.environ,
+    add_dll_directory: Callable[[str], object] | None = None,
+) -> None:
+    """Configure dynamically loaded math libraries in a frozen sidecar."""
+
+    if platform_name != "win32" or bundle_root is None:
+        return
+    runtime_directory = bundle_root / "math-runtime"
+    candidates = [
+        runtime_directory / "mkl_rt.dll",
+        *sorted(runtime_directory.glob("mkl_rt.*.dll")),
+    ]
+    runtime = next((path for path in candidates if path.is_file()), None)
+    if runtime is None:
+        raise RuntimeError("the frozen DEVSIM sidecar is missing its MKL runtime")
+    register = add_dll_directory or getattr(os, "add_dll_directory", None)
+    if register is None:
+        raise RuntimeError("Windows DLL directory registration is unavailable")
+    handle = register(str(runtime_directory))
+    if handle is not None:
+        _DLL_DIRECTORY_HANDLES.append(handle)
+    environment["DEVSIM_MATH_LIBS"] = str(runtime)
 
 
 def _sha256(path: Path) -> str:
@@ -260,10 +289,14 @@ class DevsimSidecarRunner:
 def main(argv: Sequence[str] | None = None) -> int:
     values = list(sys.argv[1:] if argv is None else argv)
     try:
+        bundle_root_value = getattr(sys, "_MEIPASS", None)
+        configure_bundled_math_runtime(
+            Path(bundle_root_value) if bundle_root_value else None
+        )
         if len(values) != 1:
             raise ValueError("one compiled job manifest is required")
         return execute_manifest(Path(values[0]))
-    except (OSError, ValueError, json.JSONDecodeError, TypeError, KeyError):
+    except (OSError, RuntimeError, ValueError, json.JSONDecodeError, TypeError, KeyError):
         print(
             "Agent Kronig rejected an invalid compiled DEVSIM job.",
             file=sys.stderr,

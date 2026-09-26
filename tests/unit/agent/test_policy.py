@@ -75,6 +75,19 @@ def test_repository_commands_are_low_risk(workspace: Path, command: str) -> None
 @pytest.mark.parametrize(
     "command",
     [
+        r"C:\hostedtoolcache\windows\Python\3.13.15\x64\python.exe scripts/check.py",
+        r'"C:\Program Files\Python\python.exe" scripts/check.py',
+    ],
+)
+def test_windows_python_commands_inside_repository_are_low_risk(
+    workspace: Path, command: str
+) -> None:
+    assert classify_action(workspace, terminal_event(command)) is SecurityRisk.LOW
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
         "pip install x",
         "git add src",
         "git commit -am x",

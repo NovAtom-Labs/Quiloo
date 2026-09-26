@@ -8,18 +8,53 @@ import sys
 from pathlib import Path
 
 
-def configure_environment(github_environment: Path) -> None:
-    """Append the setup-python interpreter as the DEVSIM execution runtime."""
+def _windows_mkl_runtime(python_prefix: Path) -> Path:
+    runtime_directory = python_prefix / "Library" / "bin"
+    candidates = [
+        runtime_directory / "mkl_rt.dll",
+        *sorted(runtime_directory.glob("mkl_rt.*.dll")),
+    ]
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate.resolve()
+    raise RuntimeError(
+        "Windows DEVSIM requires an MKL runtime under "
+        f"{runtime_directory}; install the pinned mkl package first"
+    )
+
+
+def configure_environment(
+    github_environment: Path,
+    *,
+    github_path: Path | None = None,
+    python_executable: Path = Path(sys.executable),
+    platform_name: str = sys.platform,
+    python_prefix: Path = Path(sys.prefix),
+) -> None:
+    """Export the active interpreter and native math runtime for later CI steps."""
 
     with github_environment.open("a", encoding="utf-8", newline="\n") as handle:
-        handle.write(f"TCAD_DEVSIM_PYTHON={sys.executable}\n")
+        handle.write(f"TCAD_DEVSIM_PYTHON={python_executable}\n")
+        if platform_name == "win32":
+            runtime = _windows_mkl_runtime(python_prefix)
+            handle.write(f"DEVSIM_MATH_LIBS={runtime}\n")
+    if platform_name == "win32":
+        if github_path is None:
+            raise RuntimeError("GITHUB_PATH is required on Windows")
+        runtime_directory = python_prefix / "Library" / "bin"
+        with github_path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(f"{runtime_directory.resolve()}\n")
 
 
 def main() -> int:
     target = os.getenv("GITHUB_ENV")
     if not target:
         raise RuntimeError("GITHUB_ENV is required")
-    configure_environment(Path(target))
+    path_target = os.getenv("GITHUB_PATH")
+    configure_environment(
+        Path(target),
+        github_path=Path(path_target) if path_target else None,
+    )
     return 0
 
 

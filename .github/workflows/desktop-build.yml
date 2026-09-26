@@ -54,6 +54,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     env:
       OPENHANDS_SUPPRESS_BANNER: "1"
+      PYTHONUTF8: "1"
 
     steps:
       - uses: actions/checkout@v4
@@ -120,7 +121,7 @@ jobs:
         run: python scripts/inspect_desktop_artifacts.py desktop/resources/${{ matrix.platform == 'win' && 'win' || matrix.platform }}-${{ matrix.arch }}
 
       - name: Build native installers
-        run: pnpm --dir desktop exec electron-builder --config electron-builder.yml --${{ matrix.platform }} --${{ matrix.arch }}
+        run: python scripts/build_native_installers.py ${{ matrix.platform }} ${{ matrix.arch }}
         env:
           CSC_LINK: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_LINK || matrix.platform == 'win' && secrets.DESKTOP_WINDOWS_CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ matrix.platform == 'mac' && secrets.DESKTOP_MAC_CSC_KEY_PASSWORD || matrix.platform == 'win' && secrets.DESKTOP_WINDOWS_CSC_KEY_PASSWORD || '' }}
@@ -166,8 +167,8 @@ jobs:
       - name: Publish Agent Kronig alpha
         run: |
           gh release create "${GITHUB_REF_NAME}" release-assets/* \
-            --title "Agent Kronig 0.1.0 Alpha 7" \
-            --notes-file docs/releases/v0.1.0-alpha.7.md \
+            --title "Agent Kronig 0.1.0 Alpha 8" \
+            --notes-file docs/releases/v0.1.0-alpha.8.md \
             --prerelease \
             --verify-tag
         env:
