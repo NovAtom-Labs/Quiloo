@@ -161,7 +161,7 @@ body { overflow: hidden; background: var(--background); }
 .path-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
 input { height: 32px; padding: 0 8px; font-size: 0.7rem; }
 textarea { resize: none; padding: 9px; line-height: 1.45; }
-.path-entry button, .browse-workspace, #create-conversation, #send-message, dialog button {
+.path-entry button, .browse-workspace, #send-message, dialog button {
   border: 1px solid var(--blue);
   border-radius: var(--radius-small);
   background: #617fae;
@@ -170,7 +170,7 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 }
 .path-entry button { padding: 0 10px; }
 .browse-workspace { width: 100%; margin-top: 7px; padding: 7px 10px; }
-.path-entry button:hover, .browse-workspace:hover, #create-conversation:hover, #send-message:hover { background: #6d8bb8; }
+.path-entry button:hover, .browse-workspace:hover, #send-message:hover { background: #6d8bb8; }
 
 .repository-tree { padding: 8px 6px 24px; }
 .tree-entry {
@@ -432,30 +432,17 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .agent-session { display: grid; gap: 3px; min-width: 0; margin: 0; }
 .agent-heading span { color: var(--muted); font-size: 0.56rem; letter-spacing: 0.055em; }
 .agent-heading b { color: var(--blue-strong); font-weight: 650; }
-.agent-session select {
-  width: 100%;
-  min-width: 0;
-  height: 24px;
-  padding: 0 24px 0 0;
-  overflow: hidden;
-  color: #d1d7dd;
-  border: 0;
-  background: transparent;
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-overflow: ellipsis;
-}
-.agent-session select:focus-visible { outline: 1px solid var(--blue); outline-offset: 2px; }
+.agent-session strong { overflow: hidden; color: #d1d7dd; font-size: 0.72rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
 .agent-heading-actions { display: flex; align-items: center; gap: 5px; }
-#create-conversation, #refresh-conversation, #close-agent-panel { padding: 6px 8px; white-space: nowrap; }
-#refresh-conversation, #close-agent-panel {
+#refresh-session, #close-agent-panel { padding: 6px 8px; white-space: nowrap; }
+#refresh-session, #close-agent-panel {
   color: #aeb7c1;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-small);
   background: transparent;
   font-size: 0.62rem;
 }
-#refresh-conversation:hover, #close-agent-panel:hover { color: var(--text-strong); background: var(--surface-hover); }
+#refresh-session:hover, #close-agent-panel:hover { color: var(--text-strong); background: var(--surface-hover); }
 #close-agent-panel { display: none; }
 .run-controls {
   display: flex;
@@ -484,8 +471,8 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
   background: rgba(198, 124, 128, 0.08);
   font-size: 0.68rem;
 }
-.conversation-messages, .agent-activity, .agent-changes { min-height: 0; overflow-y: auto; }
-.conversation-messages { flex: 1 1 auto; padding: 0 11px; }
+.session-messages, .agent-activity, .agent-changes { min-height: 0; overflow-y: auto; }
+.session-messages { flex: 1 1 auto; padding: 0 11px; }
 .research-trail {
   padding: 16px 0 17px;
   border-bottom: 1px solid var(--border);
@@ -570,7 +557,7 @@ textarea { resize: none; padding: 9px; line-height: 1.45; }
 .message-body blockquote { padding-left: 9px; color: #aab3bd; border-left: 2px solid var(--border-strong); }
 .message-body a { color: var(--blue-strong); }
 .agent-chat { position: relative; }
-.agent-chat.has-approval-open .conversation-messages,
+.agent-chat.has-approval-open .session-messages,
 .agent-chat.has-approval-open .message-form {
   opacity: 0.25;
   filter: saturate(0.65);
@@ -818,7 +805,7 @@ dialog h2 { margin: 8px 0 22px; font-size: 1.2rem; font-weight: 580; }
 dialog input, dialog select { margin-bottom: 20px; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
 dialog button { padding: 7px 12px; }
-#cancel-conversation, #desktop-settings-cancel { color: #b8c0c9; border: 1px solid var(--border-strong); background: transparent; }
+#desktop-settings-cancel { color: #b8c0c9; border: 1px solid var(--border-strong); background: transparent; }
 .settings-storage { margin: -12px 0 20px; color: var(--muted); font-size: 0.7rem; line-height: 1.5; }
 .settings-check { display: flex; align-items: center; gap: 8px; margin: -4px 0 18px; }
 .settings-check input { width: auto; height: auto; margin: 0; }

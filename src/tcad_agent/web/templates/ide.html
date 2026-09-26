@@ -6,7 +6,7 @@
     <meta name="color-scheme" content="dark">
     <title>Agent Kronig workspace · NovAtom Labs</title>
     <link rel="stylesheet" href="/static/theme.css?v=20260925-1">
-    <link rel="stylesheet" href="/static/ide.css?v=20260925-14">
+    <link rel="stylesheet" href="/static/ide.css?v=20260926-1">
   </head>
   <body>
     <div class="ide-shell">
@@ -59,10 +59,10 @@
         <section id="workspace-welcome" class="workspace-welcome">
           <span class="section-label">Workspace</span>
           <h1>Repository research environment</h1>
-          <p>Inspect a local repository, maintain persistent research sessions, and move between source work and validated simulation.</p>
+          <p>Inspect a local repository, run agent-assisted research, and move between source work and validated simulation.</p>
           <dl class="workspace-facts">
             <div><dt>Access scope</dt><dd>Selected repository</dd></div>
-            <div><dt>Session storage</dt><dd>Local and persistent</dd></div>
+            <div><dt>Agent session</dt><dd>Temporary for this app run</dd></div>
             <div><dt>Simulation</dt><dd>DEVSIM ready</dd></div>
           </dl>
         </section>
@@ -102,7 +102,7 @@
 
       <div id="agent-resizer" class="pane-resizer agent-resizer" role="separator" aria-label="Resize agent pane" aria-orientation="vertical" aria-valuemin="320" aria-valuemax="520" aria-valuenow="420" tabindex="0"></div>
 
-      <aside id="agent-panel" class="agent-panel" aria-label="Agent conversation">
+      <aside id="agent-panel" class="agent-panel" aria-label="Agent workspace">
         <nav id="agent-tabs" class="agent-tabs" aria-label="Agent views" role="tablist">
           <button id="agent-tab-chat" class="is-active" type="button" role="tab" data-agent-view="chat" aria-controls="agent-view-chat" aria-selected="true" tabindex="0">Chat</button>
           <button id="agent-tab-activity" type="button" role="tab" data-agent-view="activity" aria-controls="agent-view-activity" aria-selected="false" tabindex="-1">Activity</button>
@@ -110,15 +110,12 @@
         </nav>
         <section id="agent-view-chat" class="agent-view agent-chat is-active" data-agent-panel="chat" role="tabpanel" aria-labelledby="agent-tab-chat">
           <div class="agent-heading">
-            <label class="agent-session" for="conversation-select">
+            <div class="agent-session">
               <span>SESSION · <b id="run-state">IDLE</b></span>
-              <select id="conversation-select" aria-label="Conversation" disabled>
-                <option value="">Select a conversation</option>
-              </select>
-            </label>
+              <strong id="session-state">Open a repository</strong>
+            </div>
             <div class="agent-heading-actions">
-              <button id="refresh-conversation" type="button" disabled>Refresh</button>
-              <button id="create-conversation" type="button" disabled>New conversation</button>
+              <button id="refresh-session" type="button" disabled>Refresh</button>
               <button id="close-agent-panel" type="button" aria-label="Close agent panel">Close</button>
             </div>
           </div>
@@ -128,8 +125,8 @@
             <button id="stop-run" type="button" hidden>Stop</button>
           </div>
           <p id="ide-error" class="ide-error hidden" role="alert" aria-live="assertive"></p>
-          <div id="conversation-messages" class="conversation-messages" aria-live="polite">
-            <p class="empty-copy">Open a workspace and start a conversation.</p>
+          <div id="session-messages" class="session-messages" aria-live="polite">
+            <p class="empty-copy">Describe the task for this repository.</p>
           </div>
           <button id="jump-to-latest" class="jump-to-latest hidden" type="button">Jump to latest</button>
           <button id="approval-launcher" class="approval-launcher hidden" type="button" aria-controls="approval-section" aria-expanded="false">
@@ -179,18 +176,6 @@
       </aside>
     </div>
 
-    <dialog id="conversation-dialog" aria-labelledby="conversation-dialog-title">
-      <form id="conversation-form" method="dialog">
-        <span class="section-label">New session</span>
-        <h2 id="conversation-dialog-title">Start a repository conversation</h2>
-        <label for="conversation-title-input">Conversation title</label>
-        <input id="conversation-title-input" maxlength="120" required value="Repository task">
-        <div class="dialog-actions">
-          <button id="cancel-conversation" value="cancel" type="button">Cancel</button>
-          <button value="create" type="submit">Create conversation</button>
-        </div>
-      </form>
-    </dialog>
     <dialog id="desktop-settings-dialog" aria-labelledby="desktop-settings-title">
       <form id="desktop-settings-form">
         <span class="section-label">Desktop configuration</span>
@@ -227,7 +212,7 @@
         </div>
       </form>
     </dialog>
-    <script src="/static/ide-state.js?v=20260925-8" defer></script>
+    <script src="/static/ide-state.js?v=20260926-1" defer></script>
     <script src="/static/file-viewer.js?v=20260925-2" defer></script>
     <script src="/static/ide-markdown.js?v=20260925-2" defer></script>
     <script src="/static/ide-events.js?v=20260925-5" defer></script>
@@ -235,6 +220,6 @@
     <script src="/static/ide-agent.js?v=20260925-6" defer></script>
     <script src="/static/ide-changes.js?v=20260925-4" defer></script>
     <script src="/static/desktop-bridge.js?v=20260925-1" defer></script>
-    <script src="/static/ide.js?v=20260925-16" defer></script>
+    <script src="/static/ide.js?v=20260926-1" defer></script>
   </body>
 </html>

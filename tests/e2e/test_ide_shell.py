@@ -64,6 +64,11 @@ def test_workspace_route_restores_current_process_session_activity(
     assert 'id="agent-view-chat"' in restored_page.text
     assert 'id="agent-view-activity"' in restored_page.text
     assert 'id="agent-view-changes"' in restored_page.text
+    assert 'id="session-state"' in restored_page.text
+    assert 'id="session-messages"' in restored_page.text
+    assert 'id="conversation-select"' not in restored_page.text
+    assert 'id="create-conversation"' not in restored_page.text
+    assert 'id="conversation-dialog"' not in restored_page.text
     assert 'id="agent-run-summary"' in restored_page.text
     assert 'id="agent-reasoning"' in restored_page.text
     assert 'id="agent-changes"' in restored_page.text

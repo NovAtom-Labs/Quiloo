@@ -373,6 +373,9 @@ def test_workspace_session_switch_refuses_live_run_then_releases_terminal_state(
 
     assert second.status_code == 200
     assert second.json()["workspace_id"] == second_workspace["id"]
+    second_url = f"/api/workspaces/{second_workspace['id']}/session"
+    assert web.get(f"{second_url}/messages").json() == []
+    assert web.get(f"{second_url}/runs/active").json() is None
     with pytest.raises(ConversationNotFoundError):
         store.get_conversation(UUID(first_session["id"]))
     assert web.get(f"{first_url}/approvals").status_code == 404

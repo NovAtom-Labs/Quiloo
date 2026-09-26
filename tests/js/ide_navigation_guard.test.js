@@ -29,39 +29,45 @@ assertEqual(
 
 const guard = globalThis.AgentKronigIDEState.createNavigationGuard();
 const firstRoute = guard.beginRoute();
-const pendingMessage = guard.captureMessage(firstRoute, "conversation-a", "inspect the deck");
+const pendingMessage = guard.captureMessage(firstRoute, "session-a", "inspect the deck");
+const firstSession = guard.captureSession(firstRoute, "session-a");
 
 assertEqual(
-  guard.canApplyMessage(pendingMessage, "conversation-a"),
+  guard.canApplyMessage(pendingMessage, "session-a"),
   true,
-  "the current conversation response should be accepted",
+  "the current session response should be accepted",
 );
 
 guard.beginRoute();
 assertEqual(
-  guard.canApplyMessage(pendingMessage, "conversation-a"),
+  guard.canApplyMessage(pendingMessage, "session-a"),
   false,
   "a response from the previous route must be ignored",
 );
+assertEqual(
+  guard.canApplySession(firstSession, "session-a"),
+  false,
+  "approval and event responses from a released session must be ignored",
+);
 
 const currentRoute = guard.currentRoute();
-const currentMessage = guard.captureMessage(currentRoute, "conversation-b", "run validation");
+const currentMessage = guard.captureMessage(currentRoute, "session-b", "run validation");
 assertEqual(
-  guard.canApplyMessage(currentMessage, "conversation-c"),
+  guard.canApplyMessage(currentMessage, "session-c"),
   false,
-  "a response must not render in another conversation",
+  "a response must not render in another workspace session",
 );
 assertEqual(
-  guard.canClearDraft(currentMessage, "conversation-b", "new draft"),
+  guard.canClearDraft(currentMessage, "session-b", "new draft"),
   false,
   "a response must not clear a draft typed while it was pending",
 );
 
 const submissions = globalThis.AgentKronigIDEState.createSubmissionTracker();
-const firstAttempt = submissions.begin("conversation-b", "edit and test");
+const firstAttempt = submissions.begin("session-b", "edit and test");
 assertEqual(firstAttempt.messageId, null, "a new prompt should create a message");
 submissions.recordMessage(firstAttempt, "message-1");
-const retry = submissions.begin("conversation-b", "edit and test");
+const retry = submissions.begin("session-b", "edit and test");
 assertEqual(retry.messageId, "message-1", "a retry must reuse the persisted message");
 submissions.recordRun(retry, "run-1");
 assertEqual(submissions.current(), null, "a successful run should clear submission state");
@@ -187,13 +193,13 @@ const refreshCoordinator = globalThis.AgentKronigIDEState.createRefreshCoordinat
     return new Promise((resolve) => { releaseRefresh = resolve; });
   },
 );
-const firstRefresh = refreshCoordinator.request("conversation-b");
-const duplicateRefresh = refreshCoordinator.request("conversation-b");
+const firstRefresh = refreshCoordinator.request("session-b");
+const duplicateRefresh = refreshCoordinator.request("session-b");
 assertEqual(firstRefresh, duplicateRefresh, "overlapping refreshes should be coalesced");
 assertEqual(refreshCalls, 1, "coalesced refreshes should issue one request");
 releaseRefresh();
 Promise.all([firstRefresh, duplicateRefresh]).then(async () => {
-  const nextRefresh = refreshCoordinator.request("conversation-b");
+  const nextRefresh = refreshCoordinator.request("session-b");
   assertEqual(refreshCalls, 2, "a completed refresh should allow the next sync");
   releaseRefresh();
   await nextRefresh;

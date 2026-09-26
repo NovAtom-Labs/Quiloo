@@ -26,15 +26,21 @@
       isCurrent(routeToken) {
         return routeToken === routeGeneration;
       },
-      captureMessage(routeToken, conversationId, draft) {
-        return {routeToken, conversationId, draft};
+      captureSession(routeToken, sessionKey) {
+        return {routeToken, sessionKey};
       },
-      canApplyMessage(pending, activeConversationId) {
+      canApplySession(pending, activeSessionKey) {
         return pending.routeToken === routeGeneration
-          && pending.conversationId === activeConversationId;
+          && pending.sessionKey === activeSessionKey;
       },
-      canClearDraft(pending, activeConversationId, currentDraft) {
-        return this.canApplyMessage(pending, activeConversationId)
+      captureMessage(routeToken, sessionKey, draft) {
+        return {routeToken, sessionKey, draft};
+      },
+      canApplyMessage(pending, activeSessionKey) {
+        return this.canApplySession(pending, activeSessionKey);
+      },
+      canClearDraft(pending, activeSessionKey, currentDraft) {
+        return this.canApplyMessage(pending, activeSessionKey)
           && pending.draft === currentDraft;
       },
     };
@@ -44,9 +50,9 @@
     let pending = null;
 
     return {
-      begin(conversationId, draft) {
-        if (!pending || pending.conversationId !== conversationId || pending.draft !== draft) {
-          pending = {conversationId, draft, messageId: null};
+      begin(sessionKey, draft) {
+        if (!pending || pending.sessionKey !== sessionKey || pending.draft !== draft) {
+          pending = {sessionKey, draft, messageId: null};
         }
         return pending;
       },
@@ -186,20 +192,20 @@
 
   function createRefreshCoordinator(refresh) {
     let inFlight = null;
-    let activeConversationId = null;
+    let activeSessionKey = null;
 
     return {
-      request(conversationId) {
-        if (inFlight && activeConversationId === conversationId) return inFlight;
-        activeConversationId = conversationId;
+      request(sessionKey) {
+        if (inFlight && activeSessionKey === sessionKey) return inFlight;
+        activeSessionKey = sessionKey;
         try {
-          inFlight = Promise.resolve(refresh(conversationId)).finally(() => {
+          inFlight = Promise.resolve(refresh(sessionKey)).finally(() => {
             inFlight = null;
-            activeConversationId = null;
+            activeSessionKey = null;
           });
         } catch (error) {
           inFlight = null;
-          activeConversationId = null;
+          activeSessionKey = null;
           throw error;
         }
         return inFlight;

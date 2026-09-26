@@ -72,16 +72,18 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert parser.elements["file-editor"] == "textarea"
     assert parser.elements["file-viewer-download"] == "a"
     assert parser.elements["agent-panel"] == "aside"
-    assert parser.elements["conversation-select"] == "select"
-    assert "conversation-list" not in parser.elements
-    assert "Select a conversation" in page.text
-    assert parser.elements["conversation-messages"] == "div"
+    assert "conversation-select" not in parser.elements
+    assert "create-conversation" not in parser.elements
+    assert "conversation-dialog" not in parser.elements
+    assert "conversation-title-input" not in parser.elements
+    assert parser.elements["session-state"] == "strong"
+    assert parser.elements["session-messages"] == "div"
+    assert "Describe the task for this repository." in page.text
     assert "agent-progress" not in parser.elements
     assert parser.elements["agent-activity"] == "div"
     assert parser.elements["open-workspace"] == "button"
     assert parser.elements["browse-workspace"] == "button"
-    assert parser.elements["create-conversation"] == "button"
-    assert parser.elements["refresh-conversation"] == "button"
+    assert parser.elements["refresh-session"] == "button"
     assert parser.elements["toggle-agent-panel"] == "button"
     assert parser.elements["close-agent-panel"] == "button"
     assert parser.elements["file-viewer-edit"] == "button"
@@ -89,6 +91,9 @@ def test_root_serves_workspace_ide_shell(tmp_path: Path) -> None:
     assert parser.elements["file-viewer-cancel"] == "button"
     assert 'href="/simulate"' not in page.text
     assert "No workspace open" not in page.text
+    assert "Start a repository conversation" not in page.text
+    assert "Select a conversation" not in page.text
+    assert "New conversation" not in page.text
 
 
 def test_conversation_page_route_is_removed(tmp_path: Path) -> None:

@@ -8,17 +8,12 @@ const workspaceContextName = document.querySelector("#workspace-context-name");
 const workspaceContextState = document.querySelector("#workspace-context-state");
 const gitState = document.querySelector("#git-state");
 const repositoryTree = document.querySelector("#repository-tree");
-const conversationSelect = document.querySelector("#conversation-select");
 const agentPanel = document.querySelector("#agent-panel");
 const toggleAgentPanel = document.querySelector("#toggle-agent-panel");
 const closeAgentPanel = document.querySelector("#close-agent-panel");
-const createConversation = document.querySelector("#create-conversation");
-const refreshConversation = document.querySelector("#refresh-conversation");
-const conversationDialog = document.querySelector("#conversation-dialog");
-const conversationForm = document.querySelector("#conversation-form");
-const conversationTitleInput = document.querySelector("#conversation-title-input");
-const cancelConversation = document.querySelector("#cancel-conversation");
-const conversationMessages = document.querySelector("#conversation-messages");
+const refreshSession = document.querySelector("#refresh-session");
+const sessionState = document.querySelector("#session-state");
+const sessionMessages = document.querySelector("#session-messages");
 const jumpToLatest = document.querySelector("#jump-to-latest");
 const agentTabs = Array.from(document.querySelectorAll("[data-agent-view]"));
 const agentViews = Array.from(document.querySelectorAll("[data-agent-panel]"));
@@ -87,7 +82,7 @@ const desktopApplyUpdate = document.querySelector("#desktop-apply-update");
 const desktopUpdateStatus = document.querySelector("#desktop-update-status");
 
 let activeWorkspace = null;
-let activeConversation = null;
+let activeSession = null;
 let activeRun = null;
 let eventSource = null;
 let sendingPrompt = false;
@@ -207,12 +202,12 @@ async function saveDesktopSettings(event) {
 }
 
 function parseRoute() {
-  const conversation = window.location.pathname.match(
-    /^\/workspaces\/([0-9a-f-]{36})\/conversations\/([0-9a-f-]{36})$/i,
-  );
-  if (conversation) return {workspaceId: conversation[1], conversationId: conversation[2]};
   const workspace = window.location.pathname.match(/^\/workspaces\/([0-9a-f-]{36})$/i);
-  return workspace ? {workspaceId: workspace[1], conversationId: null} : {workspaceId: null, conversationId: null};
+  return workspace ? {workspaceId: workspace[1]} : {workspaceId: null};
+}
+
+function sessionEndpoint(workspaceId, suffix = "") {
+  return `/api/workspaces/${workspaceId}/session${suffix}`;
 }
 
 function navigate(path) {
@@ -244,7 +239,6 @@ function renderWorkspace(workspace) {
   gitState.textContent = workspace.git.available
     ? `${workspace.git.branch || "DETACHED"}${workspace.git.dirty ? " · MODIFIED" : " · CLEAN"}`
     : "NO GIT";
-  createConversation.disabled = false;
   if (changedWorkspace) closeFileViewer();
 }
 
@@ -652,29 +646,8 @@ async function refreshCurrentRepository() {
   }
 }
 
-function renderConversationSelect(conversations) {
-  clearNode(conversationSelect);
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = conversations.length ? "Select a conversation" : "No conversations";
-  placeholder.disabled = conversations.length > 0;
-  conversationSelect.append(placeholder);
-  if (!conversations.length) {
-    conversationSelect.disabled = true;
-    return;
-  }
-  conversations.forEach((conversation) => {
-    const option = document.createElement("option");
-    option.value = conversation.id;
-    option.textContent = conversation.title;
-    conversationSelect.append(option);
-  });
-  conversationSelect.disabled = false;
-  conversationSelect.value = activeConversation?.id || "";
-}
-
 function appendMessage(message) {
-  if (conversationMessages.querySelector(`[data-message-id="${message.id}"]`)) return null;
+  if (sessionMessages.querySelector(`[data-message-id="${message.id}"]`)) return null;
   const article = document.createElement("article");
   const header = document.createElement("header");
   const role = document.createElement("span");
@@ -692,20 +665,20 @@ function appendMessage(message) {
   window.AgentKronigMarkdown.render(content, message.content);
   header.append(role, time);
   article.append(header, content);
-  conversationMessages.append(article);
+  sessionMessages.append(article);
   return article;
 }
 
-function scrollConversationToBottom() {
+function scrollSessionToBottom() {
   requestAnimationFrame(() => {
-    conversationMessages.scrollTop = conversationMessages.scrollHeight;
+    sessionMessages.scrollTop = sessionMessages.scrollHeight;
   });
 }
 
-function isConversationNearBottom() {
-  const remaining = conversationMessages.scrollHeight
-    - conversationMessages.clientHeight
-    - conversationMessages.scrollTop;
+function isSessionNearBottom() {
+  const remaining = sessionMessages.scrollHeight
+    - sessionMessages.clientHeight
+    - sessionMessages.scrollTop;
   return remaining <= 48;
 }
 
@@ -713,8 +686,8 @@ function renderChatProgress(snapshot, {allowFollow = true, wasNearBottom = null}
   const trail = window.AgentKronigAgentView.researchTrail(snapshot);
   const signature = JSON.stringify(trail);
   const changed = signature !== researchTrailSignature;
-  const nearBottom = wasNearBottom ?? isConversationNearBottom();
-  conversationMessages.querySelector("#agent-research-trail")?.remove();
+  const nearBottom = wasNearBottom ?? isSessionNearBottom();
+  sessionMessages.querySelector("#agent-research-trail")?.remove();
   researchTrailSignature = signature;
   if (!trail.visible) {
     jumpToLatest.classList.add("hidden");
@@ -772,13 +745,13 @@ function renderChatProgress(snapshot, {allowFollow = true, wasNearBottom = null}
   activityLink.textContent = "Open technical activity";
   activityLink.addEventListener("click", () => activateAgentView("activity", {focus: true}));
   narrative.append(activityLink);
-  const latestUser = Array.from(conversationMessages.querySelectorAll('.message[data-role="user"]')).at(-1);
+  const latestUser = Array.from(sessionMessages.querySelectorAll('.message[data-role="user"]')).at(-1);
   if (latestUser) latestUser.after(narrative);
-  else conversationMessages.append(narrative);
+  else sessionMessages.append(narrative);
 
   if (!changed || !allowFollow) return;
   if (window.AgentKronigIDEState.shouldAutoFollowProgress(changed, nearBottom)) {
-    scrollConversationToBottom();
+    scrollSessionToBottom();
     jumpToLatest.classList.add("hidden");
   } else {
     jumpToLatest.classList.remove("hidden");
@@ -786,9 +759,9 @@ function renderChatProgress(snapshot, {allowFollow = true, wasNearBottom = null}
 }
 
 function renderMessages(messages, {forceScroll = false} = {}) {
-  const previousLastId = conversationMessages.querySelector(".message:last-of-type")?.dataset.messageId;
-  const previousScrollTop = conversationMessages.scrollTop;
-  const wasNearBottom = isConversationNearBottom();
+  const previousLastId = sessionMessages.querySelector(".message:last-of-type")?.dataset.messageId;
+  const previousScrollTop = sessionMessages.scrollTop;
+  const wasNearBottom = isSessionNearBottom();
   const nextLastId = messages.at(-1)?.id;
   const shouldFollow = window.AgentKronigIDEState.shouldAutoFollowChat(
     previousLastId,
@@ -796,9 +769,9 @@ function renderMessages(messages, {forceScroll = false} = {}) {
     wasNearBottom,
     forceScroll,
   );
-  clearNode(conversationMessages);
+  clearNode(sessionMessages);
   if (!messages.length) {
-    conversationMessages.append(emptyCopy("Send the first task for this workspace."));
+    sessionMessages.append(emptyCopy("Describe the task for this repository."));
     return;
   }
   messages.forEach((message) => {
@@ -808,46 +781,60 @@ function renderMessages(messages, {forceScroll = false} = {}) {
     allowFollow: false,
     wasNearBottom,
   });
-  if (shouldFollow) scrollConversationToBottom();
-  else requestAnimationFrame(() => { conversationMessages.scrollTop = previousScrollTop; });
+  if (shouldFollow) scrollSessionToBottom();
+  else requestAnimationFrame(() => { sessionMessages.scrollTop = previousScrollTop; });
 }
 
-async function refreshMessages(conversationId = activeConversation?.id, options = {}) {
-  if (!conversationId) return;
-  const messages = await api(`/api/conversations/${conversationId}/messages`);
-  if (activeConversation?.id !== conversationId) return;
+async function refreshMessages(sessionKey = activeSession?.id, options = {}) {
+  const workspaceId = activeWorkspace?.id;
+  if (!sessionKey || !workspaceId) return;
+  const pending = navigationGuard.captureSession(
+    navigationGuard.currentRoute(), sessionKey,
+  );
+  const messages = await api(sessionEndpoint(workspaceId, "/messages"));
+  if (
+    activeWorkspace?.id !== workspaceId
+    || !navigationGuard.canApplySession(pending, activeSession?.id)
+  ) return;
   renderMessages(messages, options);
 }
 
-async function synchronizeConversation(conversationId) {
-  if (!conversationId || activeConversation?.id !== conversationId) return;
+async function synchronizeSession(sessionKey) {
+  const workspaceId = activeWorkspace?.id;
+  if (!sessionKey || !workspaceId || activeSession?.id !== sessionKey) return;
+  const pending = navigationGuard.captureSession(
+    navigationGuard.currentRoute(), sessionKey,
+  );
   const [messages, run, approvals] = await Promise.all([
-    api(`/api/conversations/${conversationId}/messages`),
-    api(`/api/conversations/${conversationId}/runs/active`),
-    api(`/api/conversations/${conversationId}/approvals`),
+    api(sessionEndpoint(workspaceId, "/messages")),
+    api(sessionEndpoint(workspaceId, "/runs/active")),
+    api(sessionEndpoint(workspaceId, "/approvals")),
   ]);
-  if (activeConversation?.id !== conversationId) return;
+  if (
+    activeWorkspace?.id !== workspaceId
+    || !navigationGuard.canApplySession(pending, activeSession?.id)
+  ) return;
   renderMessages(messages);
   setRun(run);
   renderApprovals(approvals);
 }
 
 const refreshCoordinator = window.AgentKronigIDEState.createRefreshCoordinator(
-  synchronizeConversation,
+  synchronizeSession,
 );
 
-async function requestConversationRefresh(conversationId = activeConversation?.id) {
-  if (!conversationId) return;
-  refreshConversation.disabled = true;
-  refreshConversation.textContent = "Refreshing…";
+async function requestSessionRefresh(sessionKey = activeSession?.id) {
+  if (!sessionKey) return;
+  refreshSession.disabled = true;
+  refreshSession.textContent = "Refreshing…";
   try {
-    await refreshCoordinator.request(conversationId);
+    await refreshCoordinator.request(sessionKey);
   } catch (error) {
-    if (activeConversation?.id === conversationId) showError(error.message);
+    if (activeSession?.id === sessionKey) showError(error.message);
   } finally {
-    if (activeConversation?.id === conversationId) {
-      refreshConversation.disabled = false;
-      refreshConversation.textContent = "Refresh";
+    if (activeSession?.id === sessionKey) {
+      refreshSession.disabled = false;
+      refreshSession.textContent = "Refresh";
     }
   }
 }
@@ -862,10 +849,10 @@ function setRun(run) {
   resumeRun.hidden = !controls.resume;
   stopRun.hidden = !controls.stop;
   runControls.hidden = !controls.pause && !controls.resume && !controls.stop;
-  messageInput.disabled = !activeConversation || !controls.send || sendingPrompt;
+  messageInput.disabled = !activeSession || !controls.send || sendingPrompt;
   sendMessage.disabled = messageInput.disabled;
   sendMessage.textContent = sendingPrompt ? "Starting…" : "Send";
-  refreshConversation.disabled = !activeConversation;
+  refreshSession.disabled = !activeSession;
 }
 
 function activateAgentView(name, {focus = false} = {}) {
@@ -1205,8 +1192,8 @@ function restoreApprovalFocus() {
   requestAnimationFrame(() => {
     if (target?.isConnected && !target.disabled && !target.inert) {
       target.focus();
-    } else if (!conversationSelect.disabled) {
-      conversationSelect.focus();
+    } else if (!messageInput.disabled) {
+      messageInput.focus();
     }
   });
 }
@@ -1222,7 +1209,7 @@ function setApprovalDrawerOpen(open, {focus = true, restoreFocus = false} = {}) 
   approvalLauncher.classList.toggle("hidden", !hasApprovals || shouldOpen);
   approvalLauncher.setAttribute("aria-expanded", String(shouldOpen));
   agentChat.classList.toggle("has-approval-open", shouldOpen);
-  conversationMessages.inert = shouldOpen;
+  sessionMessages.inert = shouldOpen;
   messageForm.inert = shouldOpen;
   if (shouldOpen && focus) requestAnimationFrame(() => approvalSection.focus());
   if (!shouldOpen && restoreFocus) restoreApprovalFocus();
@@ -1343,10 +1330,17 @@ function renderApprovals(approvals) {
   }
 }
 
-async function loadApprovals(conversationId = activeConversation?.id) {
-  if (!conversationId) return;
-  const approvals = await api(`/api/conversations/${conversationId}/approvals`);
-  if (activeConversation?.id === conversationId) renderApprovals(approvals);
+async function loadApprovals(sessionKey = activeSession?.id) {
+  const workspaceId = activeWorkspace?.id;
+  if (!sessionKey || !workspaceId) return;
+  const pending = navigationGuard.captureSession(
+    navigationGuard.currentRoute(), sessionKey,
+  );
+  const approvals = await api(sessionEndpoint(workspaceId, "/approvals"));
+  if (
+    activeWorkspace?.id === workspaceId
+    && navigationGuard.canApplySession(pending, activeSession?.id)
+  ) renderApprovals(approvals);
 }
 
 function updateRunFromEvent(event) {
@@ -1367,7 +1361,7 @@ function updateRunFromEvent(event) {
   }
 }
 
-function connectEvents(conversationId) {
+function connectEvents(sessionKey) {
   if (eventSource) eventSource.close();
   runPresentation.reset();
   runChanges.clear();
@@ -1377,9 +1371,16 @@ function connectEvents(conversationId) {
   renderAgentPresentation();
   void refreshChanges(selectedRunId);
   streamState.textContent = "CONNECTING";
-  eventSource = new EventSource(`/api/conversations/${conversationId}/events`);
+  const workspaceId = activeWorkspace.id;
+  const pending = navigationGuard.captureSession(
+    navigationGuard.currentRoute(), sessionKey,
+  );
+  eventSource = new EventSource(sessionEndpoint(workspaceId, "/events"));
   const receive = (rawEvent) => {
-    if (activeConversation?.id !== conversationId) return;
+    if (
+      activeWorkspace?.id !== workspaceId
+      || !navigationGuard.canApplySession(pending, activeSession?.id)
+    ) return;
     streamState.textContent = "LIVE";
     const event = JSON.parse(rawEvent.data);
     if (!runPresentation.accept(event)) return;
@@ -1389,9 +1390,9 @@ function connectEvents(conversationId) {
     }
     renderAgentPresentation();
     updateRunFromEvent(event);
-    if (event.kind === "message_created") void refreshMessages(conversationId);
+    if (event.kind === "message_created") void refreshMessages(sessionKey);
     if (event.kind === "approval_requested" || event.kind === "approval_resolved") {
-      void loadApprovals(conversationId);
+      void loadApprovals(sessionKey);
     }
     if (event.kind === "tool_call_completed") void refreshChanges(selectedRunId);
     if (window.AgentKronigIDEState.shouldRefreshRepository(event.kind)) {
@@ -1399,7 +1400,7 @@ function connectEvents(conversationId) {
     }
     if (["run_completed", "run_failed", "run_blocked", "run_cancelled"].includes(event.kind)) {
       void refreshChanges(selectedRunId);
-      void refreshCoordinator.request(conversationId).catch((error) => showError(error.message));
+      void refreshCoordinator.request(sessionKey).catch((error) => showError(error.message));
     }
   };
   [
@@ -1413,62 +1414,43 @@ function connectEvents(conversationId) {
   ].forEach((kind) => eventSource.addEventListener(kind, receive));
   eventSource.onopen = () => {
     streamState.textContent = "LIVE";
-    void refreshCoordinator.request(conversationId).catch((error) => showError(error.message));
+    void refreshCoordinator.request(sessionKey).catch((error) => showError(error.message));
   };
   eventSource.onerror = () => { streamState.textContent = "RECONNECTING"; };
 }
 
-async function loadConversation(conversationId, routeToken) {
-  const conversation = await api(`/api/conversations/${conversationId}`);
-  if (!navigationGuard.isCurrent(routeToken)) return;
-  activeConversation = conversation;
+async function bindSession(session, workspaceId, routeToken) {
+  activeSession = session;
+  sessionState.textContent = "Current repository";
   setAgentPanelOpen(true);
-  await refreshMessages(conversationId, {forceScroll: true});
-  if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
-  const run = await api(`/api/conversations/${conversationId}/runs/active`);
-  if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
+  await refreshMessages(session.id, {forceScroll: true});
+  if (!navigationGuard.isCurrent(routeToken) || activeSession?.id !== session.id) return;
+  const run = await api(sessionEndpoint(workspaceId, "/runs/active"));
+  if (!navigationGuard.isCurrent(routeToken) || activeSession?.id !== session.id) return;
   setRun(run);
-  await loadApprovals(conversationId);
-  if (!navigationGuard.isCurrent(routeToken) || activeConversation?.id !== conversationId) return;
-  connectEvents(conversationId);
+  await loadApprovals(session.id);
+  if (!navigationGuard.isCurrent(routeToken) || activeSession?.id !== session.id) return;
+  connectEvents(session.id);
 }
 
-async function redirectToWorkspaceRun(workspaceId, conversationId = null, {notice = true} = {}) {
-  const run = await api(`/api/workspaces/${workspaceId}/runs/active`);
-  if (!run) return false;
-  if (run.conversation_id === conversationId) {
-    await refreshCoordinator.request(conversationId);
-    await loadApprovals(conversationId);
-  } else {
-    navigate(`/workspaces/${workspaceId}/conversations/${run.conversation_id}`);
-  }
-  if (notice) {
-    const message = run.state === "waiting_for_approval"
-      ? "An earlier run is waiting for approval. Agent Kronig opened that research session."
-      : "Agent Kronig opened the research session that is already active in this workspace.";
-    showError(message);
-  }
-  return true;
-}
-
-function clearConversation() {
-  activeConversation = null;
+function clearSession() {
+  activeSession = null;
   activeRun = null;
   selectedRunId = null;
   activeChangeSet = null;
   submissions.reset();
   runPresentation.reset();
-  conversationSelect.value = "";
   setRun(null);
-  clearNode(conversationMessages);
-  conversationMessages.append(emptyCopy("Start or select a conversation."));
+  clearNode(sessionMessages);
+  sessionMessages.append(emptyCopy("Describe the task for this repository."));
   clearNode(agentActivity);
   clearNode(agentReasoning);
   clearNode(agentRunSummary);
   void refreshChanges(null);
   renderApprovals([]);
   streamState.textContent = "OFFLINE";
-  refreshConversation.disabled = true;
+  sessionState.textContent = "Open a repository";
+  refreshSession.disabled = true;
   if (eventSource) eventSource.close();
   eventSource = null;
 }
@@ -1480,23 +1462,32 @@ function setAgentPanelOpen(open) {
 
 async function restoreRoute() {
   const routeToken = navigationGuard.beginRoute();
+  const previousWorkspaceId = activeWorkspace?.id || null;
   showError();
   const route = parseRoute();
-  if (!route.workspaceId) return;
+  if (!route.workspaceId) {
+    clearSession();
+    return;
+  }
   try {
     const workspace = await api(`/api/workspaces/${route.workspaceId}`);
     if (!navigationGuard.isCurrent(routeToken)) return;
+    const session = await api(sessionEndpoint(route.workspaceId), {method: "POST"});
+    if (!navigationGuard.isCurrent(routeToken)) return;
+    clearSession();
     renderWorkspace(workspace);
     await loadEntries(".", routeToken);
     if (!navigationGuard.isCurrent(routeToken)) return;
-    if (route.conversationId) await loadConversation(route.conversationId, routeToken);
-    else clearConversation();
-    if (!navigationGuard.isCurrent(routeToken)) return;
-    const conversations = await api(`/api/workspaces/${route.workspaceId}/conversations`);
-    if (!navigationGuard.isCurrent(routeToken)) return;
-    renderConversationSelect(conversations);
+    await bindSession(session, route.workspaceId, routeToken);
   } catch (error) {
-    if (navigationGuard.isCurrent(routeToken)) showError(error.message);
+    if (!navigationGuard.isCurrent(routeToken)) return;
+    if (error.code === "workspace_session_busy" && previousWorkspaceId && activeSession) {
+      window.history.replaceState({}, "", `/workspaces/${previousWorkspaceId}`);
+      navigationGuard.beginRoute();
+      connectEvents(activeSession.id);
+      void requestSessionRefresh(activeSession.id);
+    }
+    showError(error.message);
   }
 }
 
@@ -1538,72 +1529,61 @@ browseWorkspace.addEventListener("click", async () => {
   }
 });
 
-createConversation.addEventListener("click", () => {
-  conversationTitleInput.value = "Repository task";
-  conversationDialog.showModal();
-  conversationTitleInput.select();
-});
-
-cancelConversation.addEventListener("click", () => conversationDialog.close());
-
-conversationForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  try {
-    const conversation = await api(`/api/workspaces/${activeWorkspace.id}/conversations`, {
-      method: "POST",
-      body: JSON.stringify({title: conversationTitleInput.value}),
-    });
-    conversationDialog.close();
-    navigate(`/workspaces/${activeWorkspace.id}/conversations/${conversation.id}`);
-  } catch (error) {
-    showError(error.message);
-  }
-});
-
 messageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const draft = messageInput.value.trim();
-  if (!draft || !activeConversation || sendingPrompt) return;
+  if (!draft || !activeSession || sendingPrompt) return;
   if (!window.AgentKronigIDEState.controlsForState(activeRun?.state).send) return;
-  const conversationId = activeConversation.id;
+  const sessionKey = activeSession.id;
+  const workspaceId = activeWorkspace.id;
+  const pendingResponse = navigationGuard.captureMessage(
+    navigationGuard.currentRoute(), sessionKey, draft,
+  );
   sendingPrompt = true;
   setRun(activeRun);
   showError();
   try {
-    if (await redirectToWorkspaceRun(activeWorkspace.id, conversationId)) return;
-    const submission = submissions.begin(conversationId, draft);
+    const submission = submissions.begin(sessionKey, draft);
     let messageId = submission.messageId;
     if (!messageId) {
-      const message = await api(`/api/conversations/${conversationId}/messages`, {
+      const message = await api(sessionEndpoint(workspaceId, "/messages"), {
         method: "POST",
         body: JSON.stringify({content: draft}),
       });
+      if (
+        activeWorkspace?.id !== workspaceId
+        || !navigationGuard.canApplyMessage(pendingResponse, activeSession?.id)
+      ) return;
       submissions.recordMessage(submission, message.id);
       messageId = message.id;
-      if (conversationMessages.querySelector(".empty-copy")) clearNode(conversationMessages);
+      if (sessionMessages.querySelector(".empty-copy")) clearNode(sessionMessages);
       appendMessage(message);
-      scrollConversationToBottom();
+      scrollSessionToBottom();
     }
-    const run = await api(`/api/conversations/${conversationId}/runs`, {
+    const run = await api(sessionEndpoint(workspaceId, "/runs"), {
       method: "POST",
       body: JSON.stringify({message_id: messageId}),
     });
     submissions.recordRun(submission, run.id);
-    if (activeConversation?.id !== conversationId) return;
+    if (
+      activeWorkspace?.id !== workspaceId
+      || !navigationGuard.canApplyMessage(pendingResponse, activeSession?.id)
+    ) return;
     messageInput.value = "";
     setRun(run);
   } catch (error) {
-    if (error.code === "agent_run_conflict" && activeWorkspace) {
-      try {
-        if (await redirectToWorkspaceRun(activeWorkspace.id, conversationId)) return;
-      } catch {
-        // Keep the original conflict message when recovery lookup fails.
-      }
+    if (error.code === "agent_run_conflict") {
+      await requestSessionRefresh(sessionKey).catch(() => {});
     }
-    if (activeConversation?.id === conversationId) showError(error.message);
+    if (
+      activeWorkspace?.id === workspaceId
+      && navigationGuard.canApplyMessage(pendingResponse, activeSession?.id)
+    ) showError(error.message);
   } finally {
     sendingPrompt = false;
-    if (activeConversation?.id === conversationId) setRun(activeRun);
+    if (activeWorkspace?.id === workspaceId && activeSession?.id === sessionKey) {
+      setRun(activeRun);
+    }
   }
 });
 
@@ -1629,11 +1609,11 @@ pauseRun.addEventListener("click", () => void controlRun("pause"));
 resumeRun.addEventListener("click", () => void controlRun("resume"));
 stopRun.addEventListener("click", () => void controlRun("stop"));
 jumpToLatest.addEventListener("click", () => {
-  scrollConversationToBottom();
+  scrollSessionToBottom();
   jumpToLatest.classList.add("hidden");
 });
-conversationMessages.addEventListener("scroll", () => {
-  if (isConversationNearBottom()) jumpToLatest.classList.add("hidden");
+sessionMessages.addEventListener("scroll", () => {
+  if (isSessionNearBottom()) jumpToLatest.classList.add("hidden");
 }, {passive: true});
 approvalLauncher.addEventListener("click", () => setApprovalDrawerOpen(true));
 minimizeApproval.addEventListener("click", () => setApprovalDrawerOpen(false, {restoreFocus: true}));
@@ -1677,11 +1657,7 @@ approvalSection.addEventListener("keydown", (event) => {
     focusable.at(-1).focus();
   }
 });
-refreshConversation.addEventListener("click", () => void requestConversationRefresh());
-conversationSelect.addEventListener("change", () => {
-  if (!conversationSelect.value || !activeWorkspace) return;
-  navigate(`/workspaces/${activeWorkspace.id}/conversations/${conversationSelect.value}`);
-});
+refreshSession.addEventListener("click", () => void requestSessionRefresh());
 agentTabs.forEach((button) => {
   button.addEventListener("click", () => activateAgentView(button.dataset.agentView));
   button.addEventListener("keydown", (event) => {
@@ -1734,12 +1710,12 @@ desktopApplyUpdate.addEventListener("click", async () => {
 window.addEventListener("popstate", () => void restoreRoute());
 window.addEventListener("beforeunload", () => eventSource?.close());
 document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "visible") void requestConversationRefresh();
+  if (document.visibilityState === "visible") void requestSessionRefresh();
 });
 setInterval(() => {
-  if (!activeConversation) return;
+  if (!activeSession) return;
   const shouldRefresh = window.AgentKronigIDEState.isActiveState(activeRun?.state)
     || streamState.textContent === "RECONNECTING";
-  if (shouldRefresh) void refreshCoordinator.request(activeConversation.id).catch((error) => showError(error.message));
+  if (shouldRefresh) void refreshCoordinator.request(activeSession.id).catch((error) => showError(error.message));
 }, 5000);
 void restoreRoute();

@@ -183,7 +183,7 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         'document.addEventListener("visibilitychange"',
         "setInterval",
         'querySelector("#toggle-agent-panel")',
-        'querySelector("#refresh-conversation")',
+        'querySelector("#refresh-session")',
         'querySelector("#file-viewer-edit")',
         'querySelector("#file-editor")',
         "/files/content",
@@ -195,11 +195,9 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         "Reversibility:",
         "refreshCurrentRepository",
         "shouldRefreshRepository(event.kind)",
-        'conversationSelect.addEventListener("change"',
-        "scrollConversationToBottom",
+        "scrollSessionToBottom",
         "renderChatProgress",
         "/runs/active",
-        "redirectToWorkspaceRun",
         "error.code = data.code",
         "change-validation-link",
         "data-action-id",
@@ -212,7 +210,10 @@ def test_production_ide_wires_chat_recovery_file_editing_and_panel_controls() ->
         assert required in source or required in permission_source
 
     assert ".slice(0, 12_000)" not in source
-    assert "await redirectToWorkspaceRun(route.workspaceId" not in source
+    assert "/conversations/" not in source
+    assert "conversationId" not in source
+    assert "conversationSelect" not in source
+    assert "createConversation" not in source
     assert "Working in the repository" not in source
     assert "Run active. Waiting for the next recorded action." not in source
     assert 'addEventListener("keydown"' in source
